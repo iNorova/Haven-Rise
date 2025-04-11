@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: e8f4d24a8e68cfa47863298fab3dd24d
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/UI/Canvas/WoodCanvas.cs
+  uploadId: 403997

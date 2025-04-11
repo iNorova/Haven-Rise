@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: bff3a796a5d79e74e852ae8e386a33f3
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/Recipe Module/GlovesRecipe.cs
+  uploadId: 403997

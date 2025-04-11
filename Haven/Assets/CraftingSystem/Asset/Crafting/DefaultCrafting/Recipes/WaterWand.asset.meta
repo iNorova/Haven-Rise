@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: da82cad09c3ad894e91b8ed97183f16c
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/DefaultCrafting/Recipes/WaterWand.asset
+  uploadId: 403997

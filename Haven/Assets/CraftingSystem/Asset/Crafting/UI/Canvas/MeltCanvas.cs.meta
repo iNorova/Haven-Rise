@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 9eac6bec264eb8a45843ebf07d3953f2
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/UI/Canvas/MeltCanvas.cs
+  uploadId: 403997

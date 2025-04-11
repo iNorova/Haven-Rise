@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: cbf97184c7daf4145a452ad8fd7eff2b
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/Base Material Module/BaseMaterial.cs
+  uploadId: 403997

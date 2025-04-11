@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c850b55610c113641ab9b9c682e7c0b6, type: 3}
+  m_Name: Plate
+  m_EditorClassIdentifier: 
+  image: {fileID: 21300000, guid: 53831ffd2c1064d07b3fcc10982b1e0d, type: 3}
+  description: Plyta
+  defaultColor: {r: 0.3207547, g: 0.29200783, b: 0.29200783, a: 1}
+  lvl: 0
+  exp: 0
+  time: 5
+  materialCapacity: 0
+  requiredItems:
+  - {fileID: 11400000, guid: ebbf5b5bcb5b30249a49ab2f448ad1e6, type: 2}
+  - {fileID: 11400000, guid: ebbf5b5bcb5b30249a49ab2f448ad1e6, type: 2}

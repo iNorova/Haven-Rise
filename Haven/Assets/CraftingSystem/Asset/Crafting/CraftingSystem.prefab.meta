@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 70c73475d94abf2468b30d1b128e2263
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/CraftingSystem.prefab
+  uploadId: 403997

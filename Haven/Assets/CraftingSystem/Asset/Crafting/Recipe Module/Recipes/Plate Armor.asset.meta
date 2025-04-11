@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d3744b5e19a04dd4a84efd8e44552829
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/Recipe Module/Recipes/Plate Armor.asset
+  uploadId: 403997

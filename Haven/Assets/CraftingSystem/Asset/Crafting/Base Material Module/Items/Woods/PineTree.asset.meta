@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d11906bcd84fe2f4aa0fc2ef77cd8f55
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/Base Material Module/Items/Woods/PineTree.asset
+  uploadId: 403997

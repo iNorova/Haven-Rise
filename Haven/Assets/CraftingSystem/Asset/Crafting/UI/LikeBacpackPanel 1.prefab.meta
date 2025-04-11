@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: e4549e620e4825c4ebfa9cd828f4659b
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/UI/LikeBacpackPanel 1.prefab
+  uploadId: 403997

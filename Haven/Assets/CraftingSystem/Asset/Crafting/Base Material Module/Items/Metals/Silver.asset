@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 07bb3d310a8e33142abe2ace78c1fba2, type: 3}
+  m_Name: Silver
+  m_EditorClassIdentifier: 
+  image: {fileID: 21300000, guid: 7e082cc2cf2a4433d85e388c6bf94234, type: 3}
+  color: {r: 0.3018868, g: 0.2748309, b: 0.2748309, a: 1}
+  description: Metal worth quite a bit
+  lvl: 0
+  exp: 0
+  usedConditioner: 0
+  conditionerCapacity: 10
+  hardness: 28.349998
+  meltingTemperature: 45.899998
+  density: 14.849999
+  thermalConductivity: 31.05
+  electricalConductivity: 14.849999
+  thermalInsulation: 32

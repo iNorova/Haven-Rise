@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: f071d83d51a85f44a8fcc0cb1ce562ef
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/Create Item Module/TwoHandedWeapon.cs
+  uploadId: 403997

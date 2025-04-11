@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 0bb21f4728d268046ae9477978ce129e
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/Recipe Module/Recipes/CoperArmor.asset
+  uploadId: 403997

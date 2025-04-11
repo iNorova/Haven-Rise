@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 33a0a206dd708f0428d40bcfc980cf7e
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/Recipe Module/Recipes/Dagger.asset
+  uploadId: 403997

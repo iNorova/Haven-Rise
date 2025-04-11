@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 5262025a10702814bbfebe625db1a16c
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/Base Material Module/Items/Woods/newItem.asset
+  uploadId: 403997

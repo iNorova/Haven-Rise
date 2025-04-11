@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 6c466573dbad97545a67a5ce2d9a31ee
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/Base Material Module/BaseMaterials/Conditioner.cs
+  uploadId: 403997

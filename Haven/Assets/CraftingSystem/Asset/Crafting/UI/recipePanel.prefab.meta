@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d4473b326321bdf4e902d37a35d215a3
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/UI/recipePanel.prefab
+  uploadId: 403997

@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 6d66f6d5c30663c4f8e41084ff2e3416
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/UI/UiControlSystem/WindowDragHandler.cs
+  uploadId: 403997

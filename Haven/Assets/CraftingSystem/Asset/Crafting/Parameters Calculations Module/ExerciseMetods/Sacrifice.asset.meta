@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: af5806fde1d4e19439ca3504ffa8a9c2
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/Parameters Calculations Module/ExerciseMetods/Sacrifice.asset
+  uploadId: 403997

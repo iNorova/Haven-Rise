@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: ee1b7f95bce45d14bb28c7f1716f26e9
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/Base Material Module/Items/Metals/Mezo.asset
+  uploadId: 403997

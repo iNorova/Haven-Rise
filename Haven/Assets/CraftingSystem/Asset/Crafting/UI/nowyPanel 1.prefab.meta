@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 8528de0b0a4bd364e90790bfa62569b7
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/UI/nowyPanel 1.prefab
+  uploadId: 403997

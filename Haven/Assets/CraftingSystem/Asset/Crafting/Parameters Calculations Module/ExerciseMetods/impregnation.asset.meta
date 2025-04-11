@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 5a685be82d345464d85312c83e07c169
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/Parameters Calculations Module/ExerciseMetods/impregnation.asset
+  uploadId: 403997

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 4246bac533a434f42bef225f734a00d0
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/Parameters Calculations Module/ExerciseMetods/Calendering.asset
+  uploadId: 403997

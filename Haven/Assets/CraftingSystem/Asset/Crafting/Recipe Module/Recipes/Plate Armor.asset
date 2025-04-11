@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0dac6d673ec96334d85b8b57675602d4, type: 3}
+  m_Name: Plate Armor
+  m_EditorClassIdentifier: 
+  materialCapacity: 3
+  image: {fileID: 21300000, guid: 1618cb37bcd5144fd923b9697be57d63, type: 3}
+  requiredItems:
+  - {fileID: 11400000, guid: 40b3e3700a980a948871f97f20aaa8a3, type: 2}
+  description: Full of defence armor
+  lvl: 20
+  time: 0
+  defaultColor: {r: 0.31132078, g: 0.23349059, b: 0.23349059, a: 1}
+  multiplier_defence: 11
+  multiplier_magicDefence: 1
+  multiplier_fireDefence: 1
+  multiplier_earthDefence: 1
+  multiplier_frostDefence: 1
+  multiplier_windDefence: 1

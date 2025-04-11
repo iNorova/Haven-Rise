@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: b63c6cfcb17059847b04c61d79e12d90
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/Parameters Calculations Module/ExerciseMetods/Focus.asset
+  uploadId: 403997

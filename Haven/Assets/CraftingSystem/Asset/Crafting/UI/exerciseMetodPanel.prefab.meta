@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 4fa0803b592526e40a806c9a372db786
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/UI/exerciseMetodPanel.prefab
+  uploadId: 403997

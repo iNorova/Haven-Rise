@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: e23b7b1018c756241a71228e7fd30505
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/DefaultCrafting/Recipes/Malina.asset
+  uploadId: 403997

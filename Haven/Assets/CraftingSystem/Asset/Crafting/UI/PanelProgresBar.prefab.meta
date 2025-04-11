@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 8ab7a4e8718375048b4a11d7638e65c9
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/UI/PanelProgresBar.prefab
+  uploadId: 403997

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: f43e4b3d1a9a16f40b00876f38e47367
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/DefaultCrafting/goldenRune.asset
+  uploadId: 403997

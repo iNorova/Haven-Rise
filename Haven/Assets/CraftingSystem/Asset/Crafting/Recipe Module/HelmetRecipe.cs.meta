@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 3f4a5c8a0b227694eaa9696044ebc64c
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/Recipe Module/HelmetRecipe.cs
+  uploadId: 403997

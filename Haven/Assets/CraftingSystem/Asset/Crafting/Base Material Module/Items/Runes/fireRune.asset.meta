@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 8a881e03463a3f04f801ee0c0bae1b13
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/Base Material Module/Items/Runes/fireRune.asset
+  uploadId: 403997

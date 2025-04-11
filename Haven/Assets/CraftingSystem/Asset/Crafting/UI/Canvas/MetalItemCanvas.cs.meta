@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: f4e7ba26d3f9ff5429c069cc39f553fc
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/UI/Canvas/MetalItemCanvas.cs
+  uploadId: 403997

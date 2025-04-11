@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6c466573dbad97545a67a5ce2d9a31ee, type: 3}
+  m_Name: Green Powder
+  m_EditorClassIdentifier: 
+  image: {fileID: 21300000, guid: f59401c5c79564fd1ae3bfb0876455a7, type: 3}
+  color: {r: 0, g: 0.8117647, b: 0, a: 1}
+  description: 
+  lvl: 0
+  exp: 0
+  usedConditioner: 0
+  conditionerCapacity: 0
+  impact_on_hardness: 1
+  impact_on_density: 0
+  impact_on_melting_temperature: 2
+  impact_on_termal_conductivity: 1
+  impact_on_electrical_conductivity: 0.5
+  impact_on_termal_permeability: 1
+  impact_on_flexibility: 1
+  impact_on_strenght: 1
+  impact_on_processing: 1
+  impact_on_magic_efect: 1
+  impact_on_resistance: 1
+  impact_on_regeneration: 1
+  impact_on_poison: 1

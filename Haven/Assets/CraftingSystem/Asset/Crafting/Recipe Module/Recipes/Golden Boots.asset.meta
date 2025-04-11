@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: e26941e1b443bd5448c157e5d7470742
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/Recipe Module/Recipes/Golden Boots.asset
+  uploadId: 403997

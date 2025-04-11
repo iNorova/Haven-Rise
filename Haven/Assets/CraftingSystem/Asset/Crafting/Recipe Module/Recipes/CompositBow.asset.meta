@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 4463638af31fb4847a6ed01a12a099e9
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/Recipe Module/Recipes/CompositBow.asset
+  uploadId: 403997

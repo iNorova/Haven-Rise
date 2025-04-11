@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 74a4b3ec82b7c304eb0150f33162b3b1
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/Base Material Module/Items/Conditioners/Coal.asset
+  uploadId: 403997

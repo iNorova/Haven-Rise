@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 595baf5cf02c5614b8ffb8c54880abd9
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/UI/Canvas/DefaultCraftingCanvas.cs
+  uploadId: 403997

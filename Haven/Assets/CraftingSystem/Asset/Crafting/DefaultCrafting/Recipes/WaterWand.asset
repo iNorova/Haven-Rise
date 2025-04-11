@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a65082909d5abda47a11df7b18e5e614, type: 3}
+  m_Name: WaterWand
+  m_EditorClassIdentifier: 
+  materialCapacity: 0
+  image: {fileID: 21300000, guid: 32fb7e0aee1614fe8ac38467a139e9a6, type: 3}
+  requiredItems:
+  - {fileID: 11400000, guid: 76e38124530a84848b636b4914767926, type: 2}
+  - {fileID: 11400000, guid: 1bb9a766a48eddf4ba02b53326b32974, type: 2}
+  description: 
+  lvl: 0
+  time: 5
+  defaultColor: {r: 0.059763268, g: 0.4369081, b: 0.745283, a: 1}
+  multiplier_earthAttack: 0
+  multiplier_fireAttack: 0
+  multiplier_waterAttack: 100
+  multiplier_windAttack: 0

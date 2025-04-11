@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 1ded825408acb3f4b865f056c61ec591
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 138641
+  packageName: Crafting System
+  packageVersion: 1.0
+  assetPath: Assets/CraftingSystem/Asset/Crafting/UI/UiControlSystem/DragHandler.cs
+  uploadId: 403997
