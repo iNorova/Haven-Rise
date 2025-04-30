@@ -44,6 +44,9 @@ public class CharController_Motor : MonoBehaviour {
     public float maxLookAngle = 85f;
     public bool webGLRightClickRotation = true;
 
+    // Add hand transform for holding items
+    public Transform playerHand; // Reference to the hand transform
+
     void Start(){
         character = GetComponent<CharacterController>();
         if (Application.isEditor) {
@@ -60,6 +63,32 @@ public class CharController_Motor : MonoBehaviour {
         character.height = standingHeight;
         originalCameraPos = cam.transform.localPosition;
         targetCameraPosition = originalCameraPos;
+
+        // Create hand transform if it doesn't exist
+        if (playerHand == null)
+        {
+            // First check if the hand already exists as a child of the camera
+            Transform existingHand = cam.transform.Find("PlayerHand");
+            if (existingHand != null)
+            {
+                playerHand = existingHand;
+            }
+            else
+            {
+                // Create new hand transform
+                GameObject handObj = new GameObject("PlayerHand");
+                handObj.transform.SetParent(cam.transform, false);
+                handObj.transform.localPosition = new Vector3(0.3f, -0.2f, 0.5f);
+                handObj.transform.localRotation = Quaternion.identity;
+                playerHand = handObj.transform;
+                
+                // Save the changes to the scene
+                #if UNITY_EDITOR
+                UnityEditor.EditorUtility.SetDirty(gameObject);
+                UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(gameObject.scene);
+                #endif
+            }
+        }
     }
 
     void CheckForWaterHeight(){
