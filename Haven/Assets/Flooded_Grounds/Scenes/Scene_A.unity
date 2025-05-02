@@ -221824,14 +221824,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a54e993f0a4904e7fbf3e94832703663, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  pickupDistance: 2
+  pickupRange: 3
   pickupKey: 102
   dropKey: 113
-  playerHand: {fileID: 1183905595}
-  pickupLayer:
-    serializedVersion: 2
-    m_Bits: 8
-  playerCamera: {fileID: 1229290732}
+  holdPoint: {fileID: 0}
+  throwForce: 10
+  defaultHeldItemPosition: {x: 0.5, y: -0.3, z: 1}
+  defaultHeldItemRotation: {x: 0, y: 0, z: 0}
+  itemSmoothSpeed: 30
 --- !u!114 &1780305049
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -263322,6 +263322,10 @@ PrefabInstance:
       propertyPath: m_Layer
       value: 3
       objectReference: {fileID: 0}
+    - target: {fileID: -6941414114772725795, guid: 79dffcfb8e72c49228699877fb306466, type: 3}
+      propertyPath: m_TagString
+      value: Pickupable
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 79dffcfb8e72c49228699877fb306466, type: 3}
       propertyPath: m_Name
       value: Rock
@@ -263329,6 +263333,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 79dffcfb8e72c49228699877fb306466, type: 3}
       propertyPath: m_Layer
       value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 79dffcfb8e72c49228699877fb306466, type: 3}
+      propertyPath: m_TagString
+      value: Pickupable
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -271106,11 +271114,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: b26e07b874e8aff49b2ee1f07b34b68d, type: 3}
       propertyPath: m_Name
-      value: Axe_01
+      value: Axe
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: b26e07b874e8aff49b2ee1f07b34b68d, type: 3}
       propertyPath: m_Layer
       value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: b26e07b874e8aff49b2ee1f07b34b68d, type: 3}
+      propertyPath: m_TagString
+      value: Pickupable
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

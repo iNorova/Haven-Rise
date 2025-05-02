@@ -1,117 +1,200 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 public class ItemPickup : MonoBehaviour
 {
-    public float pickupDistance = 2f; // Distance at which items can be picked up
-    public KeyCode pickupKey = KeyCode.E; // Key to press for pickup
-    public KeyCode dropKey = KeyCode.Q; // Key to press for dropping
-    public Transform playerHand; // Where items will be held
-    public LayerMask pickupLayer; // Layer mask for items that can be picked up
-    public Camera playerCamera; // Reference to the player's camera
+    public float pickupRange = 3f;
+    public KeyCode pickupKey = KeyCode.F;
+    public KeyCode dropKey = KeyCode.Q;
+    public Transform holdPoint;
+    public float throwForce = 10f;
 
-    private bool isHoldingItem = false;
+    // Default position and rotation for items without custom settings
+    public Vector3 defaultHeldItemPosition = new Vector3(0.5f, -0.3f, 1f);
+    public Vector3 defaultHeldItemRotation = new Vector3(0f, 0f, 0f);
+    public float itemSmoothSpeed = 10f;
+
+    // Dictionary to store custom positions for specific items
+    private Dictionary<string, ItemPositionSettings> customItemPositions = new Dictionary<string, ItemPositionSettings>();
+
     private GameObject heldItem;
-    private GameObject currentTargetItem;
+    private bool isHoldingItem = false;
+    private Camera playerCamera;
+    private Collider[] itemColliders;
+
+    [System.Serializable]
+    public class ItemPositionSettings
+    {
+        public Vector3 position;
+        public Vector3 rotation;
+    }
 
     void Start()
     {
-        // If camera isn't assigned, try to find it
+        playerCamera = GetComponentInChildren<Camera>();
         if (playerCamera == null)
         {
-            playerCamera = GetComponentInChildren<Camera>();
-            if (playerCamera == null)
-            {
-                Debug.LogError("No camera found! Please assign a camera to the ItemPickup component.");
-            }
+            Debug.LogError("Player camera not found!");
         }
+
+        // Set up custom positions for specific items
+        // Format: customItemPositions.Add("ItemName", new ItemPositionSettings { position = position, rotation = rotation });
+
+        // Axe position (adjust these values to match your axe model)
+        customItemPositions.Add("Axe", new ItemPositionSettings 
+        { 
+            position = new Vector3(0.5f, -0.88f, 0.68f),
+            rotation = new Vector3(90f, -90f, 0f)
+        });
+
+        // Rock position (adjust these values to match your rock model)
+        customItemPositions.Add("Rock", new ItemPositionSettings 
+        { 
+            position = new Vector3(0.3f, -0.2f, 0.8f),
+            rotation = new Vector3(0f, 0f, 0f)
+        });
     }
 
     void Update()
     {
-        if (playerCamera == null) return;
-
-        // Debug ray visualization
-        Debug.DrawRay(playerCamera.transform.position, playerCamera.transform.forward * pickupDistance, Color.red);
-
-        // Check if player is looking at an item and within pickup distance
-        RaycastHit hit;
-        if (Physics.Raycast(playerCamera.transform.position, playerCamera.transform.forward, out hit, pickupDistance, pickupLayer))
+        if (Input.GetKeyDown(pickupKey))
         {
-            Debug.Log("Raycast hit: " + hit.collider.gameObject.name);
-            currentTargetItem = hit.collider.gameObject;
-            
-            // Show pickup prompt
             if (!isHoldingItem)
             {
-                Debug.Log("Press " + pickupKey.ToString() + " to pick up " + currentTargetItem.name);
+                TryPickupItem();
             }
             else
             {
-                Debug.Log("Press " + dropKey.ToString() + " to drop " + heldItem.name);
-            }
-
-            // Handle pickup input
-            if (Input.GetKeyDown(pickupKey) && !isHoldingItem)
-            {
-                PickupItem(currentTargetItem);
+                DropItem();
             }
         }
 
-        // Handle drop input (can be pressed anytime while holding an item)
-        if (isHoldingItem && Input.GetKeyDown(dropKey))
+        if (Input.GetKeyDown(dropKey) && isHoldingItem)
         {
             DropItem();
+        }
+
+        if (isHoldingItem && heldItem != null)
+        {
+            UpdateHeldItemPosition();
+        }
+    }
+
+    void UpdateHeldItemPosition()
+    {
+        if (playerCamera == null) return;
+
+        // Get the appropriate position and rotation settings for the current item
+        Vector3 targetPosition;
+        Vector3 targetRotation;
+
+        if (customItemPositions.TryGetValue(heldItem.name, out ItemPositionSettings settings))
+        {
+            targetPosition = settings.position;
+            targetRotation = settings.rotation;
+        }
+        else
+        {
+            targetPosition = defaultHeldItemPosition;
+            targetRotation = defaultHeldItemRotation;
+        }
+
+        // Calculate final position in world space
+        Vector3 finalPosition = playerCamera.transform.position + 
+            playerCamera.transform.right * targetPosition.x +
+            playerCamera.transform.up * targetPosition.y +
+            playerCamera.transform.forward * targetPosition.z;
+
+        // Smoothly move the item to its target position
+        heldItem.transform.position = Vector3.Lerp(
+            heldItem.transform.position,
+            finalPosition,
+            Time.deltaTime * itemSmoothSpeed
+        );
+
+        // Set the rotation based on camera direction
+        Quaternion finalRotation = playerCamera.transform.rotation * Quaternion.Euler(targetRotation);
+        heldItem.transform.rotation = Quaternion.Lerp(
+            heldItem.transform.rotation,
+            finalRotation,
+            Time.deltaTime * itemSmoothSpeed
+        );
+    }
+
+    void TryPickupItem()
+    {
+        RaycastHit hit;
+        if (Physics.Raycast(playerCamera.transform.position, playerCamera.transform.forward, out hit, pickupRange))
+        {
+            if (hit.collider.CompareTag("Pickupable"))
+            {
+                PickupItem(hit.collider.gameObject);
+            }
         }
     }
 
     void PickupItem(GameObject item)
     {
-        isHoldingItem = true;
         heldItem = item;
-        
-        // Parent the item to the player's hand
-        heldItem.transform.parent = playerHand;
-        heldItem.transform.localPosition = Vector3.zero;
-        heldItem.transform.localRotation = Quaternion.identity;
-        
-        // Disable physics if it has a rigidbody
+        isHoldingItem = true;
+
+        // Store and disable all colliders
+        itemColliders = heldItem.GetComponents<Collider>();
+        foreach (Collider col in itemColliders)
+        {
+            col.enabled = false;
+        }
+
+        // Disable physics
         Rigidbody rb = heldItem.GetComponent<Rigidbody>();
         if (rb != null)
         {
             rb.isKinematic = true;
+            rb.useGravity = false;
         }
-        
-        // Disable collider to prevent physics issues
-        Collider col = heldItem.GetComponent<Collider>();
-        if (col != null)
-        {
-            col.enabled = false;
-        }
+
+        // Set initial position and rotation
+        UpdateHeldItemPosition();
     }
 
     void DropItem()
     {
-        if (heldItem == null) return;
-        
-        isHoldingItem = false;
-        
-        // Unparent the item
-        heldItem.transform.parent = null;
-        
-        // Enable physics if it has a rigidbody
-        Rigidbody rb = heldItem.GetComponent<Rigidbody>();
-        if (rb != null)
+        if (heldItem != null)
         {
-            rb.isKinematic = false;
+            // Re-enable all colliders
+            if (itemColliders != null)
+            {
+                foreach (Collider col in itemColliders)
+                {
+                    col.enabled = true;
+                }
+            }
+
+            // Re-enable physics
+            Rigidbody rb = heldItem.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.isKinematic = false;
+                rb.useGravity = true;
+                rb.AddForce(playerCamera.transform.forward * throwForce, ForceMode.Impulse);
+            }
+
+            isHoldingItem = false;
+            heldItem = null;
+            itemColliders = null;
         }
-        
-        // Enable collider
-        Collider col = heldItem.GetComponent<Collider>();
-        if (col != null)
+    }
+
+    // Public method to add or update custom positions for items
+    public void SetCustomItemPosition(string itemName, Vector3 position, Vector3 rotation)
+    {
+        if (customItemPositions.ContainsKey(itemName))
         {
-            col.enabled = true;
+            customItemPositions[itemName] = new ItemPositionSettings { position = position, rotation = rotation };
         }
-        
-        heldItem = null;
+        else
+        {
+            customItemPositions.Add(itemName, new ItemPositionSettings { position = position, rotation = rotation });
+        }
     }
 } 
