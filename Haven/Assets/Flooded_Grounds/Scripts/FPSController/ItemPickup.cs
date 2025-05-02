@@ -12,7 +12,9 @@ public class ItemPickup : MonoBehaviour
     // Default position and rotation for items without custom settings
     public Vector3 defaultHeldItemPosition = new Vector3(0.5f, -0.3f, 1f);
     public Vector3 defaultHeldItemRotation = new Vector3(0f, 0f, 0f);
-    public float itemSmoothSpeed = 10f;
+    public float itemSmoothSpeed = 15f;
+    public float maxDistanceFromTarget = 0.5f; // Maximum distance the item can be from its target position
+    public float maxSmoothFactor = 0.3f; // Maximum smoothing factor when item is far from target
 
     // Dictionary to store custom positions for specific items
     private Dictionary<string, ItemPositionSettings> customItemPositions = new Dictionary<string, ItemPositionSettings>();
@@ -105,19 +107,33 @@ public class ItemPickup : MonoBehaviour
             playerCamera.transform.up * targetPosition.y +
             playerCamera.transform.forward * targetPosition.z;
 
-        // Smoothly move the item to its target position
+        // Calculate current distance from target
+        float currentDistance = Vector3.Distance(heldItem.transform.position, finalPosition);
+
+        // Calculate smoothing factor based on distance
+        float distanceFactor = Mathf.Clamp01(currentDistance / maxDistanceFromTarget);
+        float smoothFactor = Mathf.Lerp(
+            Mathf.Clamp01(Time.deltaTime * itemSmoothSpeed),
+            maxSmoothFactor,
+            distanceFactor
+        );
+
+        // Apply position smoothing
         heldItem.transform.position = Vector3.Lerp(
             heldItem.transform.position,
             finalPosition,
-            Time.deltaTime * itemSmoothSpeed
+            smoothFactor
         );
 
-        // Set the rotation based on camera direction
-        Quaternion finalRotation = playerCamera.transform.rotation * Quaternion.Euler(targetRotation);
-        heldItem.transform.rotation = Quaternion.Lerp(
+        // Calculate target rotation
+        Quaternion targetRot = playerCamera.transform.rotation * Quaternion.Euler(targetRotation);
+        
+        // Apply rotation smoothing (use a fixed smooth factor for rotation)
+        float rotationSmoothFactor = Mathf.Clamp01(Time.deltaTime * itemSmoothSpeed);
+        heldItem.transform.rotation = Quaternion.Slerp(
             heldItem.transform.rotation,
-            finalRotation,
-            Time.deltaTime * itemSmoothSpeed
+            targetRot,
+            rotationSmoothFactor
         );
     }
 

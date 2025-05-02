@@ -221831,7 +221831,9 @@ MonoBehaviour:
   throwForce: 10
   defaultHeldItemPosition: {x: 0.5, y: -0.3, z: 1}
   defaultHeldItemRotation: {x: 0, y: 0, z: 0}
-  itemSmoothSpeed: 30
+  itemSmoothSpeed: 15
+  maxDistanceFromTarget: 0.5
+  maxSmoothFactor: 0.3
 --- !u!114 &1780305049
 MonoBehaviour:
   m_ObjectHideFlags: 0
