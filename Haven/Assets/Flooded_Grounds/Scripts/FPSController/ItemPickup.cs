@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using System.Collections;
 
 public class ItemPickup : MonoBehaviour
 {
@@ -24,6 +25,13 @@ public class ItemPickup : MonoBehaviour
     private Camera playerCamera;
     private Collider[] itemColliders;
 
+    // Animation related variables
+    private Animator itemAnimator;
+    private bool isAnimating = false;
+
+    // Animation state names
+    private const string SWING_ANIMATION = "Swing";
+
     [System.Serializable]
     public class ItemPositionSettings
     {
@@ -42,11 +50,11 @@ public class ItemPickup : MonoBehaviour
         // Set up custom positions for specific items
         // Format: customItemPositions.Add("ItemName", new ItemPositionSettings { position = position, rotation = rotation });
 
-        // Axe position (adjust these values to match your axe model)
+        // Axe position (adjusted to be more visible in FOV)
         customItemPositions.Add("Axe", new ItemPositionSettings 
         { 
-            position = new Vector3(0.5f, -0.88f, 0.68f),
-            rotation = new Vector3(90f, -90f, 0f)
+            position = new Vector3(0.5f, -0.6f, 0.8f),
+            rotation = new Vector3(90f, 360f, 90f)
         });
 
         // Rock position (adjust these values to match your rock model)
@@ -76,6 +84,15 @@ public class ItemPickup : MonoBehaviour
             DropItem();
         }
 
+        // Add animation control for axe swing
+        if (isHoldingItem && heldItem != null && heldItem.name == "Axe" && Input.GetMouseButtonDown(0))
+        {
+            PlaySwingAnimation();
+        }
+    }
+
+    void LateUpdate()
+    {
         if (isHoldingItem && heldItem != null)
         {
             UpdateHeldItemPosition();
@@ -84,57 +101,30 @@ public class ItemPickup : MonoBehaviour
 
     void UpdateHeldItemPosition()
     {
-        if (playerCamera == null) return;
+        if (playerCamera == null || heldItem == null) return;
 
-        // Get the appropriate position and rotation settings for the current item
-        Vector3 targetPosition;
-        Vector3 targetRotation;
-
-        if (customItemPositions.TryGetValue(heldItem.name, out ItemPositionSettings settings))
+        // Only set transform if not animating
+        if (!isAnimating)
         {
-            targetPosition = settings.position;
-            targetRotation = settings.rotation;
+            // Get the appropriate position and rotation settings for the current item
+            Vector3 targetPosition;
+            Vector3 targetRotation;
+
+            if (customItemPositions.TryGetValue(heldItem.name, out ItemPositionSettings settings))
+            {
+                targetPosition = settings.position;
+                targetRotation = settings.rotation;
+            }
+            else
+            {
+                targetPosition = defaultHeldItemPosition;
+                targetRotation = defaultHeldItemRotation;
+            }
+
+            // Set local position and rotation relative to the camera
+            heldItem.transform.localPosition = targetPosition;
+            heldItem.transform.localRotation = Quaternion.Euler(targetRotation);
         }
-        else
-        {
-            targetPosition = defaultHeldItemPosition;
-            targetRotation = defaultHeldItemRotation;
-        }
-
-        // Calculate final position in world space
-        Vector3 finalPosition = playerCamera.transform.position + 
-            playerCamera.transform.right * targetPosition.x +
-            playerCamera.transform.up * targetPosition.y +
-            playerCamera.transform.forward * targetPosition.z;
-
-        // Calculate current distance from target
-        float currentDistance = Vector3.Distance(heldItem.transform.position, finalPosition);
-
-        // Calculate smoothing factor based on distance
-        float distanceFactor = Mathf.Clamp01(currentDistance / maxDistanceFromTarget);
-        float smoothFactor = Mathf.Lerp(
-            Mathf.Clamp01(Time.deltaTime * itemSmoothSpeed),
-            maxSmoothFactor,
-            distanceFactor
-        );
-
-        // Apply position smoothing
-        heldItem.transform.position = Vector3.Lerp(
-            heldItem.transform.position,
-            finalPosition,
-            smoothFactor
-        );
-
-        // Calculate target rotation
-        Quaternion targetRot = playerCamera.transform.rotation * Quaternion.Euler(targetRotation);
-        
-        // Apply rotation smoothing (use a fixed smooth factor for rotation)
-        float rotationSmoothFactor = Mathf.Clamp01(Time.deltaTime * itemSmoothSpeed);
-        heldItem.transform.rotation = Quaternion.Slerp(
-            heldItem.transform.rotation,
-            targetRot,
-            rotationSmoothFactor
-        );
     }
 
     void TryPickupItem()
@@ -169,7 +159,11 @@ public class ItemPickup : MonoBehaviour
             rb.useGravity = false;
         }
 
-        // Set initial position and rotation
+        // Get the animator component if it exists
+        itemAnimator = heldItem.GetComponent<Animator>();
+
+        // Parent the item to the camera
+        heldItem.transform.SetParent(playerCamera.transform);
         UpdateHeldItemPosition();
     }
 
@@ -177,6 +171,9 @@ public class ItemPickup : MonoBehaviour
     {
         if (heldItem != null)
         {
+            // Unparent the item
+            heldItem.transform.SetParent(null);
+
             // Re-enable all colliders
             if (itemColliders != null)
             {
@@ -198,7 +195,30 @@ public class ItemPickup : MonoBehaviour
             isHoldingItem = false;
             heldItem = null;
             itemColliders = null;
+            itemAnimator = null;
         }
+    }
+
+    // Animation control method
+    private void PlaySwingAnimation()
+    {
+        if (itemAnimator != null && !isAnimating)
+        {
+            itemAnimator.Play(SWING_ANIMATION);
+            isAnimating = true;
+            StartCoroutine(ResetAnimationState());
+        }
+    }
+
+    private System.Collections.IEnumerator ResetAnimationState()
+    {
+        // Wait for the animation to complete
+        yield return new WaitForSeconds(itemAnimator.GetCurrentAnimatorStateInfo(0).length);
+
+        // Add a small delay to ensure the last frame is rendered
+        yield return new WaitForSeconds(0.07f); // You can tweak this value
+
+        isAnimating = false;
     }
 
     // Public method to add or update custom positions for items
