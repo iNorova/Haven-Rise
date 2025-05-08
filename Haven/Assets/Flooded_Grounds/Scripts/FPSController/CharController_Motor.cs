@@ -202,4 +202,14 @@ public class CharController_Motor : MonoBehaviour {
         transform.Rotate(0, rotX * Time.deltaTime, 0);
         cam.transform.Rotate(-rotY * Time.deltaTime, 0, 0);
     }
+
+    // Public properties for AI detection
+    public bool IsCrouching() { return isCrouching; }
+    public bool IsSprinting() { return currentStamina > 0 && Input.GetKey(KeyCode.LeftShift) && !isCrouching; }
+    public bool IsWalking() {
+        float moveLR = Input.GetAxis("Horizontal");
+        float moveFB = Input.GetAxis("Vertical");
+        bool isMoving = Mathf.Abs(moveLR) > 0.1f || Mathf.Abs(moveFB) > 0.1f;
+        return isMoving && !IsSprinting() && !isCrouching;
+    }
 }
