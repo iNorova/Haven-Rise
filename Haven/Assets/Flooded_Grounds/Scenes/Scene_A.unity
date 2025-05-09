@@ -222374,7 +222374,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   hitDamage: 20
   hitRange: 3
-  hitCooldown: 0.5
+  hitCooldown: 1
   treeLayer:
     serializedVersion: 2
     m_Bits: 64
