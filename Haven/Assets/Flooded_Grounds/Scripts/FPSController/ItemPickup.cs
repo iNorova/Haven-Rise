@@ -4,7 +4,7 @@ using System.Collections;
 
 public class ItemPickup : MonoBehaviour
 {
-    public float pickupRange = 3f;
+    public float pickupRange = 5f;
     public KeyCode pickupKey = KeyCode.F;
     public KeyCode dropKey = KeyCode.Q;
     public Transform holdPoint;
@@ -130,7 +130,8 @@ public class ItemPickup : MonoBehaviour
     void TryPickupItem()
     {
         RaycastHit hit;
-        if (Physics.Raycast(playerCamera.transform.position, playerCamera.transform.forward, out hit, pickupRange))
+        float sphereRadius = 0.5f; // Wider detection area for easier pickup
+        if (Physics.SphereCast(playerCamera.transform.position, sphereRadius, playerCamera.transform.forward, out hit, pickupRange))
         {
             if (hit.collider.CompareTag("Pickupable"))
             {
@@ -174,6 +175,10 @@ public class ItemPickup : MonoBehaviour
             // Unparent the item
             heldItem.transform.SetParent(null);
 
+            // Move the item slightly forward to avoid overlapping with the player
+            Vector3 dropOffset = playerCamera.transform.forward * 1.0f; // 1 unit in front of the camera
+            heldItem.transform.position = playerCamera.transform.position + dropOffset;
+
             // Re-enable all colliders
             if (itemColliders != null)
             {
@@ -189,6 +194,8 @@ public class ItemPickup : MonoBehaviour
             {
                 rb.isKinematic = false;
                 rb.useGravity = true;
+                rb.collisionDetectionMode = CollisionDetectionMode.Continuous; // Prevent tunneling
+                rb.linearDamping = 3.0f; // Increase drag to reduce sliding
                 rb.AddForce(playerCamera.transform.forward * throwForce, ForceMode.Impulse);
             }
 
