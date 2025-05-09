@@ -31,6 +31,7 @@ public class ItemPickup : MonoBehaviour
 
     // Animation state names
     private const string SWING_ANIMATION = "Swing";
+    private const string ROCK_SWING_ANIMATION = "RockSwing";
 
     [System.Serializable]
     public class ItemPositionSettings
@@ -84,10 +85,17 @@ public class ItemPickup : MonoBehaviour
             DropItem();
         }
 
-        // Add animation control for axe swing
-        if (isHoldingItem && heldItem != null && heldItem.name == "Axe" && Input.GetMouseButtonDown(0))
+        // Add animation control for axe and rock swing
+        if (isHoldingItem && heldItem != null)
         {
-            PlaySwingAnimation();
+            if (heldItem.name == "Axe" && Input.GetMouseButtonDown(0))
+            {
+                PlaySwingAnimation(SWING_ANIMATION);
+            }
+            else if (heldItem.name == "Rock" && Input.GetMouseButtonDown(0))
+            {
+                PlaySwingAnimation(ROCK_SWING_ANIMATION);
+            }
         }
     }
 
@@ -166,6 +174,12 @@ public class ItemPickup : MonoBehaviour
         // Parent the item to the camera
         heldItem.transform.SetParent(playerCamera.transform);
         UpdateHeldItemPosition();
+
+        // Only enable Animator for Rock if it exists
+        if (itemAnimator != null && heldItem.name == "Rock")
+        {
+            itemAnimator.enabled = true;
+        }
     }
 
     void DropItem()
@@ -199,6 +213,12 @@ public class ItemPickup : MonoBehaviour
                 rb.AddForce(playerCamera.transform.forward * throwForce, ForceMode.Impulse);
             }
 
+            // Only disable Animator for Rock if it exists
+            if (itemAnimator != null && heldItem.name == "Rock")
+            {
+                itemAnimator.enabled = false;
+            }
+
             isHoldingItem = false;
             heldItem = null;
             itemColliders = null;
@@ -207,25 +227,21 @@ public class ItemPickup : MonoBehaviour
     }
 
     // Animation control method
-    private void PlaySwingAnimation()
+    private void PlaySwingAnimation(string animationName)
     {
         if (itemAnimator != null && !isAnimating)
         {
-            itemAnimator.Play(SWING_ANIMATION);
+            itemAnimator.Play(animationName);
             isAnimating = true;
             StartCoroutine(ResetAnimationState());
         }
     }
 
-    private System.Collections.IEnumerator ResetAnimationState()
+    private IEnumerator ResetAnimationState()
     {
-        // Wait for the animation to complete
         yield return new WaitForSeconds(itemAnimator.GetCurrentAnimatorStateInfo(0).length);
-
-        // Add a small delay to ensure the last frame is rendered
-        yield return new WaitForSeconds(0.07f); // You can tweak this value
-
         isAnimating = false;
+        UpdateHeldItemPosition();
     }
 
     // Public method to add or update custom positions for items
