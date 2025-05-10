@@ -11,12 +11,13 @@ public class CrosshairUI : MonoBehaviour
     public float length = 10f;
 
     private RectTransform rectTransform;
-    private TreeCuttingController treeCutter;
+    private ObjectInteractionController interactionController;
+    private LayerMask interactableLayer;
 
     void Start()
     {
         rectTransform = GetComponent<RectTransform>();
-        treeCutter = FindObjectOfType<TreeCuttingController>();
+        interactionController = FindObjectOfType<ObjectInteractionController>();
 
         if (rectTransform == null)
         {
@@ -24,21 +25,30 @@ public class CrosshairUI : MonoBehaviour
             return;
         }
 
+        if (interactionController == null)
+        {
+            Debug.LogError("No ObjectInteractionController found in scene!");
+            return;
+        }
+
+        // Set the interactable layer
+        interactableLayer = (1 << 8); // Layer 8 is the Destroyable layer
+
         // Set initial size
         rectTransform.sizeDelta = new Vector2(length * 2, length * 2);
     }
 
     void Update()
     {
-        // Check if looking at a tree
+        // Check if looking at a destroyable object
         RaycastHit hit;
         Ray ray = Camera.main.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
         
-        if (Physics.Raycast(ray, out hit, treeCutter.hitRange, treeCutter.treeLayer))
+        if (Physics.Raycast(ray, out hit, interactionController.hitRange, interactableLayer))
         {
-            if (hit.collider.GetComponent<TreeComponent>() != null)
+            if (hit.collider.CompareTag("Destroyable"))
             {
-                // Change color when looking at a tree
+                // Change color when looking at a destroyable object
                 foreach (Image img in GetComponentsInChildren<Image>())
                 {
                     img.color = targetColor;
