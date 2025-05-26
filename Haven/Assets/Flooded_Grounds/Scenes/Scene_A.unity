@@ -51874,26 +51874,6 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 7402009758359158996, guid: 4ecab060b0afb5d4db61f7f1311b9e24, type: 3}
   m_PrefabInstance: {fileID: 437936988}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &416606268
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 416606267}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b2c67ce836140b4479603ebcf944cddd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  m_HorizontalAxis: Horizontal
-  m_VerticalAxis: Vertical
-  m_JumpButton: Jump
-  m_RunKey: 304
-  m_Camera: {fileID: 0}
-  m_MouseX: Mouse X
-  m_MouseY: Mouse Y
-  m_MouseScroll: Mouse ScrollWheel
 --- !u!114 &416606269
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -54151,9 +54131,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 7402009758359158996, guid: 4ecab060b0afb5d4db61f7f1311b9e24, type: 3}
       insertIndex: -1
       addedObject: {fileID: 416606269}
-    - targetCorrespondingSourceObject: {fileID: 7402009758359158996, guid: 4ecab060b0afb5d4db61f7f1311b9e24, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 416606268}
   m_SourcePrefab: {fileID: 100100000, guid: 4ecab060b0afb5d4db61f7f1311b9e24, type: 3}
 --- !u!1001 &437950488
 PrefabInstance:

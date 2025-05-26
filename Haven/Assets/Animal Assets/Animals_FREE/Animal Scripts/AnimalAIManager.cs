@@ -129,7 +129,8 @@ public class AnimalAIManager : MonoBehaviour
                         SetIdle();
                     }
                 }
-                else if (isFleeing && distanceToPlayer > detectionRadius * 2f)
+                // Always check if deer should stop fleeing if player is far away
+                if (isFleeing && distanceToPlayer > detectionRadius * 2f)
                 {
                     SetIdle();
                 }
@@ -215,6 +216,7 @@ public class AnimalAIManager : MonoBehaviour
         float currentDistance = fleeDistance;
         bool foundValidPosition = false;
         Vector3 fleePosition = transform.position;
+        float currentDistToPlayer = Vector3.Distance(transform.position, playerTransform.position);
 
         while (!foundValidPosition && currentDistance <= maxFleeDistance)
         {
@@ -224,8 +226,9 @@ public class AnimalAIManager : MonoBehaviour
             NavMeshHit hit;
             if (NavMesh.SamplePosition(fleePosition, out hit, currentDistance, NavMesh.AllAreas))
             {
-                // Check if the new position is far enough from the last one
-                if (Vector3.Distance(hit.position, lastFleePosition) > minFleeDistance)
+                float newDistToPlayer = Vector3.Distance(hit.position, playerTransform.position);
+                // Only accept if further from player than current position
+                if (newDistToPlayer > currentDistToPlayer && Vector3.Distance(hit.position, lastFleePosition) > minFleeDistance)
                 {
                     navAgent.SetDestination(hit.position);
                     lastFleePosition = hit.position;
@@ -236,18 +239,22 @@ public class AnimalAIManager : MonoBehaviour
             currentDistance += fleeDistance; // Increase search distance
         }
 
-        // If no valid position found, try a random direction
+        // If no valid position found, try a random direction that is further from the player
         if (!foundValidPosition)
         {
             Vector3 randomDirection = Random.insideUnitSphere;
             randomDirection.y = 0;
             randomDirection.Normalize();
-            
+            Vector3 tryPosition = transform.position + randomDirection * fleeDistance;
             NavMeshHit hit;
-            if (NavMesh.SamplePosition(transform.position + randomDirection * fleeDistance, out hit, fleeDistance, NavMesh.AllAreas))
+            if (NavMesh.SamplePosition(tryPosition, out hit, fleeDistance, NavMesh.AllAreas))
             {
-                navAgent.SetDestination(hit.position);
-                lastFleePosition = hit.position;
+                float newDistToPlayer = Vector3.Distance(hit.position, playerTransform.position);
+                if (newDistToPlayer > currentDistToPlayer)
+                {
+                    navAgent.SetDestination(hit.position);
+                    lastFleePosition = hit.position;
+                }
             }
         }
     }
