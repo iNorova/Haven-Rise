@@ -95,6 +95,9 @@ namespace Controller
         private float m_TimeSinceLastGrounded;
         private const float MAX_TIME_OFF_GROUND = 1f;
 
+        private Vector3 m_WanderTarget;
+        private float m_NextWanderTime;
+
         // Public properties for debugging
         public bool IsFleeing => m_IsFleeing;
         public float CurrentDetectionRadius => m_DetectionRadius;
@@ -155,8 +158,17 @@ namespace Controller
             }
             else
             {
-                m_Movement.Move(Time.deltaTime, in m_Axis, in m_Target, m_IsRun, m_IsMoving, out var animAxis, out var isAir);
-                m_Animation.Animate(in animAxis, m_IsRun ? 1f : 0f, Time.deltaTime);
+                // Wandering logic
+                if (Vector3.Distance(m_Transform.position, m_WanderTarget) < 1f || Time.time > m_NextWanderTime)
+                {
+                    SetNewWanderTarget();
+                }
+                Vector3 direction = (m_WanderTarget - m_Transform.position).normalized;
+                m_Axis = new Vector2(direction.x, direction.z);
+                m_IsRun = false;
+                m_IsMoving = true;
+                m_Movement.Move(Time.deltaTime, m_Axis, m_WanderTarget, false, true, out var animAxis, out var isAir);
+                m_Animation.Animate(animAxis, 0f, Time.deltaTime);
             }
         }
 
@@ -208,6 +220,14 @@ namespace Controller
                 {
                     m_IsFleeing = shouldFlee;
                     m_LastStateChangeTime = Time.time;
+                }
+
+                // Always stop fleeing if player is far away
+                if (m_IsFleeing && distanceToPlayer > m_DetectionRadius * 2f)
+                {
+                    m_IsFleeing = false;
+                    m_LastStateChangeTime = Time.time;
+                    SetNewWanderTarget();
                 }
             }
         }
@@ -483,6 +503,14 @@ namespace Controller
             }
         }
 
+        private void SetNewWanderTarget()
+        {
+            // Pick a random point within 5 units of the current position
+            Vector2 randomCircle = UnityEngine.Random.insideUnitCircle * 5f;
+            m_WanderTarget = m_Transform.position + new Vector3(randomCircle.x, 0, randomCircle.y);
+            m_NextWanderTime = Time.time + UnityEngine.Random.Range(3f, 7f); // Wander for 3-7 seconds
+        }
+
         [Serializable]
         private struct LookWeight
         {
@@ -559,11 +587,14 @@ namespace Controller
                     m_LastForward = Vector3.Normalize(movement);
                 }
 
+                // Smoothly rotate to face movement direction
+                if (movement.sqrMagnitude > 0.01f) {
+                    Quaternion targetRotation = Quaternion.LookRotation(movement.normalized);
+                    m_Transform.rotation = Quaternion.Slerp(m_Transform.rotation, targetRotation, deltaTime * m_RotateSpeed);
+                }
+
                 CaculateGravity(deltaTime, out isAir);
                 Displace(deltaTime, in movement, isRun);
-                Turn(in targetForward, isMoving);
-                UpdateRotation(deltaTime);
-
                 GenAnimationAxis(in movement, out animAxis);
             }
 
