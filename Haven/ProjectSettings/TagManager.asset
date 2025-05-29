@@ -6,6 +6,7 @@ TagManager:
   tags:
   - Pickupable
   - Destroyable
+  - Grass
   layers:
   - Default
   - TransparentFX
