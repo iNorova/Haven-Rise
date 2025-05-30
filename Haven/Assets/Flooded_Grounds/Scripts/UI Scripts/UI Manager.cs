@@ -8,19 +8,25 @@ public class UIManager : MonoBehaviour
     public RawImage pauseMenuImage;   // Reference to the pause menu background
     private bool isPaused = false;    // Track pause state
 
-    [Header("Climate System")]
-    public Slider climateSlider;              // Reference to climate UI slider
-    public float maxClimateValue = 100f;      // Maximum climate value
-    public float minClimateValue = 0f;        // Minimum climate value
-    public float climateDecreaseRate = 5f;    // How fast climate decreases per second when conditions are bad
-    public float climateIncreaseRate = 2f;    // How fast climate recovers when conditions are good
+    [Header("Temperature System")]
+    public Slider temperatureSlider;              // Reference to temperature UI slider
+    public Image temperatureFillImage;            // Reference to the slider's fill image
+    public Color normalTemperatureColor = new Color(0f, 0.75f, 1f);    // Cool blue (#00BFFF)
+    public Color dangerTemperatureColor = new Color(1f, 0.65f, 0f);    // Warm orange (#FFA500)
+    public Color criticalTemperatureColor = new Color(1f, 0f, 0f);     // Hot red (#FF0000)
+    public float maxTemperatureValue = 100f;      // Maximum temperature value
+    public float minTemperatureValue = 0f;        // Minimum temperature value
+    public float temperatureIncreaseRate = 5f;    // How fast temperature increases when trees are cut
+    public float temperatureDecreaseRate = 2f;    // How fast temperature decreases over time
+    public float temperatureIncreaseDuration = 5f;  // How long temperature increases after tree destruction
     
-    [Header("Climate Thresholds")]
-    public float dangerThreshold = 25f;       // Climate level where danger effects start
-    public float criticalThreshold = 10f;     // Climate level where critical effects start
+    [Header("Temperature Thresholds")]
+    public float dangerThreshold = 75f;       // Temperature level where danger effects start
+    public float criticalThreshold = 90f;     // Temperature level where critical effects start
     
-    private float currentClimateValue;
-    private bool isClimateDecreasing = false; // Flag to control climate decrease
+    private float currentTemperature;
+    private bool isTemperatureIncreasing = false; // Flag to control temperature increase
+    private float temperatureIncreaseTimer = 0f;  // Timer for temperature increase duration
 
     // Static instance for global access
     public static UIManager Instance { get; private set; }
@@ -44,17 +50,23 @@ public class UIManager : MonoBehaviour
     {
         Debug.Log("UI Manager Started");
         
-        // Initialize climate system
-        currentClimateValue = maxClimateValue;
-        if (climateSlider != null)
+        // Initialize temperature system
+        currentTemperature = minTemperatureValue;
+        if (temperatureSlider != null)
         {
-            climateSlider.maxValue = maxClimateValue;
-            climateSlider.minValue = minClimateValue;
-            climateSlider.value = currentClimateValue;
+            temperatureSlider.maxValue = maxTemperatureValue;
+            temperatureSlider.minValue = minTemperatureValue;
+            temperatureSlider.value = currentTemperature;
+            
+            // Set initial color
+            if (temperatureFillImage != null)
+            {
+                temperatureFillImage.color = normalTemperatureColor;
+            }
         }
         else
         {
-            Debug.LogError("Climate Slider is not assigned in the inspector!");
+            Debug.LogError("Temperature Slider is not assigned in the inspector!");
         }
 
         // Check if components are assigned
@@ -89,95 +101,118 @@ public class UIManager : MonoBehaviour
             TogglePauseMenu();
         }
 
-        // Update climate system
-        UpdateClimateSystem();
+        // Update temperature system
+        UpdateTemperatureSystem();
     }
 
-    private void UpdateClimateSystem()
+    private void UpdateTemperatureSystem()
     {
         if (!isPaused)
         {
-            if (isClimateDecreasing)
+            if (isTemperatureIncreasing)
             {
-                // Decrease climate value
-                currentClimateValue -= climateDecreaseRate * Time.deltaTime;
+                // Increase temperature
+                currentTemperature += temperatureIncreaseRate * Time.deltaTime;
+                
+                // Update temperature increase timer
+                temperatureIncreaseTimer += Time.deltaTime;
+                if (temperatureIncreaseTimer >= temperatureIncreaseDuration)
+                {
+                    isTemperatureIncreasing = false;
+                    temperatureIncreaseTimer = 0f;
+                }
             }
             else
             {
-                // Slowly recover climate value
-                currentClimateValue += climateIncreaseRate * Time.deltaTime;
+                // Slowly decrease temperature
+                currentTemperature -= temperatureDecreaseRate * Time.deltaTime;
             }
 
             // Clamp the value between min and max
-            currentClimateValue = Mathf.Clamp(currentClimateValue, minClimateValue, maxClimateValue);
+            currentTemperature = Mathf.Clamp(currentTemperature, minTemperatureValue, maxTemperatureValue);
 
             // Update the slider
-            if (climateSlider != null)
+            if (temperatureSlider != null)
             {
-                climateSlider.value = currentClimateValue;
+                temperatureSlider.value = currentTemperature;
+                
+                // Update fill color based on temperature
+                if (temperatureFillImage != null)
+                {
+                    if (currentTemperature >= criticalThreshold)
+                    {
+                        temperatureFillImage.color = criticalTemperatureColor;
+                    }
+                    else if (currentTemperature >= dangerThreshold)
+                    {
+                        temperatureFillImage.color = dangerTemperatureColor;
+                    }
+                    else
+                    {
+                        temperatureFillImage.color = normalTemperatureColor;
+                    }
+                }
             }
 
-            // Check for climate thresholds and trigger effects
-            CheckClimateEffects();
+            // Check for temperature thresholds and trigger effects
+            CheckTemperatureEffects();
         }
     }
 
-    private void CheckClimateEffects()
+    private void CheckTemperatureEffects()
     {
-        if (currentClimateValue <= criticalThreshold)
+        if (currentTemperature >= criticalThreshold)
         {
-            ApplyCriticalClimateEffects();
+            ApplyCriticalTemperatureEffects();
         }
-        else if (currentClimateValue <= dangerThreshold)
+        else if (currentTemperature >= dangerThreshold)
         {
-            ApplyDangerClimateEffects();
+            ApplyDangerTemperatureEffects();
         }
     }
 
-    private void ApplyDangerClimateEffects()
+    private void ApplyDangerTemperatureEffects()
     {
-        // TODO: Implement danger level effects
-        // Examples:
-        // - Change skybox color
-        // - Add screen effects
-        // - Slow down player
-        Debug.Log("Danger climate level reached!");
+        // Apply danger level effects
+        // - Add slight screen tint
+        // - Increase ambient temperature
+        // - Add subtle heat distortion
+        Debug.Log("Danger temperature level reached!");
     }
 
-    private void ApplyCriticalClimateEffects()
+    private void ApplyCriticalTemperatureEffects()
     {
-        // TODO: Implement critical level effects
-        // Examples:
-        // - Damage player
-        // - Extreme weather effects
-        // - Screen distortion
-        Debug.Log("Critical climate level reached!");
+        // Apply critical level effects
+        // - Strong screen tint
+        // - Heavy heat distortion
+        // - Player takes damage over time
+        Debug.Log("Critical temperature level reached!");
     }
 
-    // Public methods to control climate state
-    public void StartClimateDecrease()
+    // Public methods to control temperature state
+    public void StartTemperatureIncrease()
     {
-        isClimateDecreasing = true;
+        isTemperatureIncreasing = true;
     }
 
-    public void StopClimateDecrease()
+    public void StopTemperatureIncrease()
     {
-        isClimateDecreasing = false;
+        isTemperatureIncreasing = false;
     }
 
-    public float GetCurrentClimateValue()
+    public float GetCurrentTemperature()
     {
-        return currentClimateValue;
+        return currentTemperature;
     }
 
     public bool IsInDangerZone()
     {
-        return currentClimateValue <= dangerThreshold;
+        return currentTemperature >= dangerThreshold;
     }
 
     public bool IsInCriticalZone()
     {
-        return currentClimateValue <= criticalThreshold;
+        return currentTemperature >= criticalThreshold;
     }
 
     public void TogglePauseMenu()

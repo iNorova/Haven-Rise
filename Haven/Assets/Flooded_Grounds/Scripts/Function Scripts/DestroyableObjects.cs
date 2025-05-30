@@ -15,6 +15,7 @@ public class DestroyableObject : MonoBehaviour
     [SerializeField] private int maxDrops = 6;
     [SerializeField] private float dropScatterRadius = 2f;  // How far the drops scatter
     [SerializeField] private float dropForce = 5f;          // Force applied to dropped items
+    [SerializeField] private bool isTree = false;           // Flag to identify if this is a tree
 
     [Header("Effects")]
     [SerializeField] private ParticleSystem hitEffect;    // Optional: particle effect when object is hit
@@ -84,6 +85,13 @@ public class DestroyableObject : MonoBehaviour
         
         isDestroyed = true;
         Debug.Log($"Destroying object: {gameObject.name}");
+
+        // If this is a tree, notify UIManager to increase temperature
+        if (isTree && UIManager.Instance != null)
+        {
+            UIManager.Instance.StartTemperatureIncrease();
+            Debug.Log("Tree destroyed - increasing temperature");
+        }
 
         // Play destroy sound
         if (destroySound != null && audioSource != null)
