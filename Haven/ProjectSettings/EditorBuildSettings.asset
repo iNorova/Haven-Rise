@@ -6,7 +6,7 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Flooded_Grounds/Scenes/old menu/Main menu.unity
+    path: Assets/Flooded_Grounds/Scenes/Others/old menu/Main menu.unity
     guid: e66e8d3de1da2e2489e59429d25d3312
   - enabled: 1
     path: Assets/Flooded_Grounds/Scenes/Main Game Scene.unity
