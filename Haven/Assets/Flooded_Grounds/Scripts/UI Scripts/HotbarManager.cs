@@ -159,22 +159,31 @@ public class HotbarManager : MonoBehaviour
         {
             heldItems[selectedSlot].SetActive(true);
 
-            // Force the Animator to the Idle state and reset all its triggers
+            // Re-apply the ItemHoldOffset to ensure correct position/rotation on activation
+            var offset = heldItems[selectedSlot].GetComponent<ItemHoldOffset>();
+            if (offset != null)
+                offset.ApplyOffset(handHolder);
+            else // If no custom offset, reset to default local position/rotation relative to HandHolder
+            {
+                heldItems[selectedSlot].transform.localPosition = Vector3.zero;
+                heldItems[selectedSlot].transform.localRotation = Quaternion.identity;
+            }
+
+            // Force the Animator to its Idle state and reset all its triggers for a clean start
             Animator itemAnimator = heldItems[selectedSlot].GetComponentInChildren<Animator>();
             if (itemAnimator != null)
             {
-                // Play the Idle state immediately (assuming you have an "Idle" state in your Animator)
-                itemAnimator.Play("Idle", 0, 0f); // Play "Idle" state on base layer (0), from start (0f)
-
-                // Reset all triggers on this Animator
+                // Reset all triggers first to clear any pending ones
                 foreach (var param in itemAnimator.parameters)
                 {
                     if (param.type == AnimatorControllerParameterType.Trigger)
                     {
                         itemAnimator.ResetTrigger(param.name);
-                        Debug.Log($"Resetting trigger {param.name} for {heldItems[selectedSlot].name}");
+                        Debug.Log($"Resetting trigger {param.name} for {heldItems[selectedSlot].name} on select.");
                     }
                 }
+                // Now, force it to the Idle state. This will override any immediate transitions.
+                itemAnimator.Play("Idle", 0, 0f); // Play "Idle" state on base layer (0), from start (0f)
             }
         }
 
