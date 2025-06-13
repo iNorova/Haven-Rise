@@ -82,8 +82,24 @@ public class InventorySystem : MonoBehaviour
         if (sourceIsHotbar && targetIsHotbar) // Hotbar to Hotbar swap
         {
             Debug.Log($"[InventorySystem] Hotbar to Hotbar Swap: Source {sourceIndex}, Target {targetIndex}");
-            hotbarManager.SetItem(sourceIndex, targetItem); // Put target item in source slot
-            hotbarManager.SetItem(targetIndex, sourceItem); // Put source item in target slot
+            // Store references to the actual GameObjects before modifying the arrays
+            GameObject itemAtSourceBeforeSwap = hotbarManager.GetItem(sourceIndex);
+            GameObject itemAtTargetBeforeSwap = hotbarManager.GetItem(targetIndex);
+
+            hotbarManager.SetItem(sourceIndex, itemAtTargetBeforeSwap); // Put target item in source slot
+            hotbarManager.SetItem(targetIndex, itemAtSourceBeforeSwap); // Put source item in target slot
+
+            // Deactivate both items after they have been moved. SelectSlot will handle re-activation.
+            if (itemAtSourceBeforeSwap != null)
+            {
+                itemAtSourceBeforeSwap.SetActive(false);
+                Debug.Log($"[InventorySystem] Deactivated itemAtSourceBeforeSwap: {itemAtSourceBeforeSwap.name}");
+            }
+            if (itemAtTargetBeforeSwap != null)
+            {
+                itemAtTargetBeforeSwap.SetActive(false);
+                Debug.Log($"[InventorySystem] Deactivated itemAtTargetBeforeSwap: {itemAtTargetBeforeSwap.name}");
+            }
         }
         else if (!sourceIsHotbar && !targetIsHotbar) // Inventory to Inventory swap
         {
