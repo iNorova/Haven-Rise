@@ -9,6 +9,12 @@ public class AxeAnimationHandler : MonoBehaviour
     {
         if (animator == null)
             animator = GetComponent<Animator>();
+
+        if (animator != null)
+        {
+            animator.ResetTrigger(swingTrigger);
+            Debug.Log($"AxeAnimationHandler: Resetting {swingTrigger} trigger on Awake for {gameObject.name}");
+        }
     }
 
     // Public method to play the swing animation
