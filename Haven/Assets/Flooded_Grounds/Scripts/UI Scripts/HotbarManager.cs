@@ -145,12 +145,39 @@ public class HotbarManager : MonoBehaviour
     {
         Debug.Log($"Selecting slot {slot}");
         if (slot < 0 || slot >= maxSlots) return;
-        selectedSlot = slot;
-        for (int i = 0; i < maxSlots; i++)
+
+        // Deactivate the previously selected item
+        if (heldItems[selectedSlot] != null)
         {
-            if (heldItems[i] != null)
-                heldItems[i].SetActive(i == selectedSlot);
+            heldItems[selectedSlot].SetActive(false);
         }
+
+        selectedSlot = slot;
+
+        // Activate the newly selected item
+        if (heldItems[selectedSlot] != null)
+        {
+            heldItems[selectedSlot].SetActive(true);
+
+            // Force the Animator to the Idle state and reset all its triggers
+            Animator itemAnimator = heldItems[selectedSlot].GetComponentInChildren<Animator>();
+            if (itemAnimator != null)
+            {
+                // Play the Idle state immediately (assuming you have an "Idle" state in your Animator)
+                itemAnimator.Play("Idle", 0, 0f); // Play "Idle" state on base layer (0), from start (0f)
+
+                // Reset all triggers on this Animator
+                foreach (var param in itemAnimator.parameters)
+                {
+                    if (param.type == AnimatorControllerParameterType.Trigger)
+                    {
+                        itemAnimator.ResetTrigger(param.name);
+                        Debug.Log($"Resetting trigger {param.name} for {heldItems[selectedSlot].name}");
+                    }
+                }
+            }
+        }
+
         UpdateHotbarUI();
     }
 
