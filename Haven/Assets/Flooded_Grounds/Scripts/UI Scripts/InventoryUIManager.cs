@@ -41,6 +41,12 @@ public class InventoryUIManager : MonoBehaviour
                         playerController.SetInputActive(false);
                     }
 
+                    // Disable hotbar item input when inventory is open
+                    if (hotbarManager != null)
+                    {
+                        hotbarManager.SetInputActive(false);
+                    }
+
                     // If inventory is being opened, update its UI
                     if (inventoryManager != null)
                     {
@@ -62,6 +68,12 @@ public class InventoryUIManager : MonoBehaviour
                     if (playerController != null)
                     {
                         playerController.SetInputActive(true);
+                    }
+
+                    // Enable hotbar item input when inventory is closed
+                    if (hotbarManager != null)
+                    {
+                        hotbarManager.SetInputActive(true);
                     }
                     // Explicitly update hotbar UI when inventory is closed
                     if (hotbarManager != null)

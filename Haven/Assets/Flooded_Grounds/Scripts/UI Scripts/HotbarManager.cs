@@ -16,6 +16,8 @@ public class HotbarManager : MonoBehaviour
     // private Sprite[] itemIcons; // Item icons will be managed by InventorySlot itself
     public int selectedSlot = 0; // Made public for InventorySystem access
 
+    private bool _canProcessItemInput = true; // New flag to control item input processing
+
     void Start()
     {
         // Initialize heldItems array based on the number of hotbar slots assigned in the Inspector
@@ -54,8 +56,8 @@ public class HotbarManager : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Q))
             DropSelectedItem();
 
-        // NEW: Handle primary action (e.g., swinging axe)
-        if (heldItems[selectedSlot] != null && Input.GetMouseButtonDown(0)) // Left mouse button
+        // NEW: Handle primary action (e.g., swinging axe) only if input is active
+        if (_canProcessItemInput && heldItems[selectedSlot] != null && Input.GetMouseButtonDown(0)) // Left mouse button
         {
             // Try to get an animation handler for the current item
             AxeAnimationHandler axeAnimHandler = heldItems[selectedSlot].GetComponentInChildren<AxeAnimationHandler>();
@@ -254,5 +256,11 @@ public class HotbarManager : MonoBehaviour
         {
             Debug.LogWarning($"[HotbarManager] SetItem: Invalid index {index} for item {(item != null ? item.name : "null")}");
         }
+    }
+
+    public void SetInputActive(bool active)
+    {
+        _canProcessItemInput = active;
+        Debug.Log($"[HotbarManager] SetInputActive: Input processing set to {active}");
     }
 } 
