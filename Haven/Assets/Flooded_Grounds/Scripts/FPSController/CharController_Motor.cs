@@ -47,6 +47,9 @@ public class CharController_Motor : MonoBehaviour {
     // Add hand transform for holding items
     public Transform playerHand; // Reference to the hand transform
 
+    // New: Control input reception
+    private bool canReceiveInput = true;
+
     void Start(){
         character = GetComponent<CharacterController>();
         if (Application.isEditor) {
@@ -54,9 +57,9 @@ public class CharController_Motor : MonoBehaviour {
             sensitivity = sensitivity * 1.5f;
         }
         currentStamina = maxStamina; // Initialize stamina
-        // Lock and hide cursor for FPS
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
+        // Cursor lock/hide handled by InventoryUIManager now
+        // Cursor.lockState = CursorLockMode.Locked;
+        // Cursor.visible = false;
 
         // Initialize crouch and head bob
         currentHeight = standingHeight;
@@ -98,10 +101,19 @@ public class CharController_Motor : MonoBehaviour {
     }
 
     void Update(){
-        HandleMouseLook();
-        HandleMovement();
-        HandleCrouch();
-        HandleHeadBob();
+        if (canReceiveInput)
+        {
+            HandleMouseLook();
+            HandleMovement();
+            HandleCrouch();
+            HandleHeadBob();
+        }
+    }
+
+    // New: Public method to set input active/inactive
+    public void SetInputActive(bool active)
+    {
+        canReceiveInput = active;
     }
 
     void HandleMouseLook() {

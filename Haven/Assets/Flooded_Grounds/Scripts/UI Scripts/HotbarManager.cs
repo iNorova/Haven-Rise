@@ -1,3 +1,5 @@
+// This script manages the player's hotbar, including selecting items, picking up into hotbar slots, and dropping.
+// Ensure that the 'hotbarSlots' array is populated with only the hotbar UI InventorySlot components.
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
@@ -5,26 +7,40 @@ using System.Collections.Generic;
 public class HotbarManager : MonoBehaviour
 {
     [Header("Hotbar Setup")]
-    public int maxSlots = 5;
+    // public int maxSlots = 5; // Max slots will now be determined by the array length
     public Transform handHolder; // Assign in inspector
-    public Image[] slotImages;   // Assign your slot UI Images in inspector
+    public InventorySlot[] hotbarSlots;   // Assign your hotbar UI InventorySlot components in inspector
     public Sprite emptySlotSprite; // Sprite for empty slot
 
     private GameObject[] heldItems;
-    private Sprite[] itemIcons;
-    private int selectedSlot = 0;
+    // private Sprite[] itemIcons; // Item icons will be managed by InventorySlot itself
+    public int selectedSlot = 0; // Made public for InventorySystem access
 
     void Start()
     {
-        heldItems = new GameObject[maxSlots];
-        itemIcons = new Sprite[maxSlots];
-        UpdateHotbarUI();
+        // Initialize heldItems array based on the number of hotbar slots assigned in the Inspector
+        if (hotbarSlots != null && hotbarSlots.Length > 0)
+        {
+            heldItems = new GameObject[hotbarSlots.Length];
+            // itemIcons = new Sprite[maxSlots]; // No longer needed
+
+            // Initialize the currentItem and visuals for each hotbar slot
+            for (int i = 0; i < hotbarSlots.Length; i++)
+            {
+                hotbarSlots[i].SetItem(heldItems[i], emptySlotSprite); // Set to null initially, with empty sprite
+            }
+            UpdateHotbarUI();
+        }
+        else
+        {
+            Debug.LogWarning("No hotbar slots assigned to HotbarManager!");
+        }
     }
 
     void Update()
     {
-        // Select slot with 1-5
-        for (int i = 0; i < maxSlots; i++)
+        // Select slot with 1-X (where X is hotbarSlots.Length)
+        for (int i = 0; i < hotbarSlots.Length; i++)
         {
             if (Input.GetKeyDown(KeyCode.Alpha1 + i))
                 SelectSlot(i);
@@ -39,26 +55,23 @@ public class HotbarManager : MonoBehaviour
             DropSelectedItem();
 
         // NEW: Handle primary action (e.g., swinging axe)
-        if (Input.GetMouseButtonDown(0)) // Left mouse button
+        if (heldItems[selectedSlot] != null && Input.GetMouseButtonDown(0)) // Left mouse button
         {
-            if (heldItems[selectedSlot] != null)
+            // Try to get an animation handler for the current item
+            AxeAnimationHandler axeAnimHandler = heldItems[selectedSlot].GetComponentInChildren<AxeAnimationHandler>();
+            if (axeAnimHandler != null)
             {
-                // Try to get an animation handler for the current item
-                AxeAnimationHandler axeAnimHandler = heldItems[selectedSlot].GetComponentInChildren<AxeAnimationHandler>();
-                if (axeAnimHandler != null)
+                axeAnimHandler.PlaySwingAnimation();
+            }
+            else
+            {
+                // NEW: Check for RockAnimationHandler
+                RockAnimationHandler rockAnimHandler = heldItems[selectedSlot].GetComponentInChildren<RockAnimationHandler>();
+                if (rockAnimHandler != null)
                 {
-                    axeAnimHandler.PlaySwingAnimation();
+                    rockAnimHandler.PlaySwingAnimation();
                 }
-                else
-                {
-                    // NEW: Check for RockAnimationHandler
-                    RockAnimationHandler rockAnimHandler = heldItems[selectedSlot].GetComponentInChildren<RockAnimationHandler>();
-                    if (rockAnimHandler != null)
-                    {
-                        rockAnimHandler.PlaySwingAnimation();
-                    }
-                    // Add more item-specific handlers here as needed
-                }
+                // Add more item-specific handlers here as needed
             }
         }
 
@@ -91,7 +104,7 @@ public class HotbarManager : MonoBehaviour
                 GameObject itemToPickUp = hit.collider.gameObject;
 
                 // NEW CHECK: Ensure the item is not already in our hotbar
-                for (int i = 0; i < maxSlots; i++)
+                for (int i = 0; i < hotbarSlots.Length; i++)
                 {
                     if (heldItems[i] == itemToPickUp)
                     {
@@ -108,7 +121,7 @@ public class HotbarManager : MonoBehaviour
 
     int FindFirstEmptySlot()
     {
-        for (int i = 0; i < maxSlots; i++)
+        for (int i = 0; i < hotbarSlots.Length; i++)
             if (heldItems[i] == null)
                 return i;
         return -1;
@@ -118,33 +131,21 @@ public class HotbarManager : MonoBehaviour
     {
         Debug.Log($"Picking up {item.name} into slot {slot}");
         heldItems[slot] = item;
+        hotbarSlots[slot].SetItem(item); // Update the InventorySlot with the actual item
 
-        // Get icon (assumes item has a script with a public Sprite icon field, or use a default)
-        Sprite icon = null;
-        var iconProvider = item.GetComponent<ItemIconProvider>();
-        if (iconProvider != null)
-            icon = iconProvider.icon;
-        itemIcons[slot] = icon;
+        // Set parenting and active state in SelectSlot
+        // item.transform.SetParent(handHolder);
+        // item.transform.localPosition = Vector3.zero;
+        // item.transform.localRotation = Quaternion.identity;
+        // item.SetActive(slot == selectedSlot);
 
-        // Parent to handHolder, using custom offset if available
-        var offset = item.GetComponent<ItemHoldOffset>();
-        if (offset != null)
-            offset.ApplyOffset(handHolder);
-        else
-        {
-            item.transform.SetParent(handHolder);
-            item.transform.localPosition = Vector3.zero;
-            item.transform.localRotation = Quaternion.identity;
-        }
-        item.SetActive(slot == selectedSlot);
-
-        UpdateHotbarUI();
+        // UpdateHotbarUI(); // Redundant now as SetItem updates individually
     }
 
-    void SelectSlot(int slot)
+    public void SelectSlot(int slot) // Made public for InventorySystem access
     {
         Debug.Log($"Selecting slot {slot}");
-        if (slot < 0 || slot >= maxSlots) return;
+        if (slot < 0 || slot >= hotbarSlots.Length) return;
 
         // Deactivate the previously selected item
         if (heldItems[selectedSlot] != null)
@@ -165,6 +166,7 @@ public class HotbarManager : MonoBehaviour
                 offset.ApplyOffset(handHolder);
             else // If no custom offset, reset to default local position/rotation relative to HandHolder
             {
+                heldItems[selectedSlot].transform.SetParent(handHolder); // Ensure parenting
                 heldItems[selectedSlot].transform.localPosition = Vector3.zero;
                 heldItems[selectedSlot].transform.localRotation = Quaternion.identity;
             }
@@ -187,16 +189,16 @@ public class HotbarManager : MonoBehaviour
             }
         }
 
-        UpdateHotbarUI();
+        // UpdateHotbarUI(); // Redundant now as SetItem updates individually
     }
 
-    void DropSelectedItem()
+    public void DropSelectedItem()
     {
         if (heldItems[selectedSlot] != null)
         {
             GameObject item = heldItems[selectedSlot];
-            item.SetActive(true);
-            item.transform.SetParent(null);
+            item.SetActive(true); // Make sure it's active before dropping
+            item.transform.SetParent(null); // Unparent from hand
             // Add drop logic (e.g., throw forward)
             Rigidbody rb = item.GetComponent<Rigidbody>();
             if (rb != null)
@@ -206,17 +208,51 @@ public class HotbarManager : MonoBehaviour
                 rb.AddForce(Camera.main.transform.forward * 5f, ForceMode.Impulse);
             }
             heldItems[selectedSlot] = null;
-            itemIcons[selectedSlot] = null;
-            UpdateHotbarUI();
+            hotbarSlots[selectedSlot].SetItem(null); // Clear the InventorySlot and its visual
+
+            // UpdateHotbarUI(); // Redundant now as SetItem updates individually
         }
     }
 
-    void UpdateHotbarUI()
+    public void UpdateHotbarUI() // Made public for InventoryUIManager access
     {
-        for (int i = 0; i < maxSlots; i++)
+        for (int i = 0; i < hotbarSlots.Length; i++)
         {
-            if (slotImages[i] != null)
-                slotImages[i].sprite = itemIcons[i] != null ? itemIcons[i] : emptySlotSprite;
+            hotbarSlots[i].SetItem(heldItems[i], emptySlotSprite); // Ensure currentItem and visual are in sync
+        }
+    }
+
+    // Public method to be called by InventorySlot.OnDrop to transfer items
+    public void TransferItem(InventorySlot sourceSlot, InventorySlot targetSlot)
+    {
+        // This method will be implemented in a later step to coordinate transfers
+        // between HotbarManager and InventoryManager.
+        // For now, the direct swap in InventorySlot.OnDrop handles the visuals.
+    }
+
+    // New: Public method to get an item at a specific index
+    public GameObject GetItem(int index)
+    {
+        if (index >= 0 && index < heldItems.Length)
+        {
+            return heldItems[index];
+        }
+        return null;
+    }
+
+    // New: Public method to set an item at a specific index
+    public void SetItem(int index, GameObject item)
+    {
+        if (index >= 0 && index < heldItems.Length)
+        {
+            Debug.Log($"[HotbarManager] SetItem: Setting item {(item != null ? item.name : "null")} at index {index}");
+            heldItems[index] = item;
+            hotbarSlots[index].SetItem(item, emptySlotSprite); // Update the slot's visual and currentItem
+            // Parenting and activation will be handled by SelectSlot for equipped items, or InventorySystem for transfers
+        }
+        else
+        {
+            Debug.LogWarning($"[HotbarManager] SetItem: Invalid index {index} for item {(item != null ? item.name : "null")}");
         }
     }
 } 
