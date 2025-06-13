@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections.Generic;
 
 public class HotbarManager : MonoBehaviour
 {
@@ -48,7 +49,16 @@ public class HotbarManager : MonoBehaviour
                 {
                     axeAnimHandler.PlaySwingAnimation();
                 }
-                // Add other item types here later (e.g., RockAnimationHandler)
+                else
+                {
+                    // NEW: Check for RockAnimationHandler
+                    RockAnimationHandler rockAnimHandler = heldItems[selectedSlot].GetComponentInChildren<RockAnimationHandler>();
+                    if (rockAnimHandler != null)
+                    {
+                        rockAnimHandler.PlaySwingAnimation();
+                    }
+                    // Add more item-specific handlers here as needed
+                }
             }
         }
 
