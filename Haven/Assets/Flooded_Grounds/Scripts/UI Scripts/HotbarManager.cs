@@ -63,6 +63,14 @@ public class HotbarManager : MonoBehaviour
 
     void TryPickupItem()
     {
+        // Only pick up if there is an empty slot
+        int slot = FindFirstEmptySlot();
+        if (slot == -1)
+        {
+            Debug.Log("No empty hotbar slot available!");
+            return;
+        }
+
         RaycastHit hit;
         float sphereRadius = 0.5f;
         float pickupRange = 5f;
@@ -70,12 +78,20 @@ public class HotbarManager : MonoBehaviour
         {
             if (hit.collider.CompareTag("Pickupable"))
             {
-                int slot = FindFirstEmptySlot();
-                Debug.Log($"Found pickupable: {hit.collider.name}, first empty slot: {slot}");
-                if (slot != -1)
+                GameObject itemToPickUp = hit.collider.gameObject;
+
+                // NEW CHECK: Ensure the item is not already in our hotbar
+                for (int i = 0; i < maxSlots; i++)
                 {
-                    PickupItem(hit.collider.gameObject, slot);
+                    if (heldItems[i] == itemToPickUp)
+                    {
+                        Debug.Log($"Item {itemToPickUp.name} is already in hotbar slot {i}. Not picking up again.");
+                        return; // Item is already in the hotbar, do nothing
+                    }
                 }
+
+                Debug.Log($"Found pickupable: {itemToPickUp.name}, first empty slot: {slot}");
+                PickupItem(itemToPickUp, slot);
             }
         }
     }
