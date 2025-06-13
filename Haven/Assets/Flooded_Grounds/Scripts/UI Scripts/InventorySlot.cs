@@ -34,24 +34,38 @@ public class InventorySlot : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     {
         if (currentItem != null && itemImage != null && itemImage.sprite != null && itemImage.color.a > 0.1f) 
         {
-            Debug.Log($"[InventorySlot] OnBeginDrag: {gameObject.name} - Dragging item: {currentItem.name}");
+            Debug.Log($"[InventorySlot] OnBeginDrag: {gameObject.name} - Dragging item: {currentItem.name}. Source itemImage sprite: {(itemImage.sprite != null ? itemImage.sprite.name : "NULL")}");
             itemBeingDraggedSlot = this;
 
             // Create a temporary GameObject for the dragged icon
             draggedIconGameObject = new GameObject("DraggedItemIcon");
             draggedIconGameObject.transform.SetParent(canvas.transform); // Parent to canvas for overlay
+            draggedIconGameObject.transform.SetAsLastSibling(); // Ensure it renders on top
+            draggedIconGameObject.transform.localScale = Vector3.one; // Ensure scale is 1,1,1
             draggedIconImage = draggedIconGameObject.AddComponent<Image>();
             draggedIconImage.sprite = itemImage.sprite; // Copy the sprite from the slot's item image
             draggedIconImage.color = new Color(itemImage.color.r, itemImage.color.g, itemImage.color.b, 0.6f); // Semi-transparent
-            draggedIconImage.rectTransform.sizeDelta = itemImage.rectTransform.sizeDelta; // Match size
+
+            // Ensure sizeDelta is valid, provide fallback if necessary
+            if (itemImage.rectTransform.sizeDelta.x > 0 && itemImage.rectTransform.sizeDelta.y > 0)
+            {
+                draggedIconImage.rectTransform.sizeDelta = itemImage.rectTransform.sizeDelta; // Match size
+            }
+            else
+            {
+                draggedIconImage.rectTransform.sizeDelta = new Vector2(50, 50); // Fallback to a default size
+                Debug.LogWarning($"[InventorySlot] OnBeginDrag: {gameObject.name} - Original itemImage.sizeDelta was invalid ({itemImage.rectTransform.sizeDelta}). Using fallback size (50,50).");
+            }
             draggedIconImage.raycastTarget = false; // Disable raycasting
 
             // Hide the original item image in the slot (it will be redrawn by SetItem later)
             itemImage.enabled = false; 
+            
+            Debug.Log($"[InventorySlot] OnBeginDrag: {gameObject.name} - Created draggedIcon. SizeDelta: {draggedIconImage.rectTransform.sizeDelta}, LocalScale: {draggedIconGameObject.transform.localScale}");
         }
         else
         {
-            Debug.Log($"[InventorySlot] OnBeginDrag: {gameObject.name} - No item to drag or invalid state.");
+            Debug.Log($"[InventorySlot] OnBeginDrag: {gameObject.name} - No item to drag or invalid state. CurrentItem: {(currentItem != null ? currentItem.name : "NULL")}, ItemImage: {(itemImage != null ? itemImage.name : "NULL")}, ItemImage Sprite: {(itemImage != null && itemImage.sprite != null ? itemImage.sprite.name : "NULL")}");
             itemBeingDraggedSlot = null;
         }
     }
@@ -66,34 +80,32 @@ public class InventorySlot : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
 
     public void OnEndDrag(PointerEventData eventData)
     {
-        if (itemBeingDraggedSlot == this)
+        // This method should always attempt to clean up its own dragged icon,
+        // as it's called on the *source* slot when the drag operation ends.
+
+        Debug.Log($"[InventorySlot] OnEndDrag: {gameObject.name} - Ended dragging item: {(currentItem != null ? currentItem.name : "null")}");
+
+        // Always destroy the temporary dragged icon for the source slot
+        if (draggedIconGameObject != null)
         {
-            Debug.Log($"[InventorySlot] OnEndDrag: {gameObject.name} - Ended dragging item: {(currentItem != null ? currentItem.name : "null")}");
-
-            // Destroy the temporary dragged icon
-            if (draggedIconGameObject != null)
-            {
-                Destroy(draggedIconGameObject);
-                draggedIconGameObject = null;
-                draggedIconImage = null;
-            }
-
-            // If the item was not dropped on a valid slot, return it to its original position visually
-            // The actual item GameObject will be handled by the InventorySystem based on the drop outcome
-            if (eventData.pointerEnter == null || (eventData.pointerEnter != null && eventData.pointerEnter.GetComponent<InventorySlot>() == null))
-            {
-                // If dropped outside any valid slot, or on a non-slot UI element, return to original visual state.
-                InventorySystem.Instance.ReturnItemToOriginalSlot(this);
-            }
-            else
-            {
-                // If dropped on a valid slot, the InventorySystem.RequestItemTransfer will handle updates.
-                // Ensure our original slot's image is enabled, as it might have been disabled during drag.
-                if (itemImage != null) itemImage.enabled = true;
-            }
-
-            // itemBeingDraggedSlot will be nullified by OnDrop if successful, or by manager if returned.
+            Debug.Log($"[InventorySlot] OnEndDrag: Destroying draggedIconGameObject for {gameObject.name}.");
+            Destroy(draggedIconGameObject);
+            draggedIconGameObject = null;
+            draggedIconImage = null;
         }
+
+        // Ensure the original slot's item image is enabled, as it might have been disabled during drag.
+        if (itemImage != null) itemImage.enabled = true;
+
+        // Handle item return if dropped outside any valid slot
+        if (eventData.pointerEnter == null || (eventData.pointerEnter != null && eventData.pointerEnter.GetComponent<InventorySlot>() == null))
+        {
+            InventorySystem.Instance.ReturnItemToOriginalSlot(this);
+        }
+        // Note: If dropped on a valid slot, InventorySystem.RequestItemTransfer handles actual GameObject movement.
+
+        // The itemBeingDraggedSlot is nulled by OnDrop in the target slot, or by ReturnItemToOriginalSlot in InventorySystem.
+        // We don't need to nullify it here again for the source slot.
     }
 
     public void OnDrop(PointerEventData eventData)
@@ -125,7 +137,7 @@ public class InventorySlot : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
                 if (iconProvider != null)
                 {
                     itemIcon = iconProvider.icon;
-                    Debug.Log($"[InventorySlot] SetItem: {gameObject.name} - Set to item {item.name}, icon: {(itemIcon != null ? itemIcon.name : "null")}");
+                    Debug.Log($"[InventorySlot] SetItem: {gameObject.name} - Set to item {item.name}, icon from ItemIconProvider: {(itemIcon != null ? itemIcon.name : "NULL")}");
                 }
                 else
                 {
@@ -138,7 +150,7 @@ public class InventorySlot : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             }
             else // Slot is empty
             {
-                Debug.Log($"[InventorySlot] SetItem: {gameObject.name} - Set to empty, using emptySprite: {(emptySlotDefaultSprite != null ? emptySlotDefaultSprite.name : "null")}");
+                Debug.Log($"[InventorySlot] SetItem: {gameObject.name} - Set to empty. Empty sprite: {(emptySlotDefaultSprite != null ? emptySlotDefaultSprite.name : "NULL")}");
                 itemImage.sprite = emptySlotDefaultSprite; // Use the provided empty slot sprite
                 itemImage.color = Color.gray; // Consistent empty color
                 itemImage.enabled = true; // Still enabled to show empty state
