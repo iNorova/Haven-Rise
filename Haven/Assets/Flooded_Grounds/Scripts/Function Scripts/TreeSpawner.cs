@@ -3,130 +3,277 @@ using System.Collections.Generic;
 
 public class TreeSpawner : MonoBehaviour
 {
-    [Header("Tree Prefabs")]
-    [SerializeField] private GameObject[] treePrefabs;  // Different tree variants to spawn
-    
-    [Header("Spawn Settings")]
-    [SerializeField] private int numberOfTrees = 100;
-    [SerializeField] private float minScale = 0.8f;
-    [SerializeField] private float maxScale = 1.2f;
-    [SerializeField] private float minDistance = 5f;  // Minimum distance between trees
-    
-    [Header("Terrain Settings")]
-    [SerializeField] private Terrain terrain;
-    [SerializeField] private float minHeight = 1f;    // Minimum terrain height to spawn trees
-    [SerializeField] private float maxHeight = 50f;   // Maximum terrain height to spawn trees
-    [SerializeField] private float maxSteepness = 30f;  // Maximum slope angle for tree spawning
+    [Header("Tree Spawning Settings")]
+    public List<GameObject> treePrefabs = new List<GameObject>();  // List of tree prefabs to spawn
+    public int numberOfTrees = 50;               // Number of trees to spawn
+    public float minDistanceBetweenTrees = 2f;   // Minimum distance between spawned trees
+    public float spawnHeight = 0f;               // Height offset for spawning trees
+    public float treeRadius = 1f;                // Radius to check for structure collisions
+    public float randomOffset = 1f;              // Random offset for natural look
 
-    [Header("Seed Settings")]
-    [SerializeField] private bool useRandomSeed = true;
-    [SerializeField] private string seedString = "";
+    [Header("Spawn Area Settings")]
+    public Vector2 spawnAreaSize = new Vector2(50f, 50f);  // Size of the spawn area
+    public LayerMask groundLayer;                // Layer mask for the ground
+    public LayerMask structureLayer;             // Layer mask for structures/buildings
+    public LayerMask waterLayer;                 // Layer mask for water
+    public Terrain targetTerrain;                // Reference to the terrain
+    public float waterHeight = 0f;               // Height of the water plane
+    public float waterCheckRadius = 0.5f;        // Radius to check for water
+    public float waterCheckHeight = 1f;          // Height to check above water
 
-    private System.Random seededRandom;
-    private List<Vector3> spawnedTreePositions = new List<Vector3>();
+    private List<Vector3> spawnedPositions = new List<Vector3>();
+    private List<Vector2> gridPositions = new List<Vector2>();
+    private GameObject waterPlane;                // Reference to the water plane
 
     void Start()
     {
-        InitializeSeed();
-        SpawnTrees();
-    }
-
-    void InitializeSeed()
-    {
-        int seed;
-        if (useRandomSeed)
+        Debug.Log("TreeSpawner: Starting initialization...");
+        
+        // Find water plane
+        waterPlane = GameObject.FindGameObjectWithTag("Water");
+        if (waterPlane == null)
         {
-            seed = Random.Range(int.MinValue, int.MaxValue);
-            seedString = seed.ToString();
+            Debug.LogWarning("TreeSpawner: No water plane found with 'Water' tag. Make sure your water has the 'Water' tag.");
         }
         else
         {
-            seed = string.IsNullOrEmpty(seedString) ? 0 : seedString.GetHashCode();
+            waterHeight = waterPlane.transform.position.y;
+            Debug.Log($"TreeSpawner: Found water plane at height {waterHeight}");
         }
-        seededRandom = new System.Random(seed);
-        Debug.Log($"Initializing tree spawner with seed: {seedString}");
-    }
-
-    float GetSeededRandom()
-    {
-        return (float)seededRandom.NextDouble();
-    }
-
-    Vector3 GetRandomTerrainPosition()
-    {
-        float x = GetSeededRandom() * terrain.terrainData.size.x;
-        float z = GetSeededRandom() * terrain.terrainData.size.z;
-        float y = terrain.SampleHeight(new Vector3(x, 0, z));
-        return new Vector3(x, y, z) + terrain.transform.position;
-    }
-
-    bool IsValidSpawnPoint(Vector3 position)
-    {
-        // Check height constraints
-        if (position.y < minHeight || position.y > maxHeight)
-            return false;
-
-        // Check slope
-        float slope = GetTerrainSlope(position);
-        if (slope > maxSteepness)
-            return false;
-
-        // Check distance from other trees
-        foreach (Vector3 treePos in spawnedTreePositions)
+        
+        // Check if we have tree prefabs
+        if (treePrefabs == null || treePrefabs.Count == 0)
         {
-            if (Vector3.Distance(position, treePos) < minDistance)
+            Debug.LogError("TreeSpawner: No tree prefabs assigned! Please add at least one tree prefab in the inspector.");
+            return;
+        }
+
+        // Check if terrain is assigned
+        if (targetTerrain == null)
+        {
+            Debug.LogError("TreeSpawner: No terrain assigned! Please drag your terrain into the Target Terrain field in the inspector.");
+            return;
+        }
+
+        // Check if layers are set
+        if (groundLayer.value == 0)
+        {
+            Debug.LogError("TreeSpawner: Ground Layer is not set! Please set the Ground Layer in the inspector.");
+            return;
+        }
+
+        if (structureLayer.value == 0)
+        {
+            Debug.LogWarning("TreeSpawner: Structure Layer is not set. Trees might spawn inside buildings!");
+        }
+
+        if (waterLayer.value == 0)
+        {
+            Debug.LogWarning("TreeSpawner: Water Layer is not set. Trees might spawn in water!");
+        }
+
+        Debug.Log($"TreeSpawner: Initialization complete. Ready to spawn {numberOfTrees} trees.");
+        InitializeGrid();
+        SpawnTrees();
+    }
+
+    void InitializeGrid()
+    {
+        gridPositions.Clear();
+        
+        // Calculate grid size based on number of trees and spawn area
+        float gridSize = Mathf.Sqrt((spawnAreaSize.x * spawnAreaSize.y) / numberOfTrees);
+        int gridX = Mathf.CeilToInt(spawnAreaSize.x / gridSize);
+        int gridZ = Mathf.CeilToInt(spawnAreaSize.y / gridSize);
+
+        // Create grid positions
+        for (int x = 0; x < gridX; x++)
+        {
+            for (int z = 0; z < gridZ; z++)
+            {
+                float posX = (x * gridSize) - (spawnAreaSize.x / 2) + (gridSize / 2);
+                float posZ = (z * gridSize) - (spawnAreaSize.y / 2) + (gridSize / 2);
+                gridPositions.Add(new Vector2(posX, posZ));
+            }
+        }
+
+        // Shuffle grid positions for random distribution
+        for (int i = 0; i < gridPositions.Count; i++)
+        {
+            Vector2 temp = gridPositions[i];
+            int randomIndex = Random.Range(i, gridPositions.Count);
+            gridPositions[i] = gridPositions[randomIndex];
+            gridPositions[randomIndex] = temp;
+        }
+    }
+
+    void SpawnTrees()
+    {
+        Debug.Log("TreeSpawner: Starting tree spawning process...");
+        int successfulSpawns = 0;
+        int maxAttempts = gridPositions.Count;
+
+        foreach (Vector2 gridPos in gridPositions)
+        {
+            if (successfulSpawns >= numberOfTrees) break;
+
+            // Add random offset to grid position
+            float randomOffsetX = Random.Range(-randomOffset, randomOffset);
+            float randomOffsetZ = Random.Range(-randomOffset, randomOffset);
+            Vector3 spawnPosition = new Vector3(
+                gridPos.x + randomOffsetX + transform.position.x,
+                0,
+                gridPos.y + randomOffsetZ + transform.position.z
+            );
+
+            // Get the height at this position from the terrain
+            spawnPosition.y = targetTerrain.SampleHeight(spawnPosition) + spawnHeight;
+
+            // Check if position is valid and not in water
+            if (IsValidPosition(spawnPosition) && !IsNearStructure(spawnPosition) && !IsInWater(spawnPosition))
+            {
+                // Get random tree prefab
+                GameObject randomTreePrefab = treePrefabs[Random.Range(0, treePrefabs.Count)];
+                
+                // Spawn the tree with random rotation
+                float randomRotation = Random.Range(0f, 360f);
+                GameObject tree = Instantiate(randomTreePrefab, spawnPosition, 
+                    Quaternion.Euler(0, randomRotation, 0));
+                tree.transform.parent = transform;
+                spawnedPositions.Add(spawnPosition);
+                successfulSpawns++;
+                
+                if (successfulSpawns % 10 == 0)
+                {
+                    Debug.Log($"TreeSpawner: Successfully spawned {successfulSpawns} trees so far...");
+                }
+            }
+        }
+
+        Debug.Log($"TreeSpawner: Spawning complete. Successfully spawned {spawnedPositions.Count} trees.");
+        
+        if (spawnedPositions.Count < numberOfTrees)
+        {
+            Debug.LogWarning($"TreeSpawner: Could not spawn all requested trees. Only spawned {spawnedPositions.Count} out of {numberOfTrees} trees.");
+        }
+    }
+
+    bool IsValidPosition(Vector3 position)
+    {
+        // Check if position is too close to other trees
+        foreach (Vector3 existingPosition in spawnedPositions)
+        {
+            if (Vector3.Distance(position, existingPosition) < minDistanceBetweenTrees)
+            {
                 return false;
+            }
+        }
+
+        // Check if position is within terrain bounds
+        Vector3 terrainPosition = position - targetTerrain.transform.position;
+        if (terrainPosition.x < 0 || terrainPosition.x > targetTerrain.terrainData.size.x ||
+            terrainPosition.z < 0 || terrainPosition.z > targetTerrain.terrainData.size.z)
+        {
+            return false;
         }
 
         return true;
     }
 
-    float GetTerrainSlope(Vector3 worldPosition)
+    bool IsNearStructure(Vector3 position)
     {
-        Vector3 normal = terrain.terrainData.GetInterpolatedNormal(
-            (worldPosition.x - terrain.transform.position.x) / terrain.terrainData.size.x,
-            (worldPosition.z - terrain.transform.position.z) / terrain.terrainData.size.z
-        );
-        return Vector3.Angle(normal, Vector3.up);
-    }
+        if (structureLayer.value == 0) return false;
 
-    void SpawnTrees()
-    {
-        int attempts = 0;
-        int maxAttempts = numberOfTrees * 10;  // Prevent infinite loops
-        int treesSpawned = 0;
-
-        while (treesSpawned < numberOfTrees && attempts < maxAttempts)
+        // Check for any colliders in the structure layer within the tree radius
+        Collider[] colliders = Physics.OverlapSphere(position, treeRadius, structureLayer);
+        
+        // If any colliders found, position is too close to a structure
+        if (colliders.Length > 0)
         {
-            Vector3 position = GetRandomTerrainPosition();
-            
-            if (IsValidSpawnPoint(position))
-            {
-                // Select random tree prefab
-                int treeIndex = seededRandom.Next(0, treePrefabs.Length);
-                GameObject treePrefab = treePrefabs[treeIndex];
-
-                // Create tree with random rotation and scale
-                float rotationY = GetSeededRandom() * 360f;
-                float scale = Mathf.Lerp(minScale, maxScale, GetSeededRandom());
-                
-                GameObject tree = Instantiate(treePrefab, position, Quaternion.Euler(0, rotationY, 0));
-                tree.transform.localScale = Vector3.one * scale;
-                tree.transform.parent = transform;
-
-                spawnedTreePositions.Add(position);
-                treesSpawned++;
-            }
-            
-            attempts++;
+            return true;
         }
 
-        Debug.Log($"Spawned {treesSpawned} trees after {attempts} attempts");
+        // Additional check for structures above the spawn point
+        RaycastHit hit;
+        if (Physics.Raycast(position + Vector3.up * 100f, Vector3.down, out hit, 200f, structureLayer))
+        {
+            return true;
+        }
+
+        return false;
     }
 
-    // Optional: Method to save tree positions for persistence
-    public Vector3[] GetTreePositions()
+    bool IsInWater(Vector3 position)
     {
-        return spawnedTreePositions.ToArray();
+        // Check if position is below water height
+        if (position.y <= waterHeight)
+        {
+            return true;
+        }
+
+        // Check for water colliders in a sphere around the position
+        if (waterLayer.value != 0)
+        {
+            // Check at the base of the tree
+            Collider[] waterColliders = Physics.OverlapSphere(position, waterCheckRadius, waterLayer);
+            if (waterColliders.Length > 0)
+            {
+                return true;
+            }
+
+            // Check slightly above the position
+            Vector3 checkPosition = position + Vector3.up * waterCheckHeight;
+            waterColliders = Physics.OverlapSphere(checkPosition, waterCheckRadius, waterLayer);
+            if (waterColliders.Length > 0)
+            {
+                return true;
+            }
+        }
+
+        // Check if water plane exists and is above the position
+        if (waterPlane != null)
+        {
+            // Get the water plane's bounds
+            Bounds waterBounds = new Bounds(waterPlane.transform.position, waterPlane.transform.localScale);
+            if (waterBounds.Contains(position))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
-} 
+
+    // Optional: Visualize spawn area and structure check radius in editor
+    void OnDrawGizmosSelected()
+    {
+        // Draw spawn area
+        Gizmos.color = Color.green;
+        Gizmos.DrawWireCube(transform.position, new Vector3(spawnAreaSize.x, 0.1f, spawnAreaSize.y));
+
+        // Draw structure check radius for the last spawned position (if any)
+        if (spawnedPositions.Count > 0)
+        {
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawWireSphere(spawnedPositions[spawnedPositions.Count - 1], treeRadius);
+        }
+
+        // Draw water height and check radius
+        Gizmos.color = Color.blue;
+        Gizmos.DrawWireCube(transform.position + Vector3.up * waterHeight, 
+            new Vector3(spawnAreaSize.x, 0.1f, spawnAreaSize.y));
+        
+        if (spawnedPositions.Count > 0)
+        {
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawWireSphere(spawnedPositions[spawnedPositions.Count - 1], waterCheckRadius);
+            Gizmos.DrawWireSphere(spawnedPositions[spawnedPositions.Count - 1] + Vector3.up * waterCheckHeight, waterCheckRadius);
+        }
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        
+    }
+}

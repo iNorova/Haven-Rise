@@ -19,12 +19,15 @@ public class UIManager : MonoBehaviour
     public float temperatureIncreaseRate = 5f;    // How fast temperature increases when trees are cut
     public float temperatureDecreaseRate = 2f;    // How fast temperature decreases over time
     public float temperatureIncreaseDuration = 5f;  // How long temperature increases after tree destruction
+    public float permanentTemperatureIncreasePerTree = 2f;  // Permanent temperature increase per tree cut
+    public float temperatureDecreasePerTree = 2f;  // Temperature decrease per tree planted
     
     [Header("Temperature Thresholds")]
     public float dangerThreshold = 75f;       // Temperature level where danger effects start
     public float criticalThreshold = 90f;     // Temperature level where critical effects start
     
     private float currentTemperature;
+    private float permanentTemperatureIncrease = 0f;  // Tracks permanent temperature increase from deforestation
     private bool isTemperatureIncreasing = false; // Flag to control temperature increase
     private float temperatureIncreaseTimer = 0f;  // Timer for temperature increase duration
 
@@ -122,28 +125,26 @@ public class UIManager : MonoBehaviour
                     temperatureIncreaseTimer = 0f;
                 }
             }
-            else
-            {
-                // Slowly decrease temperature
-                currentTemperature -= temperatureDecreaseRate * Time.deltaTime;
-            }
+
+            // Calculate final temperature including permanent increase
+            float finalTemperature = currentTemperature + permanentTemperatureIncrease;
 
             // Clamp the value between min and max
-            currentTemperature = Mathf.Clamp(currentTemperature, minTemperatureValue, maxTemperatureValue);
+            finalTemperature = Mathf.Clamp(finalTemperature, minTemperatureValue, maxTemperatureValue);
 
             // Update the slider
             if (temperatureSlider != null)
             {
-                temperatureSlider.value = currentTemperature;
+                temperatureSlider.value = finalTemperature;
                 
                 // Update fill color based on temperature
                 if (temperatureFillImage != null)
                 {
-                    if (currentTemperature >= criticalThreshold)
+                    if (finalTemperature >= criticalThreshold)
                     {
                         temperatureFillImage.color = criticalTemperatureColor;
                     }
-                    else if (currentTemperature >= dangerThreshold)
+                    else if (finalTemperature >= dangerThreshold)
                     {
                         temperatureFillImage.color = dangerTemperatureColor;
                     }
@@ -193,16 +194,23 @@ public class UIManager : MonoBehaviour
     public void StartTemperatureIncrease()
     {
         isTemperatureIncreasing = true;
+        // Add permanent temperature increase when tree is cut
+        permanentTemperatureIncrease += permanentTemperatureIncreasePerTree;
+        // Ensure permanent increase doesn't exceed max temperature
+        permanentTemperatureIncrease = Mathf.Min(permanentTemperatureIncrease, maxTemperatureValue);
     }
 
-    public void StopTemperatureIncrease()
+    public void DecreaseTemperatureFromTreePlanting()
     {
-        isTemperatureIncreasing = false;
+        // Decrease permanent temperature increase when tree is planted
+        permanentTemperatureIncrease -= temperatureDecreasePerTree;
+        // Ensure permanent increase doesn't go below 0
+        permanentTemperatureIncrease = Mathf.Max(permanentTemperatureIncrease, 0f);
     }
 
     public float GetCurrentTemperature()
     {
-        return currentTemperature;
+        return currentTemperature + permanentTemperatureIncrease;
     }
 
     public bool IsInDangerZone()
