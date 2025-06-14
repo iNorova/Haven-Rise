@@ -189,8 +189,8 @@ public class ItemPickup : MonoBehaviour
             // Unparent the item
             heldItem.transform.SetParent(null);
 
-            // Move the item slightly forward to avoid overlapping with the player
-            Vector3 dropOffset = playerCamera.transform.forward * 1.0f; // 1 unit in front of the camera
+            // Move the item slightly forward and up to avoid overlapping with the player
+            Vector3 dropOffset = playerCamera.transform.forward * 1.0f + Vector3.up * 0.2f; // Reduced upward offset
             heldItem.transform.position = playerCamera.transform.position + dropOffset;
 
             // Re-enable all colliders
@@ -202,14 +202,17 @@ public class ItemPickup : MonoBehaviour
                 }
             }
 
-            // Re-enable physics
+            // Re-enable physics with improved settings
             Rigidbody rb = heldItem.GetComponent<Rigidbody>();
             if (rb != null)
             {
                 rb.isKinematic = false;
                 rb.useGravity = true;
-                rb.collisionDetectionMode = CollisionDetectionMode.Continuous; // Prevent tunneling
-                rb.linearDamping = 3.0f; // Increase drag to reduce sliding
+                rb.collisionDetectionMode = CollisionDetectionMode.Continuous; // Changed back to Continuous
+                rb.interpolation = RigidbodyInterpolation.None; // Removed interpolation for more natural movement
+                rb.linearDamping = 1.5f; // Reduced damping for more natural sliding
+                rb.angularDamping = 0.5f; // Reduced angular damping for more natural rotation
+                rb.maxAngularVelocity = 15.0f; // Increased max angular velocity for more natural spinning
                 rb.AddForce(playerCamera.transform.forward * throwForce, ForceMode.Impulse);
             }
 
