@@ -3,6 +3,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
+using Haven.Items; // NEW: Added for GenericItemHandler
 
 public class HotbarManager : MonoBehaviour
 {
@@ -78,6 +79,28 @@ public class HotbarManager : MonoBehaviour
                     {
                         rockAnimHandler.PlaySwingAnimation();
                         _isItemAnimating = true; // Set flag when animation starts
+                    }
+                    // NEW: Check for WoodAnimationHandler or other item-specific handlers
+                    else
+                    {
+                        WoodAnimationHandler woodAnimHandler = heldItems[selectedSlot].GetComponentInChildren<WoodAnimationHandler>();
+                        if (woodAnimHandler != null)
+                        {
+                            woodAnimHandler.PlayWoodActionAnimation(); // Call the specific wood animation method
+                            _isItemAnimating = true; // Set flag when animation starts
+                        }
+                        // Add more item-specific handlers here as needed
+                        else
+                        {
+                            // NEW: Check for GenericItemHandler (no animation needed)
+                            GenericItemHandler genericHandler = heldItems[selectedSlot].GetComponentInChildren<GenericItemHandler>();
+                            if (genericHandler != null)
+                            {
+                                // If it's a generic item with no specific animation, we don't set _isItemAnimating to true.
+                                // We can add a debug log or specific non-animation action here if needed.
+                                Debug.Log($"Using generic item: {heldItems[selectedSlot].name} (no animation triggered).");
+                            }
+                        }
                     }
                 }
             }
@@ -241,10 +264,10 @@ public class HotbarManager : MonoBehaviour
             {
                 rb.isKinematic = false;
                 rb.useGravity = true;
-                rb.AddForce(Camera.main.transform.forward * 5f, ForceMode.Impulse);
+                rb.AddForce(Camera.main.transform.forward * 0.5f, ForceMode.Impulse); // Reduced force for testing
             }
             heldItems[selectedSlot] = null;
-            hotbarSlots[selectedSlot].SetItem(null); // Clear the InventorySlot and its visual
+            hotbarSlots[selectedSlot].SetItem(null, emptySlotSprite); // FIX: Pass the emptySlotSprite explicitly
 
             // UpdateHotbarUI(); // Redundant now as SetItem updates individually
         }
