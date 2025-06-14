@@ -17,6 +17,8 @@ public class HotbarManager : MonoBehaviour
     public int selectedSlot = 0; // Made public for InventorySystem access
 
     private bool _canProcessItemInput = true; // New flag to control item input processing
+    private bool _isItemAnimating = false; // NEW: Flag to track if an item animation is playing
+    private Animator _currentHeldItemAnimator; // NEW: Reference to the animator of the currently held item
 
     void Start()
     {
@@ -56,24 +58,40 @@ public class HotbarManager : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Q))
             DropSelectedItem();
 
-        // NEW: Handle primary action (e.g., swinging axe) only if input is active
-        if (_canProcessItemInput && heldItems[selectedSlot] != null && Input.GetMouseButtonDown(0)) // Left mouse button
+        // NEW: Handle primary action (e.g., swinging axe) only if input is active AND no animation is playing
+        if (_canProcessItemInput && heldItems[selectedSlot] != null && !_isItemAnimating && Input.GetMouseButtonDown(0)) // Left mouse button
         {
             // Try to get an animation handler for the current item
-            AxeAnimationHandler axeAnimHandler = heldItems[selectedSlot].GetComponentInChildren<AxeAnimationHandler>();
-            if (axeAnimHandler != null)
+            _currentHeldItemAnimator = heldItems[selectedSlot].GetComponentInChildren<Animator>(); // Get Animator reference
+            if (_currentHeldItemAnimator != null)
             {
-                axeAnimHandler.PlaySwingAnimation();
-            }
-            else
-            {
-                // NEW: Check for RockAnimationHandler
-                RockAnimationHandler rockAnimHandler = heldItems[selectedSlot].GetComponentInChildren<RockAnimationHandler>();
-                if (rockAnimHandler != null)
+                AxeAnimationHandler axeAnimHandler = heldItems[selectedSlot].GetComponentInChildren<AxeAnimationHandler>();
+                if (axeAnimHandler != null)
                 {
-                    rockAnimHandler.PlaySwingAnimation();
+                    axeAnimHandler.PlaySwingAnimation();
+                    _isItemAnimating = true; // Set flag when animation starts
                 }
-                // Add more item-specific handlers here as needed
+                else
+                {
+                    RockAnimationHandler rockAnimHandler = heldItems[selectedSlot].GetComponentInChildren<RockAnimationHandler>();
+                    if (rockAnimHandler != null)
+                    {
+                        rockAnimHandler.PlaySwingAnimation();
+                        _isItemAnimating = true; // Set flag when animation starts
+                    }
+                }
+            }
+        }
+
+        // NEW: Check if current item animation has finished
+        if (_isItemAnimating && _currentHeldItemAnimator != null)
+        {
+            AnimatorStateInfo stateInfo = _currentHeldItemAnimator.GetCurrentAnimatorStateInfo(0); // Get state info from base layer
+            if (stateInfo.normalizedTime >= 1.0f && !stateInfo.loop) // Check if animation has completed and is not looping
+            {
+                _isItemAnimating = false; // Animation finished
+                ResetHeldItemPosition(); // Reset position after animation
+                _currentHeldItemAnimator = null; // Clear animator reference
             }
         }
 
@@ -149,10 +167,19 @@ public class HotbarManager : MonoBehaviour
         Debug.Log($"Selecting slot {slot}");
         if (slot < 0 || slot >= hotbarSlots.Length) return;
 
+        // NEW: Prevent slot selection if an item animation is currently playing
+        if (_isItemAnimating)
+        {
+            Debug.Log("Cannot switch slots while an item animation is playing.");
+            return;
+        }
+
         // Deactivate the previously selected item
         if (heldItems[selectedSlot] != null)
         {
             heldItems[selectedSlot].SetActive(false);
+            // Clear animator reference for the deactivated item
+            _currentHeldItemAnimator = null;
         }
 
         selectedSlot = slot;
@@ -161,18 +188,8 @@ public class HotbarManager : MonoBehaviour
         if (heldItems[selectedSlot] != null)
         {
             heldItems[selectedSlot].SetActive(true);
-
-            // Re-apply the ItemHoldOffset to ensure correct position/rotation on activation
-            var offset = heldItems[selectedSlot].GetComponent<ItemHoldOffset>();
-            if (offset != null)
-                offset.ApplyOffset(handHolder);
-            else // If no custom offset, reset to default local position/rotation relative to HandHolder
-            {
-                heldItems[selectedSlot].transform.SetParent(handHolder); // Ensure parenting
-                heldItems[selectedSlot].transform.localPosition = Vector3.zero;
-                heldItems[selectedSlot].transform.localRotation = Quaternion.identity;
-            }
-
+            ResetHeldItemPosition(); // NEW: Call the new method to reset position
+            
             // Force the Animator to its Idle state and reset all its triggers for a clean start
             Animator itemAnimator = heldItems[selectedSlot].GetComponentInChildren<Animator>();
             if (itemAnimator != null)
@@ -192,6 +209,23 @@ public class HotbarManager : MonoBehaviour
         }
 
         // UpdateHotbarUI(); // Redundant now as SetItem updates individually
+    }
+
+    // NEW: Helper method to reset the held item's position and rotation
+    private void ResetHeldItemPosition()
+    {
+        if (heldItems[selectedSlot] != null)
+        {
+            var offset = heldItems[selectedSlot].GetComponent<ItemHoldOffset>();
+            if (offset != null)
+                offset.ApplyOffset(handHolder);
+            else // If no custom offset, reset to default local position/rotation relative to HandHolder
+            {
+                heldItems[selectedSlot].transform.SetParent(handHolder); // Ensure parenting
+                heldItems[selectedSlot].transform.localPosition = Vector3.zero;
+                heldItems[selectedSlot].transform.localRotation = Quaternion.identity;
+            }
+        }
     }
 
     public void DropSelectedItem()
