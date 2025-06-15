@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
 using Haven.Items; // NEW: Added for GenericItemHandler
+using TMPro; // NEW: Added for TextMeshProUGUI
 
 public class HotbarManager : MonoBehaviour
 {
@@ -12,6 +13,7 @@ public class HotbarManager : MonoBehaviour
     public Transform handHolder; // Assign in inspector
     public InventorySlot[] hotbarSlots;   // Assign your hotbar UI InventorySlot components in inspector
     public Sprite emptySlotSprite; // Sprite for empty slot
+    public TextMeshProUGUI selectedItemNameText; // Changed from Text to TextMeshProUGUI
 
     private GameObject[] heldItems;
     // private Sprite[] itemIcons; // Item icons will be managed by InventorySlot itself
@@ -35,6 +37,9 @@ public class HotbarManager : MonoBehaviour
                 hotbarSlots[i].SetItem(heldItems[i], emptySlotSprite); // Set to null initially, with empty sprite
             }
             UpdateHotbarUI();
+
+            // Update the display for the initially selected item
+            UpdateSelectedItemNameDisplay();
         }
         else
         {
@@ -199,6 +204,9 @@ public class HotbarManager : MonoBehaviour
         
         item.SetActive(false); // Item will be activated in SelectSlot when its slot is chosen
 
+        // After picking up, ensure the item name display is updated
+        UpdateSelectedItemNameDisplay();
+
         // After picking up, ensure the item is selected if it's in the currently active slot
         // or if it's the first item being picked up into the default selected slot.
         if (slot == selectedSlot)
@@ -281,6 +289,9 @@ public class HotbarManager : MonoBehaviour
                 itemAnimator.Play("Idle", 0, 0f); // Play "Idle" state on base layer (0), from start (0f)
             }
         }
+
+        // Update the display for the newly selected item
+        UpdateSelectedItemNameDisplay();
     }
 
     // NEW: Helper method to reset the held item's position and rotation
@@ -302,12 +313,26 @@ public class HotbarManager : MonoBehaviour
 
     public void DropSelectedItem()
     {
-        if (heldItems[selectedSlot] == null) return;
+        if (heldItems[selectedSlot] == null)
+        {
+            Debug.Log("No item to drop in the selected slot.");
+            return;
+        }
 
         GameObject itemToDrop = heldItems[selectedSlot];
+        Debug.Log($"Dropping {itemToDrop.name} from slot {selectedSlot}");
 
-        // Reset parent and enable physics
-        itemToDrop.transform.SetParent(null); // Unparent from hand
+        // Remove from hotbar array
+        heldItems[selectedSlot] = null;
+
+        // Update the hotbar UI to show the slot as empty
+        hotbarSlots[selectedSlot].SetItem(null, emptySlotSprite);
+
+        // Ensure the item name display is updated after dropping
+        UpdateSelectedItemNameDisplay();
+
+        // Reset parent and enable physics for dropping
+        itemToDrop.transform.SetParent(null); // Unparent from hand holder
 
         Rigidbody rb = itemToDrop.GetComponent<Rigidbody>();
         if (rb != null)
@@ -326,11 +351,6 @@ public class HotbarManager : MonoBehaviour
         }
 
         itemToDrop.SetActive(true); // Ensure the dropped item is active
-
-        heldItems[selectedSlot] = null; // Clear the reference
-        hotbarSlots[selectedSlot].SetItem(null, emptySlotSprite); // Update UI
-
-        Debug.Log($"Dropped item from slot {selectedSlot + 1}");
     }
 
     public void UpdateHotbarUI() // Made public for InventoryUIManager access
@@ -384,13 +404,47 @@ public class HotbarManager : MonoBehaviour
     // NEW: Method to clear the currently selected hotbar slot
     public void ClearCurrentHotbarSlot()
     {
-        if (selectedSlot >= 0 && selectedSlot < heldItems.Length)
+        if (heldItems[selectedSlot] != null)
         {
-            // The item in the hand holder should already be destroyed by the consuming script (e.g., SeedInteraction).
-            // This method's role is to clear the internal hotbar state and UI.
-            heldItems[selectedSlot] = null; // Clear the reference in our array
-            hotbarSlots[selectedSlot].SetItem(null, emptySlotSprite); // Update the UI to show an empty slot
-            Debug.Log($"HotbarManager: Cleared item from slot {selectedSlot + 1}.");
+            GameObject itemToClear = heldItems[selectedSlot];
+            Debug.Log($"[HotbarManager] Clearing item {itemToClear.name} from slot {selectedSlot}");
+            
+            // Set item to inactive and unparent it from handHolder immediately
+            itemToClear.SetActive(false);
+            itemToClear.transform.SetParent(null);
+
+            heldItems[selectedSlot] = null; // Clear the item from the array
+            hotbarSlots[selectedSlot].SetItem(null, emptySlotSprite); // Update UI to empty
+            _currentHeldItemAnimator = null; // Clear animator reference
+
+            // Ensure the item name display is updated after clearing the slot
+            UpdateSelectedItemNameDisplay();
+        }
+    }
+
+    private void UpdateSelectedItemNameDisplay()
+    {
+        if (selectedItemNameText != null)
+        {
+            if (heldItems[selectedSlot] != null)
+            {
+                // Try to get a more user-friendly name, otherwise use the GameObject's name
+                string itemName = heldItems[selectedSlot].name;
+                ItemIconProvider iconProvider = heldItems[selectedSlot].GetComponent<ItemIconProvider>();
+                if (iconProvider != null && !string.IsNullOrEmpty(iconProvider.itemName))
+                {
+                    itemName = iconProvider.itemName;
+                }
+                selectedItemNameText.text = $"Current Item: {itemName}";
+            }
+            else
+            {
+                selectedItemNameText.text = "Current Item: Empty";
+            }
+        }
+        else
+        {
+            Debug.LogWarning("[HotbarManager] selectedItemNameText is not assigned. Cannot update item name display.");
         }
     }
 } 
