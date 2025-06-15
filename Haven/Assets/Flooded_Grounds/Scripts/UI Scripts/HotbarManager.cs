@@ -176,13 +176,28 @@ public class HotbarManager : MonoBehaviour
         heldItems[slot] = item;
         hotbarSlots[slot].SetItem(item); // Update the InventorySlot with the actual item
 
-        // Set parenting and active state in SelectSlot
-        // item.transform.SetParent(handHolder);
-        // item.transform.localPosition = Vector3.zero;
-        // item.transform.localRotation = Quaternion.identity;
-        // item.SetActive(slot == selectedSlot);
+        // Parent the item to the hand holder immediately
+        item.transform.SetParent(handHolder);
+        item.transform.localPosition = Vector3.zero;
+        item.transform.localRotation = Quaternion.identity;
 
-        // UpdateHotbarUI(); // Redundant now as SetItem updates individually
+        // Ensure physics is disabled while held
+        Rigidbody rb = item.GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.isKinematic = true;
+            rb.useGravity = false; // Disable gravity while held
+            Debug.Log($"[HotbarManager] PickupItem: {item.name} Rigidbody set to Kinematic and Gravity OFF."); // Debug Log
+        }
+
+        Collider itemCollider = item.GetComponent<Collider>();
+        if (itemCollider != null)
+        {
+            itemCollider.enabled = false; // Disable collider to prevent self-collision with player
+            Debug.Log($"[HotbarManager] PickupItem: {item.name} Collider disabled."); // Debug Log
+        }
+        
+        item.SetActive(false); // Item will be activated in SelectSlot when its slot is chosen
     }
 
     public void SelectSlot(int slot) // Made public for InventorySystem access
@@ -197,22 +212,51 @@ public class HotbarManager : MonoBehaviour
             return;
         }
 
-        // Deactivate the previously selected item
+        // Deactivate the previously selected item and handle its physics
         if (heldItems[selectedSlot] != null)
         {
             heldItems[selectedSlot].SetActive(false);
             // Clear animator reference for the deactivated item
             _currentHeldItemAnimator = null;
+
+            // Ensure physics is disabled while stored in inventory (not active)
+            Rigidbody prevRb = heldItems[selectedSlot].GetComponent<Rigidbody>();
+            if (prevRb != null)
+            {
+                prevRb.isKinematic = true; // Keep kinematic while stored
+                prevRb.useGravity = false;
+                Debug.Log($"[HotbarManager] SelectSlot: {heldItems[selectedSlot].name} (prev) Rigidbody set to Kinematic and Gravity OFF."); // Debug Log
+            }
+            Collider prevCollider = heldItems[selectedSlot].GetComponent<Collider>();
+            if (prevCollider != null)
+            {
+                prevCollider.enabled = false; // Keep disabled while stored
+                Debug.Log($"[HotbarManager] SelectSlot: {heldItems[selectedSlot].name} (prev) Collider disabled."); // Debug Log
+            }
         }
 
         selectedSlot = slot;
 
-        // Activate the newly selected item
+        // Activate the newly selected item and handle its physics
         if (heldItems[selectedSlot] != null)
         {
             heldItems[selectedSlot].SetActive(true);
-            ResetHeldItemPosition(); // NEW: Call the new method to reset position
+            ResetHeldItemPosition(); // Ensure correct position/rotation in hand
             
+            Rigidbody newRb = heldItems[selectedSlot].GetComponent<Rigidbody>();
+            if (newRb != null)
+            {
+                newRb.isKinematic = true; // Set kinematic when active in hand
+                newRb.useGravity = false;
+                Debug.Log($"[HotbarManager] SelectSlot: {heldItems[selectedSlot].name} (new) Rigidbody set to Kinematic and Gravity OFF."); // Debug Log
+            }
+            Collider newCollider = heldItems[selectedSlot].GetComponent<Collider>();
+            if (newCollider != null)
+            {
+                newCollider.enabled = false; // Disable collider when active in hand
+                Debug.Log($"[HotbarManager] SelectSlot: {heldItems[selectedSlot].name} (new) Collider disabled."); // Debug Log
+            }
+
             // Force the Animator to its Idle state and reset all its triggers for a clean start
             Animator itemAnimator = heldItems[selectedSlot].GetComponentInChildren<Animator>();
             if (itemAnimator != null)
@@ -230,8 +274,6 @@ public class HotbarManager : MonoBehaviour
                 itemAnimator.Play("Idle", 0, 0f); // Play "Idle" state on base layer (0), from start (0f)
             }
         }
-
-        // UpdateHotbarUI(); // Redundant now as SetItem updates individually
     }
 
     // NEW: Helper method to reset the held item's position and rotation
@@ -253,24 +295,35 @@ public class HotbarManager : MonoBehaviour
 
     public void DropSelectedItem()
     {
-        if (heldItems[selectedSlot] != null)
-        {
-            GameObject item = heldItems[selectedSlot];
-            item.SetActive(true); // Make sure it's active before dropping
-            item.transform.SetParent(null); // Unparent from hand
-            // Add drop logic (e.g., throw forward)
-            Rigidbody rb = item.GetComponent<Rigidbody>();
-            if (rb != null)
-            {
-                rb.isKinematic = false;
-                rb.useGravity = true;
-                rb.AddForce(Camera.main.transform.forward * 0.5f, ForceMode.Impulse); // Reduced force for testing
-            }
-            heldItems[selectedSlot] = null;
-            hotbarSlots[selectedSlot].SetItem(null, emptySlotSprite); // FIX: Pass the emptySlotSprite explicitly
+        if (heldItems[selectedSlot] == null) return;
 
-            // UpdateHotbarUI(); // Redundant now as SetItem updates individually
+        GameObject itemToDrop = heldItems[selectedSlot];
+
+        // Reset parent and enable physics
+        itemToDrop.transform.SetParent(null); // Unparent from hand
+
+        Rigidbody rb = itemToDrop.GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.isKinematic = false; // Enable physics
+            rb.useGravity = true; // Enable gravity
+            rb.AddForce(Camera.main.transform.forward * 5f, ForceMode.Impulse); // Add a forward force
+            Debug.Log($"[HotbarManager] DropSelectedItem: {itemToDrop.name} Rigidbody set to NOT Kinematic and Gravity ON."); // Debug Log
         }
+
+        Collider itemCollider = itemToDrop.GetComponent<Collider>();
+        if (itemCollider != null)
+        {
+            itemCollider.enabled = true; // Enable collider
+            Debug.Log($"[HotbarManager] DropSelectedItem: {itemToDrop.name} Collider enabled."); // Debug Log
+        }
+
+        itemToDrop.SetActive(true); // Ensure the dropped item is active
+
+        heldItems[selectedSlot] = null; // Clear the reference
+        hotbarSlots[selectedSlot].SetItem(null, emptySlotSprite); // Update UI
+
+        Debug.Log($"Dropped item from slot {selectedSlot + 1}");
     }
 
     public void UpdateHotbarUI() // Made public for InventoryUIManager access

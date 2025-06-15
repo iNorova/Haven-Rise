@@ -144,6 +144,7 @@ public class InventorySlot : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
                     Debug.LogWarning($"[InventorySlot] SetItem: {gameObject.name} - Item {item.name} has no ItemIconProvider. Using null icon.");
                 }
                 
+                itemImage.type = Image.Type.Simple; // Force Image Type to Simple for proper display
                 itemImage.sprite = itemIcon; // Set item icon
                 itemImage.color = Color.white;
                 itemImage.enabled = true; // Ensure image is visible
