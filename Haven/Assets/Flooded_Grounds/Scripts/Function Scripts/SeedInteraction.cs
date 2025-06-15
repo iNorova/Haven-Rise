@@ -9,6 +9,7 @@ public class SeedInteraction : MonoBehaviour
 
     private TreePlantingSystem treePlantingSystem;
     private Camera playerCamera;
+    private HotbarManager hotbarManager;
 
     void Start()
     {
@@ -22,6 +23,12 @@ public class SeedInteraction : MonoBehaviour
         if (playerCamera == null)
         {
             Debug.LogError("SeedInteraction: No main camera found! Ensure your main camera has the 'MainCamera' tag.");
+        }
+
+        hotbarManager = FindObjectOfType<HotbarManager>();
+        if (hotbarManager == null)
+        {
+            Debug.LogError("SeedInteraction: HotbarManager not found in scene! Hotbar updates will not work.");
         }
 
         // The script is disabled by default and enabled by HotbarManager when held.
@@ -56,6 +63,12 @@ public class SeedInteraction : MonoBehaviour
             {
                 Debug.Log("SeedInteraction: Hit object is tagged as Soil. Requesting TreePlantingSystem to plant.");
                 treePlantingSystem.PlantSeedOnSoil(hitObject);
+
+                // Notify HotbarManager to clear the current slot
+                if (hotbarManager != null)
+                {
+                    hotbarManager.ClearCurrentHotbarSlot();
+                }
 
                 // After successful planting, destroy this seed instance (the one in player's hand)
                 // Or, if using an inventory system, remove it from inventory.

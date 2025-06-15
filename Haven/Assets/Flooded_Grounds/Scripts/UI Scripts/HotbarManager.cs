@@ -320,4 +320,17 @@ public class HotbarManager : MonoBehaviour
         _canProcessItemInput = active;
         Debug.Log($"[HotbarManager] SetInputActive: Input processing set to {active}");
     }
+
+    // NEW: Method to clear the currently selected hotbar slot
+    public void ClearCurrentHotbarSlot()
+    {
+        if (selectedSlot >= 0 && selectedSlot < heldItems.Length)
+        {
+            // The item in the hand holder should already be destroyed by the consuming script (e.g., SeedInteraction).
+            // This method's role is to clear the internal hotbar state and UI.
+            heldItems[selectedSlot] = null; // Clear the reference in our array
+            hotbarSlots[selectedSlot].SetItem(null, emptySlotSprite); // Update the UI to show an empty slot
+            Debug.Log($"HotbarManager: Cleared item from slot {selectedSlot + 1}.");
+        }
+    }
 } 
