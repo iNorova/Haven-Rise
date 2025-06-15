@@ -17,6 +17,13 @@ public class DestroyableObject : MonoBehaviour
     [SerializeField] private float dropForce = 5f;          // Force applied to dropped items
     [SerializeField] private bool isTree = false;           // Flag to identify if this is a tree
 
+    [Header("Sprout Seed Drops")]
+    [SerializeField] private bool canDropSproutSeed = false;
+    [SerializeField] private GameObject sproutSeedPrefab;
+    [SerializeField] private int minSproutSeedDrops = 1;
+    [SerializeField] private int maxSproutSeedDrops = 1;
+    [SerializeField] private Vector3 sproutSeedDropScale = Vector3.one;
+
     [Header("Effects")]
     [SerializeField] private ParticleSystem hitEffect;    // Optional: particle effect when object is hit
     [SerializeField] private AudioClip hitSound;          // Optional: sound when object is hit
@@ -26,6 +33,8 @@ public class DestroyableObject : MonoBehaviour
 
     private AudioSource audioSource;
     private bool isDestroyed = false;
+
+    private TreePlantingSystem treePlantingSystem;
 
     void Awake()
     {
@@ -41,6 +50,13 @@ public class DestroyableObject : MonoBehaviour
         currentHealth = maxHealth;
         audioSource = gameObject.AddComponent<AudioSource>();
         Debug.Log($"DestroyableObject {gameObject.name} health set to {currentHealth}");
+
+        // Initialize TreePlantingSystem reference
+        treePlantingSystem = FindObjectOfType<TreePlantingSystem>();
+        if (treePlantingSystem == null)
+        {
+            Debug.LogWarning("DestroyableObject: TreePlantingSystem not found in scene. Tree planting features will not work.");
+        }
     }
 
     public void TakeDamage(float damage)
@@ -86,11 +102,31 @@ public class DestroyableObject : MonoBehaviour
         isDestroyed = true;
         Debug.Log($"Destroying object: {gameObject.name}");
 
-        // If this is a tree, notify UIManager to increase temperature
-        if (isTree && UIManager.Instance != null)
+        // If this is a tree, notify TreePlantingSystem to spawn soil and sproutseed
+        if (isTree)
         {
-            UIManager.Instance.StartTemperatureIncrease();
-            Debug.Log("Tree destroyed - increasing temperature");
+            if (treePlantingSystem != null)
+            {
+                treePlantingSystem.OnTreeCut(transform.position);
+                Debug.Log("DestroyableObject: Notified TreePlantingSystem to spawn soil.");
+            }
+            else
+            {
+                Debug.LogWarning("DestroyableObject: TreePlantingSystem is null, cannot spawn soil.");
+            }
+
+            // Spawn sprout seeds directly from DestroyableObject if enabled
+            if (canDropSproutSeed)
+            {
+                SpawnSproutSeedDrops();
+            }
+
+            // If you have a UIManager for temperature, you can still use it here
+            // if (UIManager.Instance != null)
+            // {
+            //     UIManager.Instance.StartTemperatureIncrease();
+            //     Debug.Log("Tree destroyed - increasing temperature");
+            // }
         }
 
         // Play destroy sound
@@ -122,12 +158,12 @@ public class DestroyableObject : MonoBehaviour
     {
         if (dropPrefabs == null || dropPrefabs.Length == 0)
         {
-            Debug.Log("No drop prefabs assigned");
+            Debug.Log("No general drop prefabs assigned");
             return;
         }
 
         int dropCount = Random.Range(minDrops, maxDrops + 1);
-        Debug.Log($"Spawning {dropCount} drops");
+        Debug.Log($"Spawning {dropCount} general drops.");
         
         for (int i = 0; i < dropCount; i++)
         {
@@ -139,13 +175,43 @@ public class DestroyableObject : MonoBehaviour
             Vector3 spawnPos = transform.position + randomOffset;
             
             GameObject drop = Instantiate(dropPrefab, spawnPos, Random.rotation);
-            Debug.Log($"Spawned drop: {drop.name}");
+            Debug.Log($"Spawned general drop: {drop.name}");
             
             // Add force to scatter the drop
             if (drop.TryGetComponent<Rigidbody>(out Rigidbody rb))
             {
                 rb.AddForce(Random.insideUnitSphere * dropForce, ForceMode.Impulse);
-                Debug.Log("Applied force to drop");
+                Debug.Log("Applied force to general drop");
+            }
+        }
+    }
+
+    void SpawnSproutSeedDrops()
+    {
+        if (sproutSeedPrefab == null)
+        {
+            Debug.LogWarning("Sprout Seed Prefab is not assigned in DestroyableObject for " + gameObject.name + ". Cannot spawn sprout seeds.");
+            return;
+        }
+
+        int seedDropCount = Random.Range(minSproutSeedDrops, maxSproutSeedDrops + 1);
+        Debug.Log($"Spawning {seedDropCount} sprout seeds for {gameObject.name}.");
+
+        for (int i = 0; i < seedDropCount; i++)
+        {
+            Vector3 randomOffset = Random.insideUnitSphere * dropScatterRadius;
+            // Ensure drops spawn slightly above the ground to prevent falling through
+            randomOffset.y = Mathf.Max(randomOffset.y, 0.5f); // Ensure a minimum positive Y offset, adjust 0.5f if needed
+            Vector3 spawnPos = transform.position + randomOffset;
+
+            GameObject spawnedSeed = Instantiate(sproutSeedPrefab, spawnPos, Random.rotation);
+            spawnedSeed.transform.localScale = sproutSeedDropScale;
+            Debug.Log($"Spawned sprout seed: {spawnedSeed.name} at position {spawnedSeed.transform.position}"); // Added position log
+
+            if (spawnedSeed.TryGetComponent<Rigidbody>(out Rigidbody rb))
+            {
+                rb.AddForce(Random.insideUnitSphere * dropForce, ForceMode.Impulse);
+                Debug.Log("Applied force to sprout seed drop");
             }
         }
     }

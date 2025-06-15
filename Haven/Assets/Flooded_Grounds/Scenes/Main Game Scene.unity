@@ -67005,6 +67005,11 @@ MonoBehaviour:
   dropScatterRadius: 2
   dropForce: 5
   isTree: 1
+  canDropSproutSeed: 1
+  sproutSeedPrefab: {fileID: 7618930772535432260, guid: c7e80923d9fbb486998b5619c334e07c, type: 3}
+  minSproutSeedDrops: 1
+  maxSproutSeedDrops: 1
+  sproutSeedDropScale: {x: 0.05, y: 0.05, z: 0.05}
   hitEffect: {fileID: 0}
   hitSound: {fileID: 8300000, guid: e532fae4addf9c446abf4321780a2d4c, type: 3}
   destroySound: {fileID: 0}
@@ -67323,6 +67328,11 @@ MonoBehaviour:
   dropScatterRadius: 2
   dropForce: 5
   isTree: 1
+  canDropSproutSeed: 1
+  sproutSeedPrefab: {fileID: 7618930772535432260, guid: c7e80923d9fbb486998b5619c334e07c, type: 3}
+  minSproutSeedDrops: 1
+  maxSproutSeedDrops: 1
+  sproutSeedDropScale: {x: 0.05, y: 0.05, z: 0.05}
   hitEffect: {fileID: 0}
   hitSound: {fileID: 8300000, guid: e532fae4addf9c446abf4321780a2d4c, type: 3}
   destroySound: {fileID: 0}
@@ -109618,6 +109628,11 @@ MonoBehaviour:
   dropScatterRadius: 2
   dropForce: 5
   isTree: 1
+  canDropSproutSeed: 1
+  sproutSeedPrefab: {fileID: 7618930772535432260, guid: c7e80923d9fbb486998b5619c334e07c, type: 3}
+  minSproutSeedDrops: 1
+  maxSproutSeedDrops: 1
+  sproutSeedDropScale: {x: 0.05, y: 0.05, z: 0.05}
   hitEffect: {fileID: 0}
   hitSound: {fileID: 8300000, guid: e532fae4addf9c446abf4321780a2d4c, type: 3}
   destroySound: {fileID: 0}
@@ -138862,6 +138877,58 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 1893b7edd0ad11b4e9f6f17eeb9455b6, type: 3}
+--- !u!1 &1008990082
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1008990084}
+  - component: {fileID: 1008990083}
+  m_Layer: 0
+  m_Name: TreePlantingSystem
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1008990083
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1008990082}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 218bffacd3b4546369443ab1293b92fe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  soilPrefab: {fileID: 2606101765789596433, guid: 3367547403ce84d36ac4c4719ec7cf72, type: 3}
+  plantedTreePrefab: {fileID: 842558052791071584, guid: 6ba01dc4066c34c05b6f075ab81eaf04, type: 3}
+  soilSpawnOffset: {x: 0, y: 0, z: 0}
+  soilScale: {x: 2, y: 2, z: 2}
+  soilRotation: {x: -90, y: 0, z: 0}
+  plantedTreeSpawnOffset: {x: 0, y: -1.3, z: 0}
+  plantedTreeScale: {x: 0.05, y: 0.05, z: 0.05}
+  plantedTreeRotation: {x: -90, y: 0, z: 0}
+--- !u!4 &1008990084
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1008990082}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.5198434, y: -7.2316933, z: 16.468647}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!4 &1008998715 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 432834, guid: d8740ed2b9dd7eb4f9b01ee19dcf0cd3, type: 3}
@@ -149700,6 +149767,11 @@ MonoBehaviour:
   dropScatterRadius: 2
   dropForce: 5
   isTree: 1
+  canDropSproutSeed: 1
+  sproutSeedPrefab: {fileID: 7618930772535432260, guid: c7e80923d9fbb486998b5619c334e07c, type: 3}
+  minSproutSeedDrops: 1
+  maxSproutSeedDrops: 1
+  sproutSeedDropScale: {x: 0.05, y: 0.05, z: 0.05}
   hitEffect: {fileID: 0}
   hitSound: {fileID: 8300000, guid: e532fae4addf9c446abf4321780a2d4c, type: 3}
   destroySound: {fileID: 0}
@@ -158552,6 +158624,11 @@ MonoBehaviour:
   dropScatterRadius: 2
   dropForce: 5
   isTree: 1
+  canDropSproutSeed: 1
+  sproutSeedPrefab: {fileID: 7618930772535432260, guid: c7e80923d9fbb486998b5619c334e07c, type: 3}
+  minSproutSeedDrops: 1
+  maxSproutSeedDrops: 1
+  sproutSeedDropScale: {x: 0.05, y: 0.05, z: 0.05}
   hitEffect: {fileID: 0}
   hitSound: {fileID: 8300000, guid: e532fae4addf9c446abf4321780a2d4c, type: 3}
   destroySound: {fileID: 0}
@@ -198228,6 +198305,11 @@ MonoBehaviour:
   dropScatterRadius: 2
   dropForce: 5
   isTree: 1
+  canDropSproutSeed: 1
+  sproutSeedPrefab: {fileID: 7618930772535432260, guid: c7e80923d9fbb486998b5619c334e07c, type: 3}
+  minSproutSeedDrops: 1
+  maxSproutSeedDrops: 1
+  sproutSeedDropScale: {x: 0.05, y: 0.05, z: 0.05}
   hitEffect: {fileID: 0}
   hitSound: {fileID: 8300000, guid: e532fae4addf9c446abf4321780a2d4c, type: 3}
   destroySound: {fileID: 0}
@@ -240278,6 +240360,11 @@ MonoBehaviour:
   dropScatterRadius: 2
   dropForce: 5
   isTree: 1
+  canDropSproutSeed: 1
+  sproutSeedPrefab: {fileID: 7618930772535432260, guid: c7e80923d9fbb486998b5619c334e07c, type: 3}
+  minSproutSeedDrops: 1
+  maxSproutSeedDrops: 1
+  sproutSeedDropScale: {x: 0.05, y: 0.05, z: 0.05}
   hitEffect: {fileID: 0}
   hitSound: {fileID: 8300000, guid: e532fae4addf9c446abf4321780a2d4c, type: 3}
   destroySound: {fileID: 0}
@@ -268983,6 +269070,11 @@ MonoBehaviour:
   dropScatterRadius: 2
   dropForce: 5
   isTree: 1
+  canDropSproutSeed: 1
+  sproutSeedPrefab: {fileID: 7618930772535432260, guid: c7e80923d9fbb486998b5619c334e07c, type: 3}
+  minSproutSeedDrops: 1
+  maxSproutSeedDrops: 1
+  sproutSeedDropScale: {x: 0.05, y: 0.05, z: 0.05}
   hitEffect: {fileID: 0}
   hitSound: {fileID: 8300000, guid: e532fae4addf9c446abf4321780a2d4c, type: 3}
   destroySound: {fileID: 0}
@@ -302640,6 +302732,11 @@ MonoBehaviour:
   dropScatterRadius: 2
   dropForce: 5
   isTree: 1
+  canDropSproutSeed: 1
+  sproutSeedPrefab: {fileID: 7618930772535432260, guid: c7e80923d9fbb486998b5619c334e07c, type: 3}
+  minSproutSeedDrops: 1
+  maxSproutSeedDrops: 1
+  sproutSeedDropScale: {x: 0.05, y: 0.05, z: 0.05}
   hitEffect: {fileID: 0}
   hitSound: {fileID: 8300000, guid: e532fae4addf9c446abf4321780a2d4c, type: 3}
   destroySound: {fileID: 0}
@@ -307720,3 +307817,4 @@ SceneRoots:
   - {fileID: 179771603}
   - {fileID: 813279411}
   - {fileID: 862910177060596441}
+  - {fileID: 1008990084}

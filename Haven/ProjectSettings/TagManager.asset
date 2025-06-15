@@ -8,6 +8,7 @@ TagManager:
   - Destroyable
   - Grass
   - Water
+  - Soil
   layers:
   - Default
   - TransparentFX
@@ -20,7 +21,7 @@ TagManager:
   - Ground
   - Destroyable
   - Structure
-  - 
+  - Soil
   - 
   - 
   - 
