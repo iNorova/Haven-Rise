@@ -121,12 +121,12 @@ public class DestroyableObject : MonoBehaviour
                 SpawnSproutSeedDrops();
             }
 
-            // If you have a UIManager for temperature, you can still use it here
-            // if (UIManager.Instance != null)
-            // {
-            //     UIManager.Instance.StartTemperatureIncrease();
-            //     Debug.Log("Tree destroyed - increasing temperature");
-            // }
+            // Notify UIManager to increase temperature when tree is cut
+            if (UIManager.Instance != null)
+            {
+                UIManager.Instance.StartTemperatureIncrease();
+                Debug.Log("Tree destroyed - increasing temperature");
+            }
         }
 
         // Play destroy sound

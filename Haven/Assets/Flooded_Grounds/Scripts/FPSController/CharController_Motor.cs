@@ -28,15 +28,6 @@ public class CharController_Motor : MonoBehaviour {
     private float bobTimer;
     private Vector3 targetCameraPosition;
 
-    // Stamina related variables
-    public float maxStamina = 100f;
-    public float staminaDepletionRate = 25f;
-    public float staminaRegenerationRate = 15f;
-    public float staminaRegenerationDelay = 1f;
-    private float currentStamina;
-    private float lastSprintTime;
-    public Slider staminaBar; // Reference to UI slider
-
     private float verticalVelocity = 0f;
     private CharacterController character;
     public GameObject cam;
@@ -56,7 +47,6 @@ public class CharController_Motor : MonoBehaviour {
             webGLRightClickRotation = false;
             sensitivity = sensitivity * 1.5f;
         }
-        currentStamina = maxStamina; // Initialize stamina
         // Cursor lock/hide handled by InventoryUIManager now
         // Cursor.lockState = CursorLockMode.Locked;
         // Cursor.visible = false;
@@ -128,23 +118,19 @@ public class CharController_Motor : MonoBehaviour {
 
     void HandleMovement() {
         float currentSpeed = speed;
-        bool canSprint = currentStamina > 0 && Input.GetKey(KeyCode.LeftShift) && !isCrouching;
+        bool isSprintKeyPressed = Input.GetKey(KeyCode.LeftShift);
+        bool canSprint = UIManager.Instance.CanSprint() && isSprintKeyPressed && !isCrouching;
         
         if (canSprint) {
             currentSpeed *= sprintMultiplier;
-            currentStamina -= staminaDepletionRate * Time.deltaTime;
-            lastSprintTime = Time.time;
+            UIManager.Instance.UseStamina();
         }
-        else if (Time.time - lastSprintTime >= staminaRegenerationDelay && !Input.GetKey(KeyCode.LeftShift)) {
-            currentStamina = Mathf.Min(maxStamina, currentStamina + staminaRegenerationRate * Time.deltaTime);
+        else if (!isSprintKeyPressed) {
+            UIManager.Instance.StopUsingStamina();
         }
 
         if (isCrouching) {
             currentSpeed *= crouchSpeedMultiplier;
-        }
-
-        if (staminaBar != null) {
-            staminaBar.value = currentStamina / maxStamina;
         }
 
         float moveLR = Input.GetAxis("Horizontal");
@@ -217,7 +203,7 @@ public class CharController_Motor : MonoBehaviour {
 
     // Public properties for AI detection
     public bool IsCrouching() { return isCrouching; }
-    public bool IsSprinting() { return currentStamina > 0 && Input.GetKey(KeyCode.LeftShift) && !isCrouching; }
+    public bool IsSprinting() { return UIManager.Instance.CanSprint() && Input.GetKey(KeyCode.LeftShift) && !isCrouching; }
     public bool IsWalking() {
         float moveLR = Input.GetAxis("Horizontal");
         float moveFB = Input.GetAxis("Vertical");

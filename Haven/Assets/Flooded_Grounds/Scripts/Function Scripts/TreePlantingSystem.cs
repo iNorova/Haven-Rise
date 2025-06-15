@@ -77,10 +77,11 @@ public class TreePlantingSystem : MonoBehaviour
         Destroy(soilGameObject); // Destroy the soil GameObject after planting
         Debug.Log("TreePlantingSystem: Soil replaced with PlantedTree.");
 
-        // If you have a UIManager for temperature, you can decrease it here
-        // if (UIManager.Instance != null)
-        // {
-        //     UIManager.Instance.DecreaseTemperatureFromTreePlanting();
-        // }
+        // Notify UIManager that a sprout seed has been planted
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.OnSproutSeedPlanted();
+            Debug.Log("TreePlantingSystem: Notified UIManager of sprout seed planting.");
+        }
     }
 } 

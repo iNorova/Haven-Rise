@@ -19,13 +19,40 @@ public class UIManager : MonoBehaviour
     public float temperatureIncreaseRate = 5f;    // How fast temperature increases when trees are cut
     public float temperatureDecreaseRate = 2f;    // How fast temperature decreases over time
     public float temperatureIncreaseDuration = 5f;  // How long temperature increases after tree destruction
-    public float permanentTemperatureIncreasePerTree = 2f;  // Permanent temperature increase per tree cut
+    public float permanentTemperatureIncreasePerTree = 2f;  // Temperature increase per tree cut
     public float temperatureDecreasePerTree = 2f;  // Temperature decrease per tree planted
     
     [Header("Temperature Thresholds")]
     public float dangerThreshold = 75f;       // Temperature level where danger effects start
     public float criticalThreshold = 90f;     // Temperature level where critical effects start
-    
+
+    [Header("Health System")]
+    public Slider healthSlider;               // Reference to health UI slider
+    public Image healthFillImage;             // Reference to the health slider's fill image
+    public Color normalHealthColor = new Color(0f, 1f, 0f);     // Green
+    public Color lowHealthColor = new Color(1f, 0.5f, 0f);      // Orange
+    public Color criticalHealthColor = new Color(1f, 0f, 0f);   // Red
+    public float maxHealth = 100f;
+    public float currentHealth;
+    public float healthDamageRate = 5f;       // How much health is lost per second in critical temperature
+    public float healthDamageInterval = 1f;   // How often health damage is applied (in seconds)
+    private float healthDamageTimer = 0f;
+
+    [Header("Stamina System")]
+    public Slider staminaSlider;              // Reference to stamina UI slider
+    public Image staminaFillImage;            // Reference to the slider's fill image
+    public Color normalStaminaColor = new Color(0f, 1f, 0f);     // Green (#00FF00)
+    public Color lowStaminaColor = new Color(1f, 0.5f, 0f);      // Orange (#FF8000)
+    public float maxStamina = 100f;           // Maximum stamina value
+    public float staminaUseRate = 25f;        // How fast stamina depletes when sprinting
+    public float normalStaminaRegenRate = 15f; // How fast stamina regenerates normally
+    public float staminaRegenDelay = 1f;      // How long to wait before regenerating stamina
+    public float dangerTempStaminaDebuff = 5f; // How much to reduce stamina regen in danger zone
+    public float criticalTempStaminaDebuff = 5f; // How much to reduce stamina regen in critical zone
+    private float currentStamina;             // Current stamina value
+    private float staminaRegenTimer;          // Timer for stamina regeneration delay
+    private bool isUsingStamina;              // Whether player is currently using stamina
+
     private float currentTemperature;
     private float permanentTemperatureIncrease = 0f;  // Tracks permanent temperature increase from deforestation
     private bool isTemperatureIncreasing = false; // Flag to control temperature increase
@@ -72,6 +99,44 @@ public class UIManager : MonoBehaviour
             Debug.LogError("Temperature Slider is not assigned in the inspector!");
         }
 
+        // Initialize health system
+        currentHealth = maxHealth;
+        if (healthSlider != null)
+        {
+            healthSlider.maxValue = maxHealth;
+            healthSlider.minValue = 0f;
+            healthSlider.value = currentHealth;
+            
+            // Set initial color
+            if (healthFillImage != null)
+            {
+                healthFillImage.color = normalHealthColor;
+            }
+        }
+        else
+        {
+            Debug.LogError("Health Slider is not assigned in the inspector!");
+        }
+
+        // Initialize stamina system
+        currentStamina = maxStamina;
+        if (staminaSlider != null)
+        {
+            staminaSlider.maxValue = maxStamina;
+            staminaSlider.minValue = 0f;
+            staminaSlider.value = currentStamina;
+            if (staminaFillImage != null)
+            {
+                staminaFillImage.fillAmount = 1f;
+                staminaFillImage.color = normalStaminaColor;
+            }
+            Debug.Log($"Stamina slider initialized - Max: {maxStamina}, Current: {currentStamina}");
+        }
+        else
+        {
+            Debug.LogError("Stamina Slider is not assigned in the inspector!");
+        }
+
         // Check if components are assigned
         if (pauseButton == null)
         {
@@ -104,8 +169,25 @@ public class UIManager : MonoBehaviour
             TogglePauseMenu();
         }
 
-        // Update temperature system
-        UpdateTemperatureSystem();
+        if (!isPaused)
+        {
+            // Update temperature system
+            UpdateTemperatureSystem();
+
+            // Update health damage in critical temperature
+            if (currentTemperature >= criticalThreshold)
+            {
+                healthDamageTimer += Time.deltaTime;
+                if (healthDamageTimer >= healthDamageInterval)
+                {
+                    TakeHealthDamage();
+                    healthDamageTimer = 0f;
+                }
+            }
+
+            // Update stamina system
+            UpdateStaminaSystem();
+        }
     }
 
     private void UpdateTemperatureSystem()
@@ -203,9 +285,18 @@ public class UIManager : MonoBehaviour
     public void DecreaseTemperatureFromTreePlanting()
     {
         // Decrease permanent temperature increase when tree is planted
-        permanentTemperatureIncrease -= temperatureDecreasePerTree;
-        // Ensure permanent increase doesn't go below 0
-        permanentTemperatureIncrease = Mathf.Max(permanentTemperatureIncrease, 0f);
+        permanentTemperatureIncrease = Mathf.Max(0f, permanentTemperatureIncrease - temperatureDecreasePerTree);
+        // Update the current temperature to reflect the change immediately
+        currentTemperature = Mathf.Max(0f, currentTemperature - temperatureDecreasePerTree);
+        Debug.Log($"Temperature decreased by {temperatureDecreasePerTree}. New temperature: {GetCurrentTemperature()}");
+    }
+
+    // New method to handle SproutSeed planting
+    public void OnSproutSeedPlanted()
+    {
+        // Decrease temperature when a sprout seed is planted
+        DecreaseTemperatureFromTreePlanting();
+        Debug.Log("SproutSeed planted - decreasing temperature");
     }
 
     public float GetCurrentTemperature()
@@ -337,5 +428,115 @@ public class UIManager : MonoBehaviour
     public bool IsGamePaused()
     {
         return isPaused;
+    }
+
+    private void UpdateStaminaSystem()
+    {
+        // Regenerate stamina whenever not using stamina
+        if (!isUsingStamina && currentStamina < maxStamina)
+        {
+            float regenRate = GetStaminaRegenRate();
+            currentStamina = Mathf.Min(currentStamina + regenRate * Time.deltaTime, maxStamina);
+            Debug.Log($"Regenerating stamina: {currentStamina} at rate {regenRate}");
+        }
+
+        // Update stamina UI
+        if (staminaSlider != null)
+        {
+            staminaSlider.value = currentStamina;
+            if (staminaFillImage != null)
+            {
+                staminaFillImage.fillAmount = currentStamina / maxStamina;
+                staminaFillImage.color = currentStamina < maxStamina * 0.3f ? lowStaminaColor : normalStaminaColor;
+            }
+        }
+    }
+
+    private float GetStaminaRegenRate()
+    {
+        float currentTemp = GetCurrentTemperature();
+        float regenRate = normalStaminaRegenRate;
+        
+        // Check if temperature is in critical zone
+        if (currentTemp >= criticalThreshold)
+        {
+            regenRate -= criticalTempStaminaDebuff;
+            Debug.Log($"Temperature in critical zone ({currentTemp} >= {criticalThreshold}). Stamina regen reduced by {criticalTempStaminaDebuff}. New rate: {regenRate}");
+        }
+        // Check if temperature is in danger zone
+        else if (currentTemp >= dangerThreshold)
+        {
+            regenRate -= dangerTempStaminaDebuff;
+            Debug.Log($"Temperature in danger zone ({currentTemp} >= {dangerThreshold}). Stamina regen reduced by {dangerTempStaminaDebuff}. New rate: {regenRate}");
+        }
+        else
+        {
+            Debug.Log($"Temperature in safe zone ({currentTemp} < {dangerThreshold}). Stamina regen at normal rate: {regenRate}");
+        }
+        
+        // Ensure regeneration rate doesn't go below 1
+        return Mathf.Max(1f, regenRate);
+    }
+
+    public void UseStamina()
+    {
+        isUsingStamina = true;
+        currentStamina = Mathf.Max(currentStamina - staminaUseRate * Time.deltaTime, 0f);
+        Debug.Log($"Using stamina: {currentStamina}");
+    }
+
+    public void StopUsingStamina()
+    {
+        isUsingStamina = false;
+        Debug.Log("Stopped using stamina, will start regenerating");
+    }
+
+    private void TakeHealthDamage()
+    {
+        currentHealth -= healthDamageRate;
+        currentHealth = Mathf.Max(currentHealth, 0f);
+        
+        // Update health UI
+        if (healthSlider != null)
+        {
+            healthSlider.value = currentHealth;
+            
+            // Update health color based on amount
+            if (healthFillImage != null)
+            {
+                if (currentHealth < maxHealth * 0.3f)
+                {
+                    healthFillImage.color = criticalHealthColor;
+                }
+                else if (currentHealth < maxHealth * 0.6f)
+                {
+                    healthFillImage.color = lowHealthColor;
+                }
+                else
+                {
+                    healthFillImage.color = normalHealthColor;
+                }
+            }
+        }
+
+        Debug.Log($"Health damaged by heat. Current health: {currentHealth}");
+
+        // Check if player died
+        if (currentHealth <= 0f)
+        {
+            HandlePlayerDeath();
+        }
+    }
+
+    private void HandlePlayerDeath()
+    {
+        Debug.Log("Player died from heat damage!");
+        // Add your death handling logic here
+        // For example: respawn player, show death screen, etc.
+    }
+
+    public bool CanSprint()
+    {
+        return currentStamina > 0;
     }
 }

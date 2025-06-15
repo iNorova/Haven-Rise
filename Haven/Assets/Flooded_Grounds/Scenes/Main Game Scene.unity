@@ -33965,13 +33965,32 @@ MonoBehaviour:
   criticalTemperatureColor: {r: 1, g: 0, b: 0, a: 1}
   maxTemperatureValue: 100
   minTemperatureValue: 0
-  temperatureIncreaseRate: 0.5
-  temperatureDecreaseRate: 0.2
-  temperatureIncreaseDuration: 2
-  permanentTemperatureIncreasePerTree: 0.5
-  temperatureDecreasePerTree: 1
+  temperatureIncreaseRate: 5
+  temperatureDecreaseRate: 2
+  temperatureIncreaseDuration: 3
+  permanentTemperatureIncreasePerTree: 15
+  temperatureDecreasePerTree: 15
   dangerThreshold: 60
-  criticalThreshold: 80
+  criticalThreshold: 90
+  healthSlider: {fileID: 547316235}
+  healthFillImage: {fileID: 1620939487}
+  normalHealthColor: {r: 0, g: 1, b: 0, a: 1}
+  lowHealthColor: {r: 1, g: 0.5, b: 0, a: 1}
+  criticalHealthColor: {r: 1, g: 0, b: 0, a: 1}
+  maxHealth: 100
+  currentHealth: 0
+  healthDamageRate: 0.5
+  healthDamageInterval: 1
+  staminaSlider: {fileID: 1342668218}
+  staminaFillImage: {fileID: 2029476840}
+  normalStaminaColor: {r: 1, g: 0.92, b: 0.016, a: 1}
+  lowStaminaColor: {r: 1, g: 0.5, b: 0, a: 1}
+  maxStamina: 100
+  staminaUseRate: 20
+  normalStaminaRegenRate: 10
+  staminaRegenDelay: 1
+  dangerTempStaminaDebuff: 2
+  criticalTempStaminaDebuff: 5
 --- !u!4 &244927875 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 474548, guid: 46222fdad88171540ac3118f38b794ee, type: 3}
@@ -250196,11 +250215,6 @@ MonoBehaviour:
   bobFrequency: 1
   bobHorizontalAmplitude: 0.1
   bobVerticalAmplitude: 0.5
-  maxStamina: 100
-  staminaDepletionRate: 25
-  staminaRegenerationRate: 15
-  staminaRegenerationDelay: 1
-  staminaBar: {fileID: 1342668218}
   cam: {fileID: 1229290729}
   maxLookAngle: 85
   webGLRightClickRotation: 1
@@ -288896,7 +288910,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 0.75357646, b: 0, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -307050,10 +307064,10 @@ RectTransform:
   - {fileID: 1735582046}
   m_Father: {fileID: 1275265881}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 14, y: -50}
-  m_SizeDelta: {x: 15, y: 70}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!4 &2280729655331489984
 Transform:
@@ -307265,10 +307279,10 @@ RectTransform:
   - {fileID: 1363537843}
   m_Father: {fileID: 1275265881}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 32, y: -50}
-  m_SizeDelta: {x: 15, y: 70}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!224 &3621727617357942756
 RectTransform:
@@ -307285,10 +307299,10 @@ RectTransform:
   - {fileID: 929265912}
   m_Father: {fileID: 1275265881}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 68, y: -50}
-  m_SizeDelta: {x: 15, y: 70}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!224 &3621727617988316377
 RectTransform:
@@ -307305,10 +307319,10 @@ RectTransform:
   - {fileID: 437526503}
   m_Father: {fileID: 1275265881}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 50, y: -50}
-  m_SizeDelta: {x: 15, y: 70}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!224 &3621727618019027725
 RectTransform:
@@ -307325,10 +307339,10 @@ RectTransform:
   - {fileID: 1320097221}
   m_Father: {fileID: 1275265881}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 86, y: -50}
-  m_SizeDelta: {x: 15, y: 70}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1001 &3658301295264669378
 PrefabInstance:
