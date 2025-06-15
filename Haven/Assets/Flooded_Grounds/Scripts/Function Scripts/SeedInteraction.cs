@@ -38,11 +38,14 @@ public class SeedInteraction : MonoBehaviour
 
     void Update()
     {
-        // Debug.Log("SeedInteraction: Update method is running."); // Uncomment for debugging if needed
-
-        if (Input.GetKeyDown(plantKey))
+        // Only process input if this seed GameObject is the one currently held in the active hotbar slot.
+        // This prevents planting when the seed is not equipped or has been consumed/destroyed.
+        if (hotbarManager != null && hotbarManager.GetItem(hotbarManager.selectedSlot) == this.gameObject)
         {
-            TryPlantSeed();
+            if (Input.GetKeyDown(plantKey))
+            {
+                TryPlantSeed();
+            }
         }
     }
 
