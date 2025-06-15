@@ -198,6 +198,13 @@ public class HotbarManager : MonoBehaviour
         }
         
         item.SetActive(false); // Item will be activated in SelectSlot when its slot is chosen
+
+        // After picking up, ensure the item is selected if it's in the currently active slot
+        // or if it's the first item being picked up into the default selected slot.
+        if (slot == selectedSlot)
+        {
+            SelectSlot(selectedSlot);
+        }
     }
 
     public void SelectSlot(int slot) // Made public for InventorySystem access
