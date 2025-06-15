@@ -14,6 +14,11 @@ public class TreePlantingSystem : MonoBehaviour
     public Vector3 plantedTreeScale = Vector3.one; // Scale for the planted tree
     public Vector3 plantedTreeRotation = Vector3.zero; // Rotation for the planted tree (Euler angles)
 
+    [Header("Ground Adjustment")]
+    public LayerMask groundLayer; // Layer(s) that represent the ground/terrain
+    public float groundOffset = 0.1f; // Adjust this value to place the tree correctly on the ground
+    public float raycastHeight = 10f; // Height from which to cast the ray downwards
+
     // Method called by DestroyableObject when a tree is cut
     public void OnTreeCut(Vector3 treePosition)
     {
@@ -44,8 +49,26 @@ public class TreePlantingSystem : MonoBehaviour
         // Hide the original soil object
         soilGameObject.SetActive(false);
 
-        // Spawn the planted tree prefab at the soil's position
-        GameObject newPlantedTree = Instantiate(plantedTreePrefab, soilGameObject.transform.position + plantedTreeSpawnOffset, Quaternion.identity);
+        // Determine the spawn position for the planted tree
+        Vector3 spawnPosition = soilGameObject.transform.position + plantedTreeSpawnOffset;
+        float targetY = spawnPosition.y;
+
+        // Perform a raycast downwards to find the actual ground height
+        RaycastHit hit;
+        Vector3 rayOrigin = new Vector3(spawnPosition.x, spawnPosition.y + raycastHeight, spawnPosition.z);
+
+        if (Physics.Raycast(rayOrigin, Vector3.down, out hit, raycastHeight * 2, groundLayer))
+        {
+            targetY = hit.point.y + groundOffset;
+            Debug.Log($"TreePlantingSystem: Ground detected at Y={hit.point.y}. Placing tree at Y={targetY}.");
+        }
+        else
+        {
+            Debug.LogWarning("TreePlantingSystem: No ground detected for planting. Using original Y position.");
+        }
+
+        // Spawn the planted tree prefab at the adjusted position
+        GameObject newPlantedTree = Instantiate(plantedTreePrefab, new Vector3(spawnPosition.x, targetY, spawnPosition.z), Quaternion.identity);
         newPlantedTree.transform.localScale = plantedTreeScale;
         newPlantedTree.transform.localRotation = Quaternion.Euler(plantedTreeRotation);
 
