@@ -155,6 +155,8 @@ namespace Controller
             if (m_IsFleeing)
             {
                 HandleFleeing();
+                // When fleeing, animation state should be 'run'
+                m_Animation.Animate(m_Axis, 1f, Time.deltaTime); 
             }
             else
             {
@@ -165,10 +167,18 @@ namespace Controller
                 }
                 Vector3 direction = (m_WanderTarget - m_Transform.position).normalized;
                 m_Axis = new Vector2(direction.x, direction.z);
-                m_IsRun = false;
-                m_IsMoving = true;
+                m_IsRun = false; 
+                m_IsMoving = true; // Set to true for wandering movement
+
+                // Determine animation state for wandering: idle or walk
+                float targetAnimState = 0f; // Default to idle
+                if (m_Axis.sqrMagnitude > 0.01f) // If there's actual movement input
+                {
+                    targetAnimState = 0.5f; // Set to walk state (assuming 0.5 is walk)
+                }
+
                 m_Movement.Move(Time.deltaTime, m_Axis, m_WanderTarget, false, true, out var animAxis, out var isAir);
-                m_Animation.Animate(animAxis, 0f, Time.deltaTime);
+                m_Animation.Animate(animAxis, targetAnimState, Time.deltaTime); 
             }
         }
 
@@ -493,6 +503,26 @@ namespace Controller
                 m_Axis = Vector3.ClampMagnitude(m_Axis, 1f);
                 m_IsMoving = true;
             }
+            
+            // Apply movement and animation based on input
+            Vector2 animAxis;
+            bool isAir;
+            m_Movement.Move(Time.deltaTime, m_Axis, m_Target, m_IsRun, m_IsMoving, out animAxis, out isAir);
+
+            // Determine animation state: idle, walk, or run
+            float targetAnimState = 0f; // Default to idle
+            if (m_IsMoving)
+            {
+                if (m_IsRun)
+                {
+                    targetAnimState = 1f; // Run
+                }
+                else
+                {
+                    targetAnimState = 0.5f; // Walk
+                }
+            }
+            m_Animation.Animate(animAxis, targetAnimState, Time.deltaTime);
         }
 
         private void OnControllerColliderHit(ControllerColliderHit hit)
@@ -717,11 +747,26 @@ namespace Controller
 
             public void Animate(in Vector2 axis, float state, float deltaTime)
             {
-                m_Animator.SetFloat(m_VerticalID, m_FlowAxis.magnitude);
-                m_Animator.SetFloat(m_StateID, Mathf.Clamp01(m_FlowState));
+                // Ensure we have valid input
+                if (axis.sqrMagnitude > 0.01f)
+                {
+                    // Smoothly update the flow axis
+                    m_FlowAxis = Vector2.Lerp(m_FlowAxis, axis, deltaTime * k_InputFlow);
+                    m_FlowAxis = Vector2.ClampMagnitude(m_FlowAxis, 1f);
+                }
+                else
+                {
+                    // Smoothly return to zero when no input
+                    m_FlowAxis = Vector2.Lerp(m_FlowAxis, Vector2.zero, deltaTime * k_InputFlow);
+                }
 
-                m_FlowAxis = Vector2.ClampMagnitude(m_FlowAxis + k_InputFlow * deltaTime * (axis - m_FlowAxis).normalized, 1f);
-                m_FlowState = Mathf.Clamp01(m_FlowState + k_InputFlow * deltaTime * Mathf.Sign(state - m_FlowState));
+                // Smoothly update the state
+                m_FlowState = Mathf.Lerp(m_FlowState, state, deltaTime * k_InputFlow);
+                m_FlowState = Mathf.Clamp01(m_FlowState);
+
+                // Update animator parameters
+                m_Animator.SetFloat(m_VerticalID, m_FlowAxis.magnitude);
+                m_Animator.SetFloat(m_StateID, m_FlowState);
             }
 
             public void AnimateIK(in Vector3 target, in LookWeight lookWeight)

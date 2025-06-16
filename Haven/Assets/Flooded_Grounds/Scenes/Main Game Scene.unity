@@ -203213,6 +203213,11 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 0894e59934291c64d9041c5d75db1750, type: 3}
+--- !u!1 &1461527838 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8374712785964805994, guid: 4d12a277b04794cb99b55e9ce1f9e82a, type: 3}
+  m_PrefabInstance: {fileID: 3443250641613427623}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &1461706144 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 490552, guid: 48a907058000acc4da8ac9293b565679, type: 3}
@@ -272442,8 +272447,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4abe787fd3ac54562a131ed1e8626530, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  deerPrefab: {fileID: 8374712785964805994, guid: 4d12a277b04794cb99b55e9ce1f9e82a, type: 3}
-  deerCount: 30
+  deerPrefab: {fileID: 1461527838}
+  deerCount: 50
   spawnRadius: 250
 --- !u!4 &1906084644
 Transform:
