@@ -9,7 +9,7 @@ EditorBuildSettings:
     path: Assets/Flooded_Grounds/Scenes/MAIN MENU FINAL.unity
     guid: b711f15d19285a747be8873ba7f0d588
   - enabled: 1
-    path: Assets/CutScene/Starting Cutscene.unity
+    path: Assets/Flooded_Grounds/Scenes/CutScene/Starting Cutscene.unity
     guid: 77db6c24d99596a45ab14d62a78613a7
   - enabled: 1
     path: Assets/Flooded_Grounds/Scenes/Main Game Scene.unity

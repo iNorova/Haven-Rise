@@ -124432,6 +124432,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1808299448}
     m_Modifications:
+    - target: {fileID: 106324, guid: 27ad1d4b823b95243a1e74fc7c44f791, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 415538, guid: 27ad1d4b823b95243a1e74fc7c44f791, type: 3}
       propertyPath: m_RootOrder
       value: 4198
@@ -124463,6 +124467,10 @@ PrefabInstance:
     - target: {fileID: 415538, guid: 27ad1d4b823b95243a1e74fc7c44f791, type: 3}
       propertyPath: m_LocalRotation.z
       value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8214860, guid: 27ad1d4b823b95243a1e74fc7c44f791, type: 3}
+      propertyPath: m_Enabled
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
