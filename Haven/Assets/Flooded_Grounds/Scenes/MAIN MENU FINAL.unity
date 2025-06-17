@@ -50441,6 +50441,11 @@ MonoBehaviour:
   dropScatterRadius: 2
   dropForce: 5
   isTree: 1
+  canDropSproutSeed: 0
+  sproutSeedPrefab: {fileID: 0}
+  minSproutSeedDrops: 1
+  maxSproutSeedDrops: 1
+  sproutSeedDropScale: {x: 1, y: 1, z: 1}
   hitEffect: {fileID: 0}
   hitSound: {fileID: 8300000, guid: e532fae4addf9c446abf4321780a2d4c, type: 3}
   destroySound: {fileID: 0}
@@ -52748,7 +52753,8 @@ MonoBehaviour:
   progressBar: {fileID: 600320460}
   progressText: {fileID: 1307327379}
   tipsText: {fileID: 822963722}
-  sceneToLoadIndex: 1
+  cutsceneSceneIndex: 1
+  gameSceneIndex: 2
   tipChangeInterval: 2
 --- !u!4 &827854747
 Transform:
@@ -60311,7 +60317,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 393194900031681128, guid: 0a68be1bd13d8694e8d8fe85574ac075, type: 3}
       propertyPath: m_text
-      value: F to Drop
+      value: Q to Drop
       objectReference: {fileID: 0}
     - target: {fileID: 393194900031681128, guid: 0a68be1bd13d8694e8d8fe85574ac075, type: 3}
       propertyPath: m_textAlignment
@@ -60339,7 +60345,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 393519214503660340, guid: 0a68be1bd13d8694e8d8fe85574ac075, type: 3}
       propertyPath: m_text
-      value: E to Select
+      value: F to Pickup
       objectReference: {fileID: 0}
     - target: {fileID: 393519214503660340, guid: 0a68be1bd13d8694e8d8fe85574ac075, type: 3}
       propertyPath: m_textAlignment
