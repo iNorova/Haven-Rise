@@ -197,21 +197,32 @@ public class DestroyableObject : MonoBehaviour
         int seedDropCount = Random.Range(minSproutSeedDrops, maxSproutSeedDrops + 1);
         Debug.Log($"Spawning {seedDropCount} sprout seeds for {gameObject.name}.");
 
+        // Define a safe initial spawn height above the object's base.
+        // Adjust this value based on the size of your seeds and potential ground level.
+        float safeSpawnHeightOffset = 1.0f; // Start with 1 unit, adjust in Inspector if needed
+
         for (int i = 0; i < seedDropCount; i++)
         {
             Vector3 randomOffset = Random.insideUnitSphere * dropScatterRadius;
-            // Ensure drops spawn slightly above the ground to prevent falling through
-            randomOffset.y = Mathf.Max(randomOffset.y, 0.5f); // Ensure a minimum positive Y offset, adjust 0.5f if needed
-            Vector3 spawnPos = transform.position + randomOffset;
+            
+            // Calculate spawn position, ensuring Y is always above the object's base
+            Vector3 spawnPos = new Vector3(
+                transform.position.x + randomOffset.x,
+                transform.position.y + safeSpawnHeightOffset + Random.Range(0f, 0.5f), // Add a bit of vertical scatter
+                transform.position.z + randomOffset.z
+            );
 
             GameObject spawnedSeed = Instantiate(sproutSeedPrefab, spawnPos, Random.rotation);
             spawnedSeed.transform.localScale = sproutSeedDropScale;
-            Debug.Log($"Spawned sprout seed: {spawnedSeed.name} at position {spawnedSeed.transform.position}"); // Added position log
+            Debug.Log($"Spawned sprout seed: {spawnedSeed.name} at position {spawnedSeed.transform.position}");
 
             if (spawnedSeed.TryGetComponent<Rigidbody>(out Rigidbody rb))
             {
-                rb.AddForce(Random.insideUnitSphere * dropForce, ForceMode.Impulse);
-                Debug.Log("Applied force to sprout seed drop");
+                // Add an initial upward force to help it clear the ground/tree base
+                Vector3 initialForce = Random.insideUnitSphere * dropForce;
+                initialForce.y = Mathf.Max(initialForce.y, 1f) * dropForce; // Ensure strong upward component
+                rb.AddForce(initialForce, ForceMode.Impulse);
+                Debug.Log("Applied force to sprout seed drop with upward bias");
             }
         }
     }

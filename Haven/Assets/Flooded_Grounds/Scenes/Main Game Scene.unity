@@ -33972,7 +33972,7 @@ MonoBehaviour:
   permanentTemperatureIncreasePerTree: 15
   temperatureDecreasePerTree: 15
   dangerThreshold: 60
-  criticalThreshold: 90
+  criticalThreshold: 65
   healthSlider: {fileID: 547316235}
   healthFillImage: {fileID: 1620939487}
   normalHealthColor: {r: 0, g: 1, b: 0, a: 1}
@@ -33980,7 +33980,7 @@ MonoBehaviour:
   criticalHealthColor: {r: 1, g: 0, b: 0, a: 1}
   maxHealth: 100
   currentHealth: 0
-  healthDamageRate: 0.5
+  healthDamageRate: 10
   healthDamageInterval: 1
   staminaSlider: {fileID: 1342668218}
   staminaFillImage: {fileID: 2029476840}
