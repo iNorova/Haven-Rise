@@ -792,7 +792,7 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 1991334059}
+      - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: LoadingScreenController, Assembly-CSharp
         m_MethodName: OnStartButtonPressed
         m_Mode: 1
@@ -2425,56 +2425,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1974579460}
   m_CullTransparentMesh: 1
---- !u!1 &1991334058
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1991334060}
-  - component: {fileID: 1991334059}
-  m_Layer: 0
-  m_Name: Loading screen Manager
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1991334059
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1991334058}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 081e40cb4e1561e4184b37fd69685223, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  loadingScreen: {fileID: 2083336895}
-  progressBar: {fileID: 1859188365}
-  progressText: {fileID: 1557040753}
-  tipsText: {fileID: 206072234}
-  sceneToLoadIndex: 1
-  tipChangeInterval: 2
---- !u!4 &1991334060
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1991334058}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 962.0952, y: 483.60077, z: -14}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2044556888
 GameObject:
   m_ObjectHideFlags: 0
@@ -2637,4 +2587,3 @@ SceneRoots:
   - {fileID: 1347618096}
   - {fileID: 1580256464}
   - {fileID: 1955944737}
-  - {fileID: 1991334060}
