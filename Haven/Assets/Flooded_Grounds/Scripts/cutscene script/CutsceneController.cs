@@ -22,7 +22,7 @@ public class CutsceneController : MonoBehaviour
         cutscenePlaying = false;
 
         // After cutscene, load the game scene using the stored index in SceneLoadData
-        int gameSceneIndex = SceneLoadData.gameSceneIndex;
+        int gameSceneIndex = 2;
 
         if (gameSceneIndex >= 0)
         {
@@ -40,7 +40,7 @@ public class CutsceneController : MonoBehaviour
         if (cutscenePlaying)
         {
             cutscenePlaying = false;
-            int gameSceneIndex = SceneLoadData.gameSceneIndex;
+            int gameSceneIndex = 2;
             if (gameSceneIndex >= 0)
             {
                 SceneManager.LoadScene(gameSceneIndex);
