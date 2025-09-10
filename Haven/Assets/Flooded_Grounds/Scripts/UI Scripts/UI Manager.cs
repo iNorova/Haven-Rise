@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI; // For UI elements
+using UnityEngine.Events;
 
 public class UIManager : MonoBehaviour
 {
@@ -25,6 +26,11 @@ public class UIManager : MonoBehaviour
     [Header("Temperature Thresholds")]
     public float dangerThreshold = 75f;       // Temperature level where danger effects start
     public float criticalThreshold = 90f;     // Temperature level where critical effects start
+
+    [Header("Temperature Hooks")]
+    public TemperatureVisualEffects[] temperatureVisualTargets; // Drag one or many visual effect controllers here
+    public UnityEvent<float> onTemperatureChanged; // Designers can hook other reactions in Inspector
+    private float lastNotifiedTemperature = -999f;
 
     [Header("Health System")]
     public Slider healthSlider;               // Reference to health UI slider
@@ -157,6 +163,9 @@ public class UIManager : MonoBehaviour
         // Add click listener to pause button
         pauseButton.onClick.AddListener(TogglePauseMenu);
         Debug.Log("Pause button listener added successfully");
+
+        // Push initial temperature to hooks
+        NotifyTemperatureChanged(GetCurrentTemperature());
     }
 
     // Update is called once per frame
@@ -237,8 +246,36 @@ public class UIManager : MonoBehaviour
                 }
             }
 
+            // Notify listeners/visual systems if value changed
+            if (Mathf.Abs(finalTemperature - lastNotifiedTemperature) > 0.001f)
+            {
+                NotifyTemperatureChanged(finalTemperature);
+            }
+
             // Check for temperature thresholds and trigger effects
             CheckTemperatureEffects();
+        }
+    }
+
+    private void NotifyTemperatureChanged(float value)
+    {
+        lastNotifiedTemperature = value;
+        // Push to any assigned visual targets (Inspector array)
+        if (temperatureVisualTargets != null)
+        {
+            for (int i = 0; i < temperatureVisualTargets.Length; i++)
+            {
+                var tgt = temperatureVisualTargets[i];
+                if (tgt != null)
+                {
+                    tgt.SetTemperature(value);
+                }
+            }
+        }
+        // Fire UnityEvent for any other listeners
+        if (onTemperatureChanged != null)
+        {
+            onTemperatureChanged.Invoke(value);
         }
     }
 
@@ -289,6 +326,8 @@ public class UIManager : MonoBehaviour
         // Update the current temperature to reflect the change immediately
         currentTemperature = Mathf.Max(0f, currentTemperature - temperatureDecreasePerTree);
         Debug.Log($"Temperature decreased by {temperatureDecreasePerTree}. New temperature: {GetCurrentTemperature()}");
+        // Push update immediately so visuals respond right away
+        NotifyTemperatureChanged(GetCurrentTemperature());
     }
 
     // New method to handle SproutSeed planting
