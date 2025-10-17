@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.UI; // Add UI namespace
 
 public class CharController_Motor : MonoBehaviour {
-
+    
     public float speed = 10.0f;
     public float sprintMultiplier = 1.5f; // New: Sprint multiplier
     public float sensitivity = 2.0f; // Lowered for better control
@@ -91,15 +91,18 @@ public class CharController_Motor : MonoBehaviour {
     }
 
     void Update(){
-        if (canReceiveInput)
-        {
-            HandleMouseLook();
-            HandleMovement();
-            HandleCrouch();
-            HandleHeadBob();
-        }
-    }
+    // ✅ Stop all input when the game is paused
+    if (Time.timeScale == 0f)
+        return;
 
+    if (canReceiveInput)
+    {
+        HandleMouseLook();
+        HandleMovement();
+        HandleCrouch();
+        HandleHeadBob();
+    }
+}
     // New: Public method to set input active/inactive
     public void SetInputActive(bool active)
     {
