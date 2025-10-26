@@ -23,6 +23,11 @@ public class AnimalAIManager : MonoBehaviour
     [SerializeField] private int maxHP = 100;
     private int currentHP;
 
+    [Header("Wander Settings")]
+    [SerializeField] private float wanderRadius = 6f;
+    [SerializeField] private float wanderInterval = 5f;
+    [SerializeField] private float wanderStoppingDistance = 0.5f;
+
     [Header("References")]
     [SerializeField] private Transform playerTransform;
     private NavMeshAgent navAgent;
@@ -49,6 +54,19 @@ public class AnimalAIManager : MonoBehaviour
     private Vector3 lastPosition;
     private float currentSpeed;
     private bool isFleeing = false;
+    private float nextWanderTime = 0f;
+    private Vector3 wanderTarget;
+
+    private void Awake()
+    {
+        // Avoid conflicting movement systems. If CreatureMover exists, disable this AI.
+        var creatureMover = GetComponent<Controller.CreatureMover>();
+        if (creatureMover != null)
+        {
+            enabled = false;
+            return;
+        }
+    }
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -64,17 +82,23 @@ public class AnimalAIManager : MonoBehaviour
         {
             navAgent.acceleration = 8f;
             navAgent.angularSpeed = 0f;
-            navAgent.stoppingDistance = 0.5f;
+            navAgent.stoppingDistance = wanderStoppingDistance;
             navAgent.radius = 0.5f;
             navAgent.height = 1f;
             navAgent.obstacleAvoidanceType = ObstacleAvoidanceType.HighQualityObstacleAvoidance;
             navAgent.avoidancePriority = 50;
             navAgent.updateRotation = false;
+
+            // Ensure agent is on NavMesh; try to recover if not
+            EnsureAgentOnNavMesh();
         }
 
         // Initialize
         currentHP = maxHP;
-        navAgent.speed = idleSpeed;
+        if (navAgent != null)
+        {
+            navAgent.speed = idleSpeed;
+        }
         lastPosition = transform.position;
 
         // Find player if not assigned
@@ -94,6 +118,17 @@ public class AnimalAIManager : MonoBehaviour
     void Update()
     {
         if (currentState == AnimalState.Dead) return;
+
+        if (navAgent == null || !navAgent.enabled)
+        {
+            return;
+        }
+
+        // If agent fell off navmesh, try to snap back; if still not on, skip frame
+        if (!navAgent.isOnNavMesh && !EnsureAgentOnNavMesh())
+        {
+            return;
+        }
 
         // Calculate actual movement speed
         currentSpeed = Vector3.Distance(transform.position, lastPosition) / Time.deltaTime;
@@ -135,6 +170,18 @@ public class AnimalAIManager : MonoBehaviour
                     SetIdle();
                 }
             }
+            else
+            {
+                // Fallback: if no controller found, use simple distance-based detection
+                if (distanceToPlayer <= detectionRadius)
+                {
+                    StartFleeing();
+                }
+                else if (isFleeing && distanceToPlayer > detectionRadius * 2f)
+                {
+                    SetIdle();
+                }
+            }
         }
 
         // Update flee position periodically
@@ -142,6 +189,12 @@ public class AnimalAIManager : MonoBehaviour
         {
             UpdateFleePosition();
             lastFleePositionUpdate = Time.time;
+        }
+
+        // Idle wandering when not fleeing
+        if (currentState == AnimalState.Idle)
+        {
+            HandleIdleWander();
         }
 
         // Handle movement and rotation
@@ -162,17 +215,23 @@ public class AnimalAIManager : MonoBehaviour
             currentAnimationSpeed = Mathf.Lerp(currentAnimationSpeed, targetSpeed, Time.deltaTime * animationBlendSpeed);
 
             // Update animator parameters
-            animator.SetFloat(State, currentAnimationSpeed);
-            animator.SetFloat(Vert, currentAnimationSpeed);
-            animator.SetFloat(Speed, currentSpeed * animationSpeedMultiplier);
+            if (animator != null)
+            {
+                animator.SetFloat(State, currentAnimationSpeed);
+                animator.SetFloat(Vert, currentAnimationSpeed);
+                animator.SetFloat(Speed, currentSpeed * animationSpeedMultiplier);
+            }
         }
         else
         {
             // Smoothly transition to idle
             currentAnimationSpeed = Mathf.Lerp(currentAnimationSpeed, 0f, Time.deltaTime * animationBlendSpeed);
-            animator.SetFloat(State, currentAnimationSpeed);
-            animator.SetFloat(Vert, currentAnimationSpeed);
-            animator.SetFloat(Speed, 0f);
+            if (animator != null)
+            {
+                animator.SetFloat(State, currentAnimationSpeed);
+                animator.SetFloat(Vert, currentAnimationSpeed);
+                animator.SetFloat(Speed, 0f);
+            }
         }
     }
 
@@ -182,8 +241,12 @@ public class AnimalAIManager : MonoBehaviour
         {
             currentState = AnimalState.Idle;
             isFleeing = false;
-            navAgent.speed = idleSpeed;
-            navAgent.isStopped = true;
+            if (navAgent != null)
+            {
+                navAgent.speed = idleSpeed;
+                navAgent.isStopped = false; // allow wandering
+            }
+            ScheduleNextWander();
         }
     }
 
@@ -193,8 +256,11 @@ public class AnimalAIManager : MonoBehaviour
         {
             currentState = AnimalState.Fleeing;
             isFleeing = true;
-            navAgent.speed = runSpeed;
-            navAgent.isStopped = false;
+            if (navAgent != null)
+            {
+                navAgent.speed = runSpeed;
+                navAgent.isStopped = false;
+            }
             UpdateFleePosition();
         }
     }
@@ -252,11 +318,67 @@ public class AnimalAIManager : MonoBehaviour
                 float newDistToPlayer = Vector3.Distance(hit.position, playerTransform.position);
                 if (newDistToPlayer > currentDistToPlayer)
                 {
-                    navAgent.SetDestination(hit.position);
+                    if (navAgent.isOnNavMesh)
+                    {
+                        navAgent.SetDestination(hit.position);
+                    }
                     lastFleePosition = hit.position;
                 }
             }
         }
+    }
+
+    private void HandleIdleWander()
+    {
+        if (Time.time >= nextWanderTime || (!navAgent.pathPending && navAgent.remainingDistance <= navAgent.stoppingDistance))
+        {
+            if (TryGetRandomNavmeshPoint(transform.position, wanderRadius, out wanderTarget))
+            {
+                if (navAgent.isOnNavMesh)
+                {
+                    navAgent.isStopped = false;
+                    navAgent.speed = idleSpeed;
+                    navAgent.SetDestination(wanderTarget);
+                }
+            }
+            ScheduleNextWander();
+        }
+    }
+
+    private void ScheduleNextWander()
+    {
+        nextWanderTime = Time.time + Random.Range(wanderInterval * 0.7f, wanderInterval * 1.3f);
+    }
+
+    private bool TryGetRandomNavmeshPoint(Vector3 center, float radius, out Vector3 result)
+    {
+        for (int i = 0; i < 8; i++)
+        {
+            Vector3 randomDirection = Random.insideUnitSphere * radius;
+            randomDirection.y = 0f;
+            Vector3 samplePos = center + randomDirection;
+            if (NavMesh.SamplePosition(samplePos, out NavMeshHit hit, radius, NavMesh.AllAreas))
+            {
+                result = hit.position;
+                return true;
+            }
+        }
+        result = center;
+        return false;
+    }
+
+    private bool EnsureAgentOnNavMesh()
+    {
+        if (navAgent == null || !navAgent.enabled) return false;
+        if (navAgent.isOnNavMesh) return true;
+
+        // Try snap to nearest navmesh
+        if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 2f, NavMesh.AllAreas))
+        {
+            // Warp will place the agent onto the navmesh without pathing
+            return navAgent.Warp(hit.position);
+        }
+        return false;
     }
 
     public void TakeDamage(int damage)
