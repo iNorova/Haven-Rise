@@ -119,8 +119,23 @@ namespace Controller
             m_StateChangeCooldown = Mathf.Max(m_StateChangeCooldown, 0.1f);
             m_ObstacleCheckDistance = Mathf.Max(m_ObstacleCheckDistance, 0.5f);
 
+            // Provide sensible defaults for masks if unset
+            if (m_ObstacleLayerMask == 0)
+            {
+                m_ObstacleLayerMask = Physics.DefaultRaycastLayers;
+            }
+            if (m_GroundLayerMask == 0)
+            {
+                int groundMask = LayerMask.GetMask("Ground", "Terrain", "Default");
+                m_GroundLayerMask = groundMask != 0 ? groundMask : Physics.DefaultRaycastLayers;
+            }
+
             m_Movement?.SetStats(m_WalkSpeed / 3.6f, m_RunSpeed / 3.6f, m_RotateSpeed, m_JumpHeight, m_Space);
         }
+
+        // AI Brain integration
+        private AnimalAIBrain m_AIBrain;
+        private bool m_UseAIBrain;
 
         private void Awake()
         {
@@ -130,6 +145,19 @@ namespace Controller
 
             m_Movement = new MovementHandler(m_Controller, m_Transform, m_WalkSpeed, m_RunSpeed, m_RotateSpeed, m_JumpHeight, m_Space);
             m_Animation = new AnimationHandler(m_Animator, m_VerticalID, m_StateID);
+
+            // Check for AI Brain component
+            m_AIBrain = GetComponent<AnimalAIBrain>();
+            m_UseAIBrain = m_AIBrain != null;
+
+            if (m_UseAIBrain)
+            {
+                Debug.Log($"[{gameObject.name}] Using AnimalAIBrain for decision making");
+            }
+            else
+            {
+                Debug.Log($"[{gameObject.name}] Using built-in AI (legacy mode)");
+            }
 
             // Find player if not assigned
             if (m_PlayerTransform == null)
@@ -149,37 +177,75 @@ namespace Controller
 
         private void Update()
         {
-            CheckPlayerProximity();
             CheckGroundStatus();
             
-            if (m_IsFleeing)
+            if (m_UseAIBrain && m_AIBrain != null && m_AIBrain.IsAlive)
             {
-                HandleFleeing();
-                // When fleeing, animation state should be 'run'
-                m_Animation.Animate(m_Axis, 1f, Time.deltaTime); 
+                // AI Brain mode: Read decisions from brain
+                HandleAIBrainMovement();
             }
             else
             {
-                // Wandering logic
-                if (Vector3.Distance(m_Transform.position, m_WanderTarget) < 1f || Time.time > m_NextWanderTime)
+                // Legacy mode: Built-in AI
+                CheckPlayerProximity();
+                
+                if (m_IsFleeing)
                 {
-                    SetNewWanderTarget();
+                    HandleFleeing();
+                    m_Animation.Animate(m_Axis, 1f, Time.deltaTime); 
                 }
-                Vector3 direction = (m_WanderTarget - m_Transform.position).normalized;
-                m_Axis = new Vector2(direction.x, direction.z);
-                m_IsRun = false; 
-                m_IsMoving = true; // Set to true for wandering movement
-
-                // Determine animation state for wandering: idle or walk
-                float targetAnimState = 0f; // Default to idle
-                if (m_Axis.sqrMagnitude > 0.01f) // If there's actual movement input
+                else
                 {
-                    targetAnimState = 0.5f; // Set to walk state (assuming 0.5 is walk)
-                }
+                    // Wandering logic
+                    if (Vector3.Distance(m_Transform.position, m_WanderTarget) < 1f || Time.time > m_NextWanderTime)
+                    {
+                        SetNewWanderTarget();
+                    }
+                    Vector3 direction = (m_WanderTarget - m_Transform.position).normalized;
+                    m_Axis = new Vector2(direction.x, direction.z);
+                    m_IsRun = false; 
+                    m_IsMoving = true;
 
-                m_Movement.Move(Time.deltaTime, m_Axis, m_WanderTarget, false, true, out var animAxis, out var isAir);
-                m_Animation.Animate(animAxis, targetAnimState, Time.deltaTime); 
+                    float targetAnimState = 0f;
+                    if (m_Axis.sqrMagnitude > 0.01f)
+                    {
+                        targetAnimState = 0.5f;
+                    }
+
+                    m_Movement.Move(Time.deltaTime, m_Axis, m_WanderTarget, false, true, out var animAxis, out var isAir);
+                    m_Animation.Animate(animAxis, targetAnimState, Time.deltaTime); 
+                }
             }
+        }
+
+        private void HandleAIBrainMovement()
+        {
+            // Read AI decisions
+            Vector3 desiredDirection = m_AIBrain.DesiredDirection;
+            float desiredSpeed = m_AIBrain.DesiredSpeed;
+            bool shouldRun = m_AIBrain.ShouldRun;
+            Vector3 lookTarget = m_AIBrain.LookTarget;
+
+            // Convert to movement input
+            m_Axis = new Vector2(desiredDirection.x, desiredDirection.z);
+            m_IsRun = shouldRun;
+            m_IsMoving = desiredDirection.magnitude > 0.01f;
+            m_Target = lookTarget;
+
+            // Determine animation state based on AI decision
+            float targetAnimState = 0f; // Idle
+            if (m_IsMoving)
+            {
+                targetAnimState = shouldRun ? 1f : 0.5f; // Run or Walk
+            }
+
+            // Apply movement with obstacle avoidance
+            Vector3 finalDirection = GetSafeFleeDirection(desiredDirection.normalized);
+            m_Axis = new Vector2(finalDirection.x, finalDirection.z);
+
+            // Execute movement
+            m_Movement.Move(Time.deltaTime, m_Axis, lookTarget, shouldRun, m_IsMoving, out var animAxis, out var isAir);
+            m_Animation.Animate(animAxis, targetAnimState, Time.deltaTime);
         }
 
         private void CheckPlayerProximity()
@@ -277,7 +343,7 @@ namespace Controller
 
             foreach (Vector3 point in checkPoints)
             {
-                if (Physics.Raycast(point + Vector3.up * m_GroundCheckHeight, Vector3.down, m_GroundCheckDistance, m_GroundLayerMask))
+                if (Physics.Raycast(point + Vector3.up * m_GroundCheckHeight, Vector3.down, m_GroundCheckDistance, m_GroundLayerMask, QueryTriggerInteraction.Ignore))
                 {
                     return true;
                 }
@@ -405,7 +471,7 @@ namespace Controller
                 }
                 
                 // If still no clear path, try moving perpendicular to obstacles
-                if (Physics.Raycast(m_Transform.position, preferredDirection, out RaycastHit hit, m_ObstacleCheckDistance, m_ObstacleLayerMask))
+                if (Physics.Raycast(m_Transform.position, preferredDirection, out RaycastHit hit, m_ObstacleCheckDistance, m_ObstacleLayerMask, QueryTriggerInteraction.Ignore))
                 {
                     Vector3 avoidDirection = Vector3.Cross(hit.normal, Vector3.up);
                     if (Vector3.Dot(avoidDirection, preferredDirection) < 0)
@@ -425,7 +491,7 @@ namespace Controller
             Vector3 rayStart = m_Transform.position + Vector3.up * m_RaycastHeight;
 
             // Check for obstacles
-            if (Physics.Raycast(rayStart, direction, out RaycastHit hit, m_ObstacleCheckDistance, m_ObstacleLayerMask))
+            if (Physics.Raycast(rayStart, direction, out RaycastHit hit, m_ObstacleCheckDistance, m_ObstacleLayerMask, QueryTriggerInteraction.Ignore))
             {
                 // Check slope angle
                 float slopeAngle = Vector3.Angle(hit.normal, Vector3.up);
@@ -442,7 +508,7 @@ namespace Controller
 
             // Check if there's ground to walk on
             Vector3 groundCheckPos = rayStart + direction * m_ObstacleCheckDistance;
-            if (!Physics.Raycast(groundCheckPos + Vector3.up * m_GroundCheckHeight, Vector3.down, m_GroundCheckDistance, m_GroundLayerMask))
+            if (!Physics.Raycast(groundCheckPos + Vector3.up * m_GroundCheckHeight, Vector3.down, m_GroundCheckDistance, m_GroundLayerMask, QueryTriggerInteraction.Ignore))
             {
                 score -= 0.5f; // Penalize directions without ground
             }
@@ -451,7 +517,7 @@ namespace Controller
             for (float height = 0.2f; height <= 1f; height += 0.2f)
             {
                 Vector3 heightCheckPos = rayStart + Vector3.up * height;
-                if (Physics.Raycast(heightCheckPos, direction, m_ObstacleCheckDistance, m_ObstacleLayerMask))
+                if (Physics.Raycast(heightCheckPos, direction, m_ObstacleCheckDistance, m_ObstacleLayerMask, QueryTriggerInteraction.Ignore))
                 {
                     score -= 0.2f; // Penalize directions with obstacles at different heights
                 }
@@ -465,14 +531,14 @@ namespace Controller
             Vector3 rayStart = m_Transform.position + Vector3.up * m_RaycastHeight;
             
             // Check for obstacles
-            if (Physics.Raycast(rayStart, direction, m_ObstacleCheckDistance, m_ObstacleLayerMask))
+            if (Physics.Raycast(rayStart, direction, m_ObstacleCheckDistance, m_ObstacleLayerMask, QueryTriggerInteraction.Ignore))
             {
                 return false;
             }
 
             // Check for ground
             Vector3 groundCheckPos = rayStart + direction * m_ObstacleCheckDistance;
-            if (!Physics.Raycast(groundCheckPos + Vector3.up * 0.1f, Vector3.down, 0.2f, m_ObstacleLayerMask))
+            if (!Physics.Raycast(groundCheckPos + Vector3.up * 0.1f, Vector3.down, 0.2f, m_GroundLayerMask, QueryTriggerInteraction.Ignore))
             {
                 return false;
             }

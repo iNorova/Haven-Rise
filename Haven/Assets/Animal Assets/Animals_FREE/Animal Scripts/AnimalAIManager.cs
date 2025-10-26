@@ -1,369 +1,825 @@
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.Events;
 using System.Collections;
 
 public class AnimalAIManager : MonoBehaviour
 {
-    [Header("Detection Settings")]
-    [SerializeField] private float detectionRadius = 10f;
-    [SerializeField] private float closeDetectionRadius = 2f;
-    [SerializeField] private float runSpeed = 5f;
-    [SerializeField] private float idleSpeed = 1f;
-    [SerializeField] private float rotationSpeed = 5f;
-    [SerializeField] private float fleeDistance = 15f;
-    [SerializeField] private float minFleeDistance = 5f;
-    [SerializeField] private float rotationSmoothTime = 0.1f;
-    [SerializeField] private float maxFleeDistance = 100f; // Maximum distance to check for valid flee positions
-
-    [Header("Animation Settings")]
-    [SerializeField] private float animationBlendSpeed = 5f;
-    [SerializeField] private float animationSpeedMultiplier = 1f;
-
-    [Header("Health Settings")]
-    [SerializeField] private int maxHP = 100;
-    private int currentHP;
-
-    [Header("Wander Settings")]
-    [SerializeField] private float wanderRadius = 6f;
-    [SerializeField] private float wanderInterval = 5f;
-    [SerializeField] private float wanderStoppingDistance = 0.5f;
-
+    [Header("Configuration")]
+    [SerializeField] private AnimalAIConfig config;
+    
     [Header("References")]
     [SerializeField] private Transform playerTransform;
+    
+    [Header("Debug")]
+    [SerializeField] private bool showDebugGizmos = true;
+    [SerializeField] private bool logStateChanges = false;
+    
+    [Header("Events")]
+    public UnityEvent<AnimalState> onStateChanged;
+    public UnityEvent onObstacleHit;
+    public UnityEvent onStuck;
+
+    // Components (cached)
     private NavMeshAgent navAgent;
     private Animator animator;
     private Rigidbody rb;
     private CapsuleCollider capsuleCollider;
-
-    // Animation parameters
+    private CharController_Motor cachedPlayerController;
+    
+    // Animation parameters (cached)
     private static readonly int State = Animator.StringToHash("State");
     private static readonly int Vert = Animator.StringToHash("Vert");
     private static readonly int Speed = Animator.StringToHash("Speed");
-
+    
     // States
-    private enum AnimalState { Idle, Fleeing, Dead }
+    public enum AnimalState { Idle, Wandering, Fleeing, Stuck, Dead }
     private AnimalState currentState = AnimalState.Idle;
-
-    private Vector3 lastFleePosition;
-    private float fleePositionUpdateInterval = 1f;
-    private float lastFleePositionUpdate;
-    private Vector3 currentVelocity;
-    private Vector3 rotationVelocity;
-    private Quaternion targetRotation;
-    private float currentAnimationSpeed;
+    private AnimalState previousState = AnimalState.Idle;
+    
+    // Reusable objects (performance)
+    private NavMeshPath reusablePath;
+    private Vector3[] groundCheckPoints;
+    
+    // Movement tracking
     private Vector3 lastPosition;
+    private Quaternion lastRotation;
     private float currentSpeed;
-    private bool isFleeing = false;
-    private float nextWanderTime = 0f;
+    private float currentRotationSpeed;
+    private Vector3 lastFleePosition;
     private Vector3 wanderTarget;
+    
+    // Timers
+    private float nextWanderTime;
+    private float nextFleeUpdateTime;
+    private float nextAvoidanceCheckTime;
+    private float lastBounceTime;
+    private float stuckTimer;
+    
+    // Animation
+    private float currentAnimationSpeed;
+    
+    // Health
+    private int currentHP;
+    
+    // Coroutines
+    private Coroutine avoidanceRoutine;
+    
+    // Debug
+    private Vector3 debugObstaclePoint;
+    private Vector3 debugBounceDirection;
+    private bool debugShowObstacle;
+
+    #region Initialization
 
     private void Awake()
     {
-        // Avoid conflicting movement systems. If CreatureMover exists, disable this AI.
+        // Avoid conflicting movement systems
         var creatureMover = GetComponent<Controller.CreatureMover>();
         if (creatureMover != null)
         {
+            LogWarning("CreatureMover detected - disabling AnimalAIManager to avoid conflicts");
             enabled = false;
             return;
         }
+        
+        // Load default config if none assigned
+        if (config == null)
+        {
+            LogWarning("No config assigned - creating default runtime config");
+            config = ScriptableObject.CreateInstance<AnimalAIConfig>();
+        }
+        
+        // Pre-allocate reusable objects
+        reusablePath = new NavMeshPath();
+        groundCheckPoints = new Vector3[5];
     }
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+    private void Start()
     {
-        // Get components
+        CacheComponents();
+        ConfigureNavMeshAgent();
+        ConfigurePhysics();
+        InitializeState();
+        FindPlayer();
+        
+        // Start coroutines for expensive operations
+        avoidanceRoutine = StartCoroutine(ObstacleAvoidanceRoutine());
+    }
+
+    private void CacheComponents()
+    {
         navAgent = GetComponent<NavMeshAgent>();
         animator = GetComponent<Animator>();
         rb = GetComponent<Rigidbody>();
         capsuleCollider = GetComponent<CapsuleCollider>();
-
-        // Configure NavMeshAgent
-        if (navAgent != null)
+        
+        if (navAgent == null)
         {
-            navAgent.acceleration = 8f;
-            navAgent.angularSpeed = 0f;
-            navAgent.stoppingDistance = wanderStoppingDistance;
-            navAgent.radius = 0.5f;
-            navAgent.height = 1f;
-            navAgent.obstacleAvoidanceType = ObstacleAvoidanceType.HighQualityObstacleAvoidance;
-            navAgent.avoidancePriority = 50;
-            navAgent.updateRotation = false;
-
-            // Ensure agent is on NavMesh; try to recover if not
-            EnsureAgentOnNavMesh();
+            LogError("NavMeshAgent component missing!");
         }
+    }
 
-        // Initialize
-        currentHP = maxHP;
-        if (navAgent != null)
+    private void ConfigureNavMeshAgent()
+    {
+        if (navAgent == null) return;
+        
+        navAgent.acceleration = 8f;
+        navAgent.angularSpeed = 0f;
+        navAgent.stoppingDistance = config.wanderStoppingDistance;
+        navAgent.radius = 0.5f;
+        navAgent.height = 1f;
+        navAgent.obstacleAvoidanceType = ObstacleAvoidanceType.HighQualityObstacleAvoidance;
+        navAgent.avoidancePriority = 50;
+        navAgent.updateRotation = false;
+        navAgent.speed = config.idleSpeed;
+        
+        EnsureAgentOnNavMesh();
+    }
+
+    private void ConfigurePhysics()
+    {
+        if (config.useKinematicRigidbody && rb != null)
         {
-            navAgent.speed = idleSpeed;
+            rb.isKinematic = true;
+            rb.interpolation = RigidbodyInterpolation.Interpolate;
         }
+        
+        if (config.useTriggerCollider && capsuleCollider != null)
+        {
+            capsuleCollider.isTrigger = true;
+        }
+    }
+
+    private void InitializeState()
+    {
+        currentHP = config.maxHP;
         lastPosition = transform.position;
-
-        // Find player if not assigned
-        if (playerTransform == null)
-        {
-            playerTransform = GameObject.FindGameObjectWithTag("Player")?.transform;
-        }
-
-        // Configure animator
+        lastRotation = transform.rotation;
+        
         if (animator != null)
         {
             animator.SetFloat(Speed, 0f);
         }
+        
+        ChangeState(AnimalState.Idle);
     }
 
-    // Update is called once per frame
-    void Update()
+    private void FindPlayer()
     {
-        if (currentState == AnimalState.Dead) return;
-
-        if (navAgent == null || !navAgent.enabled)
+        if (playerTransform == null)
         {
-            return;
+            GameObject player = GameObject.FindGameObjectWithTag("Player");
+            if (player != null)
+            {
+                playerTransform = player.transform;
+            }
         }
-
-        // If agent fell off navmesh, try to snap back; if still not on, skip frame
-        if (!navAgent.isOnNavMesh && !EnsureAgentOnNavMesh())
-        {
-            return;
-        }
-
-        // Calculate actual movement speed
-        currentSpeed = Vector3.Distance(transform.position, lastPosition) / Time.deltaTime;
-        lastPosition = transform.position;
-
+        
         if (playerTransform != null)
         {
-            float distanceToPlayer = Vector3.Distance(transform.position, playerTransform.position);
-            CharController_Motor playerController = playerTransform.GetComponent<CharController_Motor>();
+            cachedPlayerController = playerTransform.GetComponent<CharController_Motor>();
+        }
+    }
 
-            if (playerController != null)
+    #endregion
+
+    #region Update Loop
+
+    private void Update()
+    {
+        if (currentState == AnimalState.Dead) return;
+        
+        if (!ValidateNavAgent()) return;
+        
+        UpdateMovementTracking();
+        CheckPlayerProximity();
+        UpdateStateBehavior();
+        UpdateRotation();
+        UpdateAnimation();
+        DetectStuck();
+    }
+
+    private bool ValidateNavAgent()
+    {
+        if (navAgent == null || !navAgent.enabled) return false;
+        
+        if (!navAgent.isOnNavMesh)
+        {
+            if (!EnsureAgentOnNavMesh())
             {
-                // Check if player is within detection radius
-                if (playerController.IsCrouching())
-                {
-                    if (distanceToPlayer <= closeDetectionRadius)
-                    {
-                        StartFleeing();
-                    }
-                    else if (isFleeing && distanceToPlayer > closeDetectionRadius * 2f)
-                    {
-                        SetIdle();
-                    }
-                }
-                else if (playerController.IsWalking() || playerController.IsSprinting())
-                {
-                    if (distanceToPlayer <= detectionRadius)
-                    {
-                        StartFleeing();
-                    }
-                    else if (isFleeing && distanceToPlayer > detectionRadius * 2f)
-                    {
-                        SetIdle();
-                    }
-                }
-                // Always check if deer should stop fleeing if player is far away
-                if (isFleeing && distanceToPlayer > detectionRadius * 2f)
-                {
-                    SetIdle();
-                }
-            }
-            else
-            {
-                // Fallback: if no controller found, use simple distance-based detection
-                if (distanceToPlayer <= detectionRadius)
-                {
-                    StartFleeing();
-                }
-                else if (isFleeing && distanceToPlayer > detectionRadius * 2f)
-                {
-                    SetIdle();
-                }
+                return false;
             }
         }
+        
+        return true;
+    }
 
-        // Update flee position periodically
-        if (currentState == AnimalState.Fleeing && Time.time - lastFleePositionUpdate > fleePositionUpdateInterval)
+    private void UpdateMovementTracking()
+    {
+        float deltaTime = Time.deltaTime;
+        if (deltaTime < 0.0001f) return; // Avoid division by zero
+        
+        currentSpeed = Vector3.Distance(transform.position, lastPosition) / deltaTime;
+        currentRotationSpeed = Quaternion.Angle(transform.rotation, lastRotation) / deltaTime;
+        
+        lastPosition = transform.position;
+        lastRotation = transform.rotation;
+    }
+
+    #endregion
+
+    #region State Machine
+
+    private void ChangeState(AnimalState newState)
+    {
+        if (currentState == newState) return;
+        
+        previousState = currentState;
+        currentState = newState;
+        
+        OnStateEnter(newState);
+        onStateChanged?.Invoke(newState);
+        
+        if (logStateChanges)
         {
-            UpdateFleePosition();
-            lastFleePositionUpdate = Time.time;
+            Log($"State changed: {previousState} -> {newState}");
         }
+    }
 
-        // Idle wandering when not fleeing
-        if (currentState == AnimalState.Idle)
+    private void OnStateEnter(AnimalState state)
+    {
+        switch (state)
         {
-            HandleIdleWander();
+            case AnimalState.Idle:
+                if (navAgent != null)
+                {
+                    navAgent.speed = config.idleSpeed;
+                    navAgent.isStopped = true;
+                }
+                ScheduleNextWander();
+                break;
+                
+            case AnimalState.Wandering:
+                if (navAgent != null)
+                {
+                    navAgent.speed = config.walkSpeed;
+                    navAgent.isStopped = false;
+                }
+                break;
+                
+            case AnimalState.Fleeing:
+                if (navAgent != null)
+                {
+                    navAgent.speed = config.runSpeed;
+                    navAgent.isStopped = false;
+                }
+                UpdateFleeDestination();
+                break;
+                
+            case AnimalState.Stuck:
+                onStuck?.Invoke();
+                break;
         }
+    }
 
-        // Handle movement and rotation
-        if (navAgent.velocity.magnitude > 0.1f)
+    private void UpdateStateBehavior()
+    {
+        switch (currentState)
         {
-            // Calculate target rotation based on movement direction
-            targetRotation = Quaternion.LookRotation(navAgent.velocity.normalized);
-            
-            // Smoothly rotate towards the movement direction
-            transform.rotation = Quaternion.Slerp(
-                transform.rotation,
-                targetRotation,
-                Time.deltaTime * rotationSpeed
-            );
+            case AnimalState.Idle:
+                HandleIdle();
+                break;
+                
+            case AnimalState.Wandering:
+                HandleWandering();
+                break;
+                
+            case AnimalState.Fleeing:
+                HandleFleeing();
+                break;
+                
+            case AnimalState.Stuck:
+                HandleStuck();
+                break;
+        }
+    }
 
-            // Update animation speed based on actual movement
-            float targetSpeed = currentState == AnimalState.Fleeing ? 1f : 0.5f;
-            currentAnimationSpeed = Mathf.Lerp(currentAnimationSpeed, targetSpeed, Time.deltaTime * animationBlendSpeed);
+    #endregion
 
-            // Update animator parameters
-            if (animator != null)
-            {
-                animator.SetFloat(State, currentAnimationSpeed);
-                animator.SetFloat(Vert, currentAnimationSpeed);
-                animator.SetFloat(Speed, currentSpeed * animationSpeedMultiplier);
-            }
+    #region Player Detection
+
+    private void CheckPlayerProximity()
+    {
+        if (playerTransform == null || currentState == AnimalState.Stuck) return;
+        
+        float distanceToPlayer = Vector3.Distance(transform.position, playerTransform.position);
+        bool shouldFlee = false;
+        
+        if (cachedPlayerController != null)
+        {
+            shouldFlee = ShouldFleeFromPlayer(distanceToPlayer);
         }
         else
         {
-            // Smoothly transition to idle
-            currentAnimationSpeed = Mathf.Lerp(currentAnimationSpeed, 0f, Time.deltaTime * animationBlendSpeed);
-            if (animator != null)
+            // Fallback: simple distance check
+            shouldFlee = distanceToPlayer <= config.detectionRadius;
+        }
+        
+        // State transitions
+        if (shouldFlee && currentState != AnimalState.Fleeing)
+        {
+            ChangeState(AnimalState.Fleeing);
+        }
+        else if (!shouldFlee && currentState == AnimalState.Fleeing)
+        {
+            if (distanceToPlayer > config.detectionRadius * 2f)
             {
-                animator.SetFloat(State, currentAnimationSpeed);
-                animator.SetFloat(Vert, currentAnimationSpeed);
-                animator.SetFloat(Speed, 0f);
+                ChangeState(AnimalState.Idle);
             }
         }
     }
 
-    private void SetIdle()
+    private bool ShouldFleeFromPlayer(float distance)
     {
-        if (currentState != AnimalState.Idle)
+        if (cachedPlayerController.IsCrouching())
         {
-            currentState = AnimalState.Idle;
-            isFleeing = false;
-            if (navAgent != null)
-            {
-                navAgent.speed = idleSpeed;
-                navAgent.isStopped = false; // allow wandering
-            }
-            ScheduleNextWander();
+            return distance <= config.closeDetectionRadius;
         }
+        else if (cachedPlayerController.IsWalking() || cachedPlayerController.IsSprinting())
+        {
+            return distance <= config.detectionRadius;
+        }
+        
+        return false;
     }
 
-    private void StartFleeing()
+    #endregion
+
+    #region Idle Behavior
+
+    private void HandleIdle()
     {
-        if (currentState != AnimalState.Fleeing)
+        if (Time.time >= nextWanderTime)
         {
-            currentState = AnimalState.Fleeing;
-            isFleeing = true;
-            if (navAgent != null)
+            if (TryGetWanderPoint(out wanderTarget))
             {
-                navAgent.speed = runSpeed;
-                navAgent.isStopped = false;
+                ChangeState(AnimalState.Wandering);
             }
-            UpdateFleePosition();
-        }
-    }
-
-    private void UpdateFleePosition()
-    {
-        if (playerTransform == null) return;
-
-        // Calculate flee direction
-        Vector3 fleeDirection = transform.position - playerTransform.position;
-        fleeDirection.y = 0;
-        fleeDirection.Normalize();
-
-        // Add some randomness to the flee direction
-        float randomAngle = Random.Range(-30f, 30f);
-        fleeDirection = Quaternion.Euler(0, randomAngle, 0) * fleeDirection;
-
-        // Try to find a valid position at increasing distances
-        float currentDistance = fleeDistance;
-        bool foundValidPosition = false;
-        Vector3 fleePosition = transform.position;
-        float currentDistToPlayer = Vector3.Distance(transform.position, playerTransform.position);
-
-        while (!foundValidPosition && currentDistance <= maxFleeDistance)
-        {
-            fleePosition = transform.position + fleeDirection * currentDistance;
-            
-            // Sample position on NavMesh
-            NavMeshHit hit;
-            if (NavMesh.SamplePosition(fleePosition, out hit, currentDistance, NavMesh.AllAreas))
+            else
             {
-                float newDistToPlayer = Vector3.Distance(hit.position, playerTransform.position);
-                // Only accept if further from player than current position
-                if (newDistToPlayer > currentDistToPlayer && Vector3.Distance(hit.position, lastFleePosition) > minFleeDistance)
-                {
-                    navAgent.SetDestination(hit.position);
-                    lastFleePosition = hit.position;
-                    foundValidPosition = true;
-                }
+                ScheduleNextWander();
             }
-            
-            currentDistance += fleeDistance; // Increase search distance
-        }
-
-        // If no valid position found, try a random direction that is further from the player
-        if (!foundValidPosition)
-        {
-            Vector3 randomDirection = Random.insideUnitSphere;
-            randomDirection.y = 0;
-            randomDirection.Normalize();
-            Vector3 tryPosition = transform.position + randomDirection * fleeDistance;
-            NavMeshHit hit;
-            if (NavMesh.SamplePosition(tryPosition, out hit, fleeDistance, NavMesh.AllAreas))
-            {
-                float newDistToPlayer = Vector3.Distance(hit.position, playerTransform.position);
-                if (newDistToPlayer > currentDistToPlayer)
-                {
-                    if (navAgent.isOnNavMesh)
-                    {
-                        navAgent.SetDestination(hit.position);
-                    }
-                    lastFleePosition = hit.position;
-                }
-            }
-        }
-    }
-
-    private void HandleIdleWander()
-    {
-        if (Time.time >= nextWanderTime || (!navAgent.pathPending && navAgent.remainingDistance <= navAgent.stoppingDistance))
-        {
-            if (TryGetRandomNavmeshPoint(transform.position, wanderRadius, out wanderTarget))
-            {
-                if (navAgent.isOnNavMesh)
-                {
-                    navAgent.isStopped = false;
-                    navAgent.speed = idleSpeed;
-                    navAgent.SetDestination(wanderTarget);
-                }
-            }
-            ScheduleNextWander();
         }
     }
 
     private void ScheduleNextWander()
     {
-        nextWanderTime = Time.time + Random.Range(wanderInterval * 0.7f, wanderInterval * 1.3f);
+        float variance = config.wanderInterval * 0.3f;
+        nextWanderTime = Time.time + Random.Range(config.wanderInterval - variance, config.wanderInterval + variance);
     }
 
-    private bool TryGetRandomNavmeshPoint(Vector3 center, float radius, out Vector3 result)
+    #endregion
+
+    #region Wander Behavior
+
+    private void HandleWandering()
+    {
+        if (navAgent.pathPending) return;
+        
+        // Check if reached destination
+        if (navAgent.remainingDistance <= navAgent.stoppingDistance)
+        {
+            ChangeState(AnimalState.Idle);
+            return;
+        }
+        
+        // Occasionally adjust wander direction for more natural movement
+        if (Random.value < config.wanderDirectionChange * Time.deltaTime)
+        {
+            if (TryGetWanderPoint(out Vector3 newTarget))
+            {
+                SetDestinationSafely(newTarget);
+            }
+        }
+    }
+
+    private bool TryGetWanderPoint(out Vector3 result)
     {
         for (int i = 0; i < 8; i++)
         {
-            Vector3 randomDirection = Random.insideUnitSphere * radius;
+            Vector3 randomDirection = Random.insideUnitSphere * config.wanderRadius;
             randomDirection.y = 0f;
-            Vector3 samplePos = center + randomDirection;
-            if (NavMesh.SamplePosition(samplePos, out NavMeshHit hit, radius, NavMesh.AllAreas))
+            Vector3 samplePos = transform.position + randomDirection;
+            
+            if (NavMesh.SamplePosition(samplePos, out NavMeshHit hit, config.wanderRadius, NavMesh.AllAreas))
             {
                 result = hit.position;
+                
+                if (SetDestinationSafely(result))
+                {
+                    return true;
+                }
+            }
+        }
+        
+        result = transform.position;
+        return false;
+    }
+
+    #endregion
+
+    #region Flee Behavior
+
+    private void HandleFleeing()
+    {
+        if (Time.time >= nextFleeUpdateTime)
+        {
+            UpdateFleeDestination();
+            nextFleeUpdateTime = Time.time + config.fleeUpdateInterval;
+        }
+    }
+
+    private void UpdateFleeDestination()
+    {
+        if (playerTransform == null) return;
+        
+        Vector3 fleeDirection = (transform.position - playerTransform.position).normalized;
+        fleeDirection.y = 0;
+        
+        // Add variation to make flee behavior less predictable
+        float randomAngle = Random.Range(-config.fleeAngleVariation, config.fleeAngleVariation);
+        fleeDirection = Quaternion.Euler(0, randomAngle, 0) * fleeDirection;
+        
+        // Try multiple distances
+        float currentDistToPlayer = Vector3.Distance(transform.position, playerTransform.position);
+        
+        for (float distance = config.fleeDistance; distance <= config.maxFleeDistance; distance += config.fleeDistance)
+        {
+            Vector3 fleePosition = transform.position + fleeDirection * distance;
+            
+            if (NavMesh.SamplePosition(fleePosition, out NavMeshHit hit, distance, NavMesh.AllAreas))
+            {
+                float newDistToPlayer = Vector3.Distance(hit.position, playerTransform.position);
+                
+                if (newDistToPlayer > currentDistToPlayer && 
+                    Vector3.Distance(hit.position, lastFleePosition) > config.minFleeDistance)
+                {
+                    if (SetDestinationSafely(hit.position))
+                    {
+                        lastFleePosition = hit.position;
+                        return;
+                    }
+                }
+            }
+        }
+        
+        // Fallback: try random direction
+        TryRandomFleeDirection(currentDistToPlayer);
+    }
+
+    private void TryRandomFleeDirection(float currentDistToPlayer)
+    {
+        Vector3 randomDirection = Random.insideUnitSphere;
+        randomDirection.y = 0;
+        randomDirection.Normalize();
+        
+        Vector3 tryPosition = transform.position + randomDirection * config.fleeDistance;
+        
+        if (NavMesh.SamplePosition(tryPosition, out NavMeshHit hit, config.fleeDistance, NavMesh.AllAreas))
+        {
+            float newDistToPlayer = Vector3.Distance(hit.position, playerTransform.position);
+            if (newDistToPlayer > currentDistToPlayer)
+            {
+                SetDestinationSafely(hit.position);
+                lastFleePosition = hit.position;
+            }
+        }
+    }
+
+    #endregion
+
+    #region Obstacle Avoidance
+
+    private IEnumerator ObstacleAvoidanceRoutine()
+    {
+        while (true)
+        {
+            yield return new WaitForSeconds(config.avoidanceCheckInterval);
+            
+            if (currentState == AnimalState.Dead || !ValidateNavAgent()) continue;
+            
+            CheckForObstacles();
+        }
+    }
+
+    private void CheckForObstacles()
+    {
+        if (navAgent.velocity.magnitude < 0.1f) return;
+        
+        // Scale check distance with velocity
+        float dynamicCheckDistance = config.obstacleCheckDistance * 
+            (1f + (navAgent.velocity.magnitude / config.runSpeed) * config.obstacleCheckDistanceMultiplier);
+        
+        Vector3 origin = transform.position + Vector3.up * 0.5f;
+        Vector3 direction = navAgent.velocity.normalized;
+        
+        if (Physics.SphereCast(origin, config.obstacleCheckRadius, direction, 
+            out RaycastHit hit, dynamicCheckDistance, config.obstacleLayerMask, QueryTriggerInteraction.Ignore))
+        {
+            debugObstaclePoint = hit.point;
+            debugShowObstacle = true;
+            
+            HandleObstacleDetected(hit);
+        }
+        else
+        {
+            debugShowObstacle = false;
+        }
+    }
+
+    private void HandleObstacleDetected(RaycastHit hit)
+    {
+        onObstacleHit?.Invoke();
+        
+        // Check if cornered (obstacles on multiple sides)
+        if (IsCorner())
+        {
+            HandleCornerSituation();
+            return;
+        }
+        
+        // Try bounce
+        if (Time.time - lastBounceTime >= config.bounceCooldown)
+        {
+            TryBounce(hit);
+        }
+        else
+        {
+            // Try sidestep
+            TrySidestep(hit);
+        }
+    }
+
+    private bool IsCorner()
+    {
+        Vector3 origin = transform.position + Vector3.up * 0.5f;
+        int obstacleCount = 0;
+        
+        // Check 8 directions
+        for (int i = 0; i < 8; i++)
+        {
+            float angle = i * 45f;
+            Vector3 dir = Quaternion.Euler(0, angle, 0) * transform.forward;
+            
+            if (Physics.SphereCast(origin, config.obstacleCheckRadius * 0.8f, dir, 
+                out _, config.obstacleCheckDistance, config.obstacleLayerMask, QueryTriggerInteraction.Ignore))
+            {
+                obstacleCount++;
+            }
+        }
+        
+        return obstacleCount >= 5; // More than half directions blocked
+    }
+
+    private void HandleCornerSituation()
+    {
+        // Find the most open direction
+        Vector3 origin = transform.position + Vector3.up * 0.5f;
+        float maxClearance = 0f;
+        Vector3 bestDirection = -transform.forward;
+        
+        for (int i = 0; i < 16; i++)
+        {
+            float angle = i * 22.5f;
+            Vector3 dir = Quaternion.Euler(0, angle, 0) * Vector3.forward;
+            
+            if (Physics.SphereCast(origin, config.obstacleCheckRadius * 0.8f, dir, 
+                out RaycastHit hit, config.obstacleCheckDistance * 2f, config.obstacleLayerMask, QueryTriggerInteraction.Ignore))
+            {
+                if (hit.distance > maxClearance)
+                {
+                    maxClearance = hit.distance;
+                    bestDirection = dir;
+                }
+            }
+            else
+            {
+                // No hit means clear path
+                bestDirection = dir;
+                break;
+            }
+        }
+        
+        Vector3 escapeTarget = transform.position + bestDirection * config.bounceBackDistance;
+        if (TryGetNearestNavMeshPoint(escapeTarget, config.bounceBackDistance, out Vector3 validTarget))
+        {
+            SetDestinationSafely(validTarget);
+        }
+    }
+
+    private void TryBounce(RaycastHit hit)
+    {
+        Vector3 reflectDir = Vector3.Reflect(transform.forward, hit.normal);
+        float jitter = Random.Range(-config.bounceAngleJitter, config.bounceAngleJitter);
+        reflectDir = Quaternion.Euler(0f, jitter, 0f) * reflectDir;
+        reflectDir.y = 0f;
+        reflectDir.Normalize();
+        
+        debugBounceDirection = reflectDir;
+        
+        Vector3 bounceTarget = transform.position + reflectDir * config.bounceBackDistance;
+        
+        if (TryGetNearestNavMeshPoint(bounceTarget, config.bounceBackDistance, out Vector3 validTarget))
+        {
+            if (SetDestinationSafely(validTarget))
+            {
+                lastBounceTime = Time.time;
+                return;
+            }
+        }
+        
+        // Fallback to sidestep
+        TrySidestep(hit);
+    }
+
+    private void TrySidestep(RaycastHit hit)
+    {
+        Vector3 origin = transform.position + Vector3.up * 0.5f;
+        Vector3 left = -transform.right;
+        Vector3 right = transform.right;
+        
+        bool leftClear = !Physics.SphereCast(origin, config.obstacleCheckRadius * 0.8f, left, 
+            out _, config.sideStepDistance, config.obstacleLayerMask, QueryTriggerInteraction.Ignore);
+        bool rightClear = !Physics.SphereCast(origin, config.obstacleCheckRadius * 0.8f, right, 
+            out _, config.sideStepDistance, config.obstacleLayerMask, QueryTriggerInteraction.Ignore);
+        
+        Vector3 detourDir;
+        if (leftClear && !rightClear)
+            detourDir = left;
+        else if (rightClear && !leftClear)
+            detourDir = right;
+        else
+            detourDir = Random.value > 0.5f ? right : left;
+        
+        Vector3 detour = transform.position + detourDir * config.sideStepDistance + 
+            transform.forward * config.obstacleCheckDistance * 0.5f;
+        
+        if (TryGetNearestNavMeshPoint(detour, config.sideStepDistance, out Vector3 detourOnMesh))
+        {
+            SetDestinationSafely(detourOnMesh);
+        }
+    }
+
+    #endregion
+
+    #region Stuck Detection
+
+    private void DetectStuck()
+    {
+        if (currentState == AnimalState.Stuck || currentState == AnimalState.Idle) return;
+        if (navAgent == null || !navAgent.isOnNavMesh) return;
+        
+        bool tryingToMove = navAgent.hasPath && !navAgent.pathPending && 
+            navAgent.remainingDistance > navAgent.stoppingDistance + 0.2f;
+        
+        bool movingTooSlow = currentSpeed < config.stuckSpeedThreshold && 
+            navAgent.velocity.magnitude < config.stuckSpeedThreshold;
+        
+        bool spinningInPlace = currentRotationSpeed > config.stuckRotationThreshold && 
+            currentSpeed < config.stuckSpeedThreshold;
+        
+        if (tryingToMove && (movingTooSlow || spinningInPlace))
+        {
+            stuckTimer += Time.deltaTime;
+        }
+        else
+        {
+            stuckTimer = 0f;
+        }
+        
+        if (stuckTimer >= config.stuckTimeThreshold)
+        {
+            ChangeState(AnimalState.Stuck);
+        }
+    }
+
+    private void HandleStuck()
+    {
+        Log("Animal is stuck - attempting recovery");
+        
+        // Try multiple recovery strategies
+        if (TryRecoverFromStuck())
+        {
+            stuckTimer = 0f;
+            ChangeState(previousState == AnimalState.Stuck ? AnimalState.Idle : previousState);
+        }
+    }
+
+    private bool TryRecoverFromStuck()
+    {
+        // Strategy 1: Small sidestep
+        Vector3 side = (Random.value > 0.5f ? transform.right : -transform.right) * config.sideStepDistance;
+        if (SetDestinationSafely(transform.position + side))
+        {
+            return true;
+        }
+        
+        // Strategy 2: Back up
+        Vector3 backward = -transform.forward * config.sideStepDistance;
+        if (SetDestinationSafely(transform.position + backward))
+        {
+            return true;
+        }
+        
+        // Strategy 3: Random nearby point
+        if (TryGetWanderPoint(out Vector3 recover))
+        {
+            return true;
+        }
+        
+        // Strategy 4: Warp to nearest valid NavMesh position
+        if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 5f, NavMesh.AllAreas))
+        {
+            if (navAgent.Warp(hit.position))
+            {
                 return true;
             }
         }
-        result = center;
+        
+        return false;
+    }
+
+    #endregion
+
+    #region Movement & Animation
+
+    private void UpdateRotation()
+    {
+        if (navAgent == null || navAgent.velocity.magnitude < 0.1f) return;
+        
+        Quaternion targetRotation = Quaternion.LookRotation(navAgent.velocity.normalized);
+        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, 
+            Time.deltaTime * config.rotationSpeed);
+    }
+
+    private void UpdateAnimation()
+    {
+        if (animator == null) return;
+        
+        float targetAnimSpeed = GetTargetAnimationSpeed();
+        currentAnimationSpeed = Mathf.Lerp(currentAnimationSpeed, targetAnimSpeed, 
+            Time.deltaTime * config.animationBlendSpeed);
+        
+        animator.SetFloat(State, currentAnimationSpeed);
+        animator.SetFloat(Vert, currentAnimationSpeed);
+        animator.SetFloat(Speed, currentSpeed * config.animationSpeedMultiplier);
+    }
+
+    private float GetTargetAnimationSpeed()
+    {
+        switch (currentState)
+        {
+            case AnimalState.Idle:
+                return 0f;
+            case AnimalState.Wandering:
+                return 0.5f;
+            case AnimalState.Fleeing:
+                return 1f;
+            case AnimalState.Stuck:
+                return 0.1f;
+            default:
+                return 0f;
+        }
+    }
+
+    #endregion
+
+    #region NavMesh Utilities
+
+    private bool SetDestinationSafely(Vector3 target)
+    {
+        if (navAgent == null || !navAgent.isOnNavMesh) return false;
+        
+        if (navAgent.CalculatePath(target, reusablePath) && reusablePath.status == NavMeshPathStatus.PathComplete)
+        {
+            navAgent.isStopped = false;
+            navAgent.SetPath(reusablePath);
+            return true;
+        }
+        
+        return false;
+    }
+
+    private bool TryGetNearestNavMeshPoint(Vector3 position, float searchRadius, out Vector3 result)
+    {
+        if (NavMesh.SamplePosition(position, out NavMeshHit hit, searchRadius, NavMesh.AllAreas))
+        {
+            result = hit.position;
+            return true;
+        }
+        
+        result = position;
         return false;
     }
 
@@ -371,56 +827,147 @@ public class AnimalAIManager : MonoBehaviour
     {
         if (navAgent == null || !navAgent.enabled) return false;
         if (navAgent.isOnNavMesh) return true;
-
-        // Try snap to nearest navmesh
+        
         if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 2f, NavMesh.AllAreas))
         {
-            // Warp will place the agent onto the navmesh without pathing
             return navAgent.Warp(hit.position);
         }
+        
+        LogError("Failed to place agent on NavMesh!");
         return false;
     }
+
+    #endregion
+
+    #region Health System
 
     public void TakeDamage(int damage)
     {
         if (currentState == AnimalState.Dead) return;
-
+        
         currentHP -= damage;
         
         if (currentHP <= 0)
         {
             Die();
         }
+        else
+        {
+            // Flee when damaged
+            if (currentState != AnimalState.Fleeing)
+            {
+                ChangeState(AnimalState.Fleeing);
+            }
+        }
     }
 
     private void Die()
     {
-        currentState = AnimalState.Dead;
+        ChangeState(AnimalState.Dead);
         
-        // Disable components
-        navAgent.isStopped = true;
-        navAgent.enabled = false;
-        rb.isKinematic = true;
-        capsuleCollider.enabled = false;
-
-        // Start death sequence
+        if (navAgent != null)
+        {
+            navAgent.isStopped = true;
+            navAgent.enabled = false;
+        }
+        
+        if (rb != null)
+        {
+            rb.isKinematic = true;
+        }
+        
+        if (capsuleCollider != null)
+        {
+            capsuleCollider.enabled = false;
+        }
+        
+        if (avoidanceRoutine != null)
+        {
+            StopCoroutine(avoidanceRoutine);
+        }
+        
         StartCoroutine(DeathSequence());
     }
 
     private IEnumerator DeathSequence()
     {
-        // Wait a short moment before destroying
         yield return new WaitForSeconds(0.5f);
         Destroy(gameObject);
     }
 
-    // Optional: Visualize detection ranges in the editor
+    #endregion
+
+    #region Debug & Logging
+
+    private void Log(string message)
+    {
+        if (logStateChanges)
+        {
+            Debug.Log($"[{gameObject.name}] {message}", this);
+        }
+    }
+
+    private void LogWarning(string message)
+    {
+        Debug.LogWarning($"[{gameObject.name}] {message}", this);
+    }
+
+    private void LogError(string message)
+    {
+        Debug.LogError($"[{gameObject.name}] {message}", this);
+    }
+
     private void OnDrawGizmosSelected()
     {
+        if (!showDebugGizmos || config == null) return;
+        
+        // Detection radii
         Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(transform.position, detectionRadius);
+        Gizmos.DrawWireSphere(transform.position, config.detectionRadius);
         
         Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(transform.position, closeDetectionRadius);
+        Gizmos.DrawWireSphere(transform.position, config.closeDetectionRadius);
+        
+        // Current path
+        if (navAgent != null && navAgent.hasPath)
+        {
+            Gizmos.color = currentState == AnimalState.Fleeing ? Color.red : Color.green;
+            Vector3[] corners = navAgent.path.corners;
+            for (int i = 0; i < corners.Length - 1; i++)
+            {
+                Gizmos.DrawLine(corners[i], corners[i + 1]);
+            }
+        }
+        
+        // Obstacle detection
+        if (debugShowObstacle)
+        {
+            Gizmos.color = Color.magenta;
+            Gizmos.DrawWireSphere(debugObstaclePoint, 0.3f);
+            Gizmos.DrawLine(transform.position, debugObstaclePoint);
+            
+            // Bounce direction
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawRay(transform.position, debugBounceDirection * config.bounceBackDistance);
+        }
+        
+        // State indicator
+        Gizmos.color = GetStateColor();
+        Gizmos.DrawWireCube(transform.position + Vector3.up * 2f, Vector3.one * 0.3f);
     }
+
+    private Color GetStateColor()
+    {
+        switch (currentState)
+        {
+            case AnimalState.Idle: return Color.white;
+            case AnimalState.Wandering: return Color.green;
+            case AnimalState.Fleeing: return Color.red;
+            case AnimalState.Stuck: return Color.yellow;
+            case AnimalState.Dead: return Color.black;
+            default: return Color.gray;
+        }
+    }
+
+    #endregion
 }
