@@ -14,6 +14,8 @@ public class HotbarManager : MonoBehaviour
     public InventorySlot[] hotbarSlots;   // Assign your hotbar UI InventorySlot components in inspector
     public Sprite emptySlotSprite; // Sprite for empty slot
     public TextMeshProUGUI selectedItemNameText; // Changed from Text to TextMeshProUGUI
+	[Header("Inventory Fallback")]
+	public InventoryManager inventoryManager; // Assign to allow pickup into inventory when hotbar is full
 
     private GameObject[] heldItems;
     // private Sprite[] itemIcons; // Item icons will be managed by InventorySlot itself
@@ -44,6 +46,16 @@ public class HotbarManager : MonoBehaviour
         else
         {
             Debug.LogWarning("No hotbar slots assigned to HotbarManager!");
+        }
+        
+        // Auto-resolve InventoryManager if not assigned
+        if (inventoryManager == null)
+        {
+            inventoryManager = FindObjectOfType<InventoryManager>();
+            if (inventoryManager == null)
+            {
+                Debug.LogWarning("[HotbarManager] Could not find InventoryManager in scene. Pickup-to-inventory fallback will be disabled.");
+            }
         }
     }
 
@@ -132,20 +144,14 @@ public class HotbarManager : MonoBehaviour
         }
     }
 
-    void TryPickupItem()
+	void TryPickupItem()
     {
-        // Only pick up if there is an empty slot
-        int slot = FindFirstEmptySlot();
-        if (slot == -1)
-        {
-            Debug.Log("No empty hotbar slot available!");
-            return;
-        }
+		int slot = FindFirstEmptySlot(); // -1 if hotbar full
 
         RaycastHit hit;
         float sphereRadius = 0.5f;
         float pickupRange = 5f;
-        if (Physics.SphereCast(Camera.main.transform.position, sphereRadius, Camera.main.transform.forward, out hit, pickupRange))
+		if (Physics.SphereCast(Camera.main.transform.position, sphereRadius, Camera.main.transform.forward, out hit, pickupRange))
         {
             if (hit.collider.CompareTag("Pickupable"))
             {
@@ -161,8 +167,23 @@ public class HotbarManager : MonoBehaviour
                     }
                 }
 
-                Debug.Log($"Found pickupable: {itemToPickUp.name}, first empty slot: {slot}");
-                PickupItem(itemToPickUp, slot);
+				if (slot != -1)
+				{
+					Debug.Log($"Found pickupable: {itemToPickUp.name}, first empty hotbar slot: {slot}");
+					PickupItem(itemToPickUp, slot);
+				}
+				else
+				{
+					// Hotbar full – try to place directly into inventory
+					if (TryPickupIntoInventory(itemToPickUp))
+					{
+						Debug.Log($"Picked up {itemToPickUp.name} into inventory (hotbar full).");
+					}
+					else
+					{
+						Debug.Log("Hotbar and inventory are full. Cannot pick up item.");
+					}
+				}
             }
         }
     }
@@ -214,6 +235,41 @@ public class HotbarManager : MonoBehaviour
             SelectSlot(selectedSlot);
         }
     }
+
+	bool TryPickupIntoInventory(GameObject item)
+	{
+		if (inventoryManager == null)
+		{
+			Debug.LogWarning("InventoryManager not assigned on HotbarManager; cannot pick up into inventory.");
+			return false;
+		}
+
+		// Attempt to add to inventory; AddItem returns false if full
+		bool added = inventoryManager.AddItem(item);
+		if (!added) return false;
+
+		// Parent to hidden items and deactivate for storage
+		if (inventoryManager.hiddenItemsParent != null)
+		{
+			item.transform.SetParent(inventoryManager.hiddenItemsParent);
+			item.transform.localPosition = Vector3.zero;
+			item.transform.localRotation = Quaternion.identity;
+		}
+
+		Rigidbody rb2 = item.GetComponent<Rigidbody>();
+		if (rb2 != null)
+		{
+			rb2.isKinematic = true;
+			rb2.useGravity = false;
+		}
+		Collider itemCollider2 = item.GetComponent<Collider>();
+		if (itemCollider2 != null)
+		{
+			itemCollider2.enabled = false;
+		}
+		item.SetActive(false);
+		return true;
+	}
 
     public void SelectSlot(int slot) // Made public for InventorySystem access
     {

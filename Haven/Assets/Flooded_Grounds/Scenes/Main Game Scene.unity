@@ -24261,6 +24261,7 @@ MonoBehaviour:
   - {fileID: 2076280839}
   emptySlotSprite: {fileID: 10917, guid: 0000000000000000f000000000000000, type: 0}
   selectedItemNameText: {fileID: 1868370463}
+  inventoryManager: {fileID: 2074610105}
   selectedSlot: 0
 --- !u!4 &173586499
 Transform:
