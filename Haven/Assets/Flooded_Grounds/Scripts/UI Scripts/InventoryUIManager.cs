@@ -6,6 +6,7 @@ public class InventoryUIManager : MonoBehaviour
     public InventoryManager inventoryManager; // Reference to the new InventoryManager
     public CharController_Motor playerController; // Reference to the player controller script
     public HotbarManager hotbarManager; // Reference to the HotbarManager
+    public GameObject craftingPanel; // New: optional crafting UI panel shown with inventory
 
     void Start()
     {
@@ -57,6 +58,12 @@ public class InventoryUIManager : MonoBehaviour
                     {
                         hotbarManager.UpdateHotbarUI();
                     }
+
+                    // Show crafting panel alongside inventory if assigned
+                    if (craftingPanel != null)
+                    {
+                        craftingPanel.SetActive(true);
+                    }
                 }
                 else
                 {
@@ -79,6 +86,12 @@ public class InventoryUIManager : MonoBehaviour
                     if (hotbarManager != null)
                     {
                         hotbarManager.UpdateHotbarUI();
+                    }
+
+                    // Hide crafting panel with inventory
+                    if (craftingPanel != null)
+                    {
+                        craftingPanel.SetActive(false);
                     }
                 }
             }
