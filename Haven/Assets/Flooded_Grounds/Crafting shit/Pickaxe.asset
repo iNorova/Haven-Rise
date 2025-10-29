@@ -19,3 +19,4 @@ MonoBehaviour:
     quantity: 2
   outputPrefab: {fileID: 4344391803625242696, guid: 07ac7efe8abc54bb9b6bef67b1ddee7e, type: 3}
   outputQuantity: 1
+  iconOverride: {fileID: 21300000, guid: 1984e7c0986dd4839ae29ffa94dfa465, type: 3}

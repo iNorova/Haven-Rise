@@ -39,11 +39,47 @@ namespace Haven.CraftingUI
 				var btn = Instantiate(recipeButtonPrefab, listContainer);
 				_spawnedButtons.Add(btn);
 
-				// Set button label
-				var label = btn.GetComponentInChildren<TextMeshProUGUI>();
-				if (label != null)
+
+				// Try to set icon image first (child Image named "Icon" preferred), fallback to label text
+				Image iconImage = null;
+				var images = btn.GetComponentsInChildren<Image>(true);
+				foreach (var img in images)
 				{
-					label.text = recipe != null && recipe.OutputPrefab != null ? recipe.OutputPrefab.name : "Unknown";
+					if (img.gameObject == btn.gameObject) continue; // skip the Button's own background image
+					if (img.name.ToLower().Contains("icon")) { iconImage = img; break; }
+					if (iconImage == null) iconImage = img; // fallback to first child image
+				}
+
+				Sprite iconSprite = null;
+				if (recipe != null)
+				{
+					// 1) Prefer recipe override if provided
+					if (recipe.IconOverride != null) iconSprite = recipe.IconOverride;
+					// 2) Else try to fetch from output prefab's ItemIconProvider
+					else if (recipe.OutputPrefab != null)
+					{
+						var provider = recipe.OutputPrefab.GetComponent<ItemIconProvider>();
+						if (provider != null) iconSprite = provider.icon;
+					}
+				}
+
+				if (iconImage != null && iconSprite != null)
+				{
+					iconImage.sprite = iconSprite;
+					iconImage.preserveAspect = true;
+					iconImage.enabled = true;
+					// Optional: hide any TMP label if present
+					var tmp = btn.GetComponentInChildren<TextMeshProUGUI>();
+					if (tmp != null) tmp.gameObject.SetActive(false);
+				}
+				else
+				{
+					var label = btn.GetComponentInChildren<TextMeshProUGUI>(true);
+					if (label != null)
+					{
+						label.gameObject.SetActive(true);
+						label.text = recipe != null && recipe.OutputPrefab != null ? recipe.OutputPrefab.name : "Unknown";
+					}
 				}
 
 				// Interactable state

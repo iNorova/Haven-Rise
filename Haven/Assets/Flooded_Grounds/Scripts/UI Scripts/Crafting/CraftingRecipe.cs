@@ -20,10 +20,13 @@ namespace Haven.CraftingUI
 		[Header("Output")]
 		[SerializeField] private GameObject outputPrefab;
 		[SerializeField, Min(1)] private int outputQuantity = 1;
+		[Header("UI")]
+		[SerializeField] private Sprite iconOverride; // Drag a button icon directly here
 
 		public IReadOnlyList<Requirement> Requirements => requirements;
 		public GameObject OutputPrefab => outputPrefab;
 		public int OutputQuantity => outputQuantity;
+		public Sprite IconOverride => iconOverride;
 	}
 }
 
