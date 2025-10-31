@@ -86,12 +86,22 @@ public class InventorySlot : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         Debug.Log($"[InventorySlot] OnEndDrag: {gameObject.name} - Ended dragging item: {(currentItem != null ? currentItem.name : "null")}");
 
         // Always destroy the temporary dragged icon for the source slot
+        // This must happen regardless of whether drop was successful to prevent white boxes appearing
         if (draggedIconGameObject != null)
         {
             Debug.Log($"[InventorySlot] OnEndDrag: Destroying draggedIconGameObject for {gameObject.name}.");
+            // Disable first to hide it immediately before destruction
+            draggedIconGameObject.SetActive(false);
+            // Destroy it
             Destroy(draggedIconGameObject);
             draggedIconGameObject = null;
             draggedIconImage = null;
+        }
+        
+        // Also check if we're still the dragged slot and clean up static reference
+        if (itemBeingDraggedSlot == this)
+        {
+            itemBeingDraggedSlot = null;
         }
 
         // Ensure the original slot's item image is enabled, as it might have been disabled during drag.
@@ -103,9 +113,6 @@ public class InventorySlot : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             InventorySystem.Instance.ReturnItemToOriginalSlot(this);
         }
         // Note: If dropped on a valid slot, InventorySystem.RequestItemTransfer handles actual GameObject movement.
-
-        // The itemBeingDraggedSlot is nulled by OnDrop in the target slot, or by ReturnItemToOriginalSlot in InventorySystem.
-        // We don't need to nullify it here again for the source slot.
     }
 
     public void OnDrop(PointerEventData eventData)
@@ -113,6 +120,19 @@ public class InventorySlot : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         if (itemBeingDraggedSlot != null && itemBeingDraggedSlot != this)
         {
             Debug.Log($"[InventorySlot] OnDrop: {gameObject.name} - Item dropped from {itemBeingDraggedSlot.gameObject.name} to {gameObject.name}");
+            
+            // CRITICAL: Destroy the dragged icon immediately when drop happens to prevent it from appearing elsewhere
+            if (itemBeingDraggedSlot.draggedIconGameObject != null)
+            {
+                Debug.Log($"[InventorySlot] OnDrop: Destroying dragged icon from source slot {itemBeingDraggedSlot.gameObject.name}");
+                // Disable first to hide it immediately
+                itemBeingDraggedSlot.draggedIconGameObject.SetActive(false);
+                // Destroy it
+                Destroy(itemBeingDraggedSlot.draggedIconGameObject);
+                itemBeingDraggedSlot.draggedIconGameObject = null;
+                itemBeingDraggedSlot.draggedIconImage = null;
+            }
+            
             // Request the InventorySystem to handle the item transfer
             InventorySystem.Instance.RequestItemTransfer(itemBeingDraggedSlot, this);
 
