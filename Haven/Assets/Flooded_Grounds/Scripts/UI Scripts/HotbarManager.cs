@@ -456,6 +456,14 @@ public class HotbarManager : MonoBehaviour
         _canProcessItemInput = active;
         Debug.Log($"[HotbarManager] SetInputActive: Input processing set to {active}");
     }
+    
+    // Public method to reset animation state (useful when item breaks)
+    public void ResetAnimationState()
+    {
+        _isItemAnimating = false;
+        _currentHeldItemAnimator = null;
+        Debug.Log("[HotbarManager] Animation state reset");
+    }
 
     // NEW: Method to clear the currently selected hotbar slot
     public void ClearCurrentHotbarSlot()

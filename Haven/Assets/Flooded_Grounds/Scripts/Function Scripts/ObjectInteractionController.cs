@@ -77,6 +77,9 @@ public class ObjectInteractionController : MonoBehaviour
                 // Apply damage to the object
                 destroyableObject.TakeDamage(damageToApply);
 
+                // Reduce durability if current item has durability component (e.g., axe)
+                ReduceItemDurability();
+
                 // Show hit effect at point of impact
                 ShowHitEffect(hit.point, hit.normal);
             }
@@ -151,6 +154,99 @@ public class ObjectInteractionController : MonoBehaviour
         if (iconProvider == null) return currentItem.name;
         
         return iconProvider.itemName ?? currentItem.name;
+    }
+    
+    // Reduce durability of the currently equipped item when it hits something
+    private void ReduceItemDurability()
+    {
+        if (hotbarManager == null) return;
+        
+        GameObject currentItem = hotbarManager.GetItem(hotbarManager.selectedSlot);
+        if (currentItem == null) return;
+        
+        // Check if the item has a durability component (e.g., axe)
+        // Check item itself first, then check children (e.g., Axe child of AxeHolder)
+        ItemDurability durability = currentItem.GetComponent<ItemDurability>();
+        if (durability == null)
+        {
+            durability = currentItem.GetComponentInChildren<ItemDurability>();
+        }
+        
+        if (durability != null)
+        {
+            // Reduce durability by 1 per hit
+            durability.ReduceDurability(1f);
+            
+            // Check if item is broken
+            if (durability.IsBroken())
+            {
+                HandleItemBroken(currentItem);
+            }
+        }
+    }
+    
+    // Handle when an item breaks (durability reaches 0)
+    private void HandleItemBroken(GameObject brokenItem)
+    {
+        if (hotbarManager == null) return;
+        
+        int brokenSlotIndex = -1;
+        
+        // Find which slot the broken item is in
+        for (int i = 0; i < hotbarManager.hotbarSlots.Length; i++)
+        {
+            if (hotbarManager.GetItem(i) == brokenItem)
+            {
+                brokenSlotIndex = i;
+                break;
+            }
+        }
+        
+        if (brokenSlotIndex >= 0)
+        {
+            Debug.Log($"[ObjectInteractionController] Item {brokenItem.name} broke! Removing from hotbar slot {brokenSlotIndex}");
+            
+            bool wasSelectedSlot = (brokenSlotIndex == hotbarManager.selectedSlot);
+            
+            // Deactivate and unparent the item first
+            brokenItem.SetActive(false);
+            brokenItem.transform.SetParent(null);
+            
+            // Clear the item from hotbar
+            hotbarManager.SetItem(brokenSlotIndex, null);
+            
+            // Reset animation state when item breaks (allows slot switching)
+            hotbarManager.ResetAnimationState();
+            
+            // Update hotbar UI to reflect the empty slot
+            hotbarManager.UpdateHotbarUI();
+            
+            // If this was the currently selected slot, update selection
+            if (wasSelectedSlot)
+            {
+                // Try to select the next available slot, or first slot if none
+                bool foundSlot = false;
+                for (int i = 0; i < hotbarManager.hotbarSlots.Length; i++)
+                {
+                    if (hotbarManager.GetItem(i) != null)
+                    {
+                        hotbarManager.SelectSlot(i);
+                        foundSlot = true;
+                        break;
+                    }
+                }
+                // If no items left, select first slot anyway
+                if (!foundSlot && hotbarManager.hotbarSlots.Length > 0)
+                {
+                    hotbarManager.SelectSlot(0);
+                }
+            }
+            
+            // Destroy the broken item
+            Destroy(brokenItem);
+            
+            Debug.Log($"[ObjectInteractionController] Broken item {brokenItem.name} destroyed and removed from hotbar");
+        }
     }
 
     void ShowHitEffect(Vector3 position, Vector3 normal)

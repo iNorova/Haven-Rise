@@ -5,6 +5,8 @@ using UnityEngine.EventSystems;
 public class InventorySlot : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IDropHandler
 {
     public Image itemImage; // The Image component that displays the item's icon (should be a child of this slot)
+    public Slider durabilitySlider; // Optional: Slider to show item durability (should be a child of this slot)
+    public Image durabilityFillImage; // Optional: Fill image for durability slider color changes
     public static InventorySlot itemBeingDraggedSlot; 
     public GameObject currentItem; // The actual GameObject representing the item in this slot
 
@@ -12,6 +14,7 @@ public class InventorySlot : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     private Canvas canvas;
     private GameObject draggedIconGameObject; // The temporary GameObject that follows the mouse
     private Image draggedIconImage; // The Image component of the temporary dragged icon
+    private ItemDurability currentItemDurability; // Reference to the current item's durability component
 
     void Awake()
     {
@@ -26,6 +29,83 @@ public class InventorySlot : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             if (itemImage == null)
             {
                 Debug.LogWarning($"[InventorySlot] {gameObject.name}: itemImage is not assigned and no child Image found.");
+            }
+        }
+        
+        // Try to find durability slider if not assigned
+        if (durabilitySlider == null)
+        {
+            durabilitySlider = GetComponentInChildren<Slider>();
+        }
+        
+        // Try to find durability fill image if not assigned
+        if (durabilityFillImage == null && durabilitySlider != null)
+        {
+            // Look for the fill image in the slider's Fill Area
+            Transform fillArea = durabilitySlider.transform.Find("Fill Area");
+            if (fillArea != null)
+            {
+                Transform fill = fillArea.Find("Fill");
+                if (fill != null)
+                {
+                    durabilityFillImage = fill.GetComponent<Image>();
+                }
+            }
+        }
+        
+        // Initially hide durability slider
+        if (durabilitySlider != null)
+        {
+            durabilitySlider.gameObject.SetActive(false);
+        }
+    }
+    
+    void Update()
+    {
+        // Update durability slider if item has durability
+        UpdateDurabilitySlider();
+    }
+    
+    // Update the durability slider based on current item's durability
+    private void UpdateDurabilitySlider()
+    {
+        if (durabilitySlider == null) return;
+        
+        if (currentItem != null && currentItemDurability != null)
+        {
+            // Show slider and update value
+            if (!durabilitySlider.gameObject.activeSelf)
+            {
+                durabilitySlider.gameObject.SetActive(true);
+            }
+            
+            durabilitySlider.value = currentItemDurability.currentDurability;
+            durabilitySlider.maxValue = currentItemDurability.maxDurability;
+            
+            // Update color based on durability percentage
+            if (durabilityFillImage != null)
+            {
+                float durabilityPercent = currentItemDurability.GetDurabilityPercent();
+                if (durabilityPercent <= 0.33f)
+                {
+                    durabilityFillImage.color = Color.red; // Critical
+                }
+                else if (durabilityPercent <= 0.66f)
+                {
+                    durabilityFillImage.color = Color.yellow; // Low
+                }
+                else
+                {
+                    durabilityFillImage.color = Color.green; // Good
+                }
+            }
+        }
+        else
+        {
+            // Hide slider if no item or item has no durability
+            if (durabilitySlider.gameObject.activeSelf)
+            {
+                durabilitySlider.gameObject.SetActive(false);
             }
         }
     }
@@ -148,6 +228,22 @@ public class InventorySlot : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     public void SetItem(GameObject item, Sprite emptySlotDefaultSprite = null)
     {
         currentItem = item;
+        
+        // Check if item has durability component (check item and its children)
+        if (item != null)
+        {
+            currentItemDurability = item.GetComponent<ItemDurability>();
+            // If not found on the item itself, check children (e.g., Axe child of AxeHolder)
+            if (currentItemDurability == null)
+            {
+                currentItemDurability = item.GetComponentInChildren<ItemDurability>();
+            }
+        }
+        else
+        {
+            currentItemDurability = null;
+        }
+        
         if (itemImage != null)
         {
             if (item != null)
@@ -177,6 +273,9 @@ public class InventorySlot : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
                 itemImage.enabled = true; // Still enabled to show empty state
             }
         }
+        
+        // Update durability slider immediately
+        UpdateDurabilitySlider();
     }
 
     // Public method to get the item from this slot
