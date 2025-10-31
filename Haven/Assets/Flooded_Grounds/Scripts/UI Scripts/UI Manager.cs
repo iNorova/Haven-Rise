@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI; // For UI elements
 using UnityEngine.Events;
+using System;
 
 public class UIManager : MonoBehaviour
 {
@@ -66,6 +67,7 @@ public class UIManager : MonoBehaviour
 
     // Static instance for global access
     public static UIManager Instance { get; private set; }
+    public static event Action OnPlayerDeath;
 
     void Awake()
     {
@@ -570,12 +572,69 @@ public class UIManager : MonoBehaviour
     private void HandlePlayerDeath()
     {
         Debug.Log("Player died from heat damage!");
-        // Add your death handling logic here
-        // For example: respawn player, show death screen, etc.
+        // Broadcast death to listeners (e.g., RespawnManager)
+        OnPlayerDeath?.Invoke();
     }
 
     public bool CanSprint()
     {
         return currentStamina > 0;
+    }
+
+    // Public helper to fully restore health and update UI immediately
+    public void RestoreFullHealth()
+    {
+        currentHealth = maxHealth;
+        if (healthSlider != null)
+        {
+            healthSlider.value = currentHealth;
+            if (healthFillImage != null)
+            {
+                healthFillImage.color = normalHealthColor;
+            }
+        }
+    }
+
+    // Reset stamina to full and update UI
+    public void RestoreFullStamina()
+    {
+        currentStamina = maxStamina;
+        if (staminaSlider != null)
+        {
+            staminaSlider.value = currentStamina;
+            if (staminaFillImage != null)
+            {
+                staminaFillImage.fillAmount = 1f;
+                staminaFillImage.color = normalStaminaColor;
+            }
+        }
+        isUsingStamina = false;
+        staminaRegenTimer = 0f;
+    }
+
+    // Reset temperature to minimum and clear permanent increase
+    public void ResetTemperature()
+    {
+        currentTemperature = minTemperatureValue;
+        permanentTemperatureIncrease = 0f;
+        isTemperatureIncreasing = false;
+        temperatureIncreaseTimer = 0f;
+        if (temperatureSlider != null)
+        {
+            temperatureSlider.value = GetCurrentTemperature();
+            if (temperatureFillImage != null)
+            {
+                temperatureFillImage.color = normalTemperatureColor;
+            }
+        }
+        NotifyTemperatureChanged(GetCurrentTemperature());
+    }
+
+    // Convenience method to reset all gameplay stats on respawn
+    public void ResetAllStats()
+    {
+        RestoreFullHealth();
+        RestoreFullStamina();
+        ResetTemperature();
     }
 }

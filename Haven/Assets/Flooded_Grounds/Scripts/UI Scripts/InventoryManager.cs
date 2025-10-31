@@ -143,4 +143,39 @@ public class InventoryManager : MonoBehaviour
         // between HotbarManager and InventoryManager.
         // For now, the direct swap in InventorySlot.OnDrop handles the visuals.
     }
+
+    // Drop all inventory items into the world near a center position (e.g., death spot)
+    public void DropAllItems(Vector3 center)
+    {
+        if (inventoryItems == null || inventorySlots == null) return;
+        for (int i = 0; i < inventoryItems.Length; i++)
+        {
+            GameObject item = inventoryItems[i];
+            if (item == null) continue;
+
+            // Unparent from hidden storage and place near center with slight random offset
+            item.transform.SetParent(null);
+            Vector2 offset2D = Random.insideUnitCircle * 1.5f;
+            Vector3 dropPos = new Vector3(center.x + offset2D.x, center.y + 1f, center.z + offset2D.y);
+            item.transform.position = dropPos;
+            item.transform.rotation = Quaternion.identity;
+
+            Rigidbody rb = item.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.isKinematic = false;
+                rb.useGravity = true;
+                rb.AddForce(Vector3.up * 2f, ForceMode.Impulse);
+            }
+            Collider col = item.GetComponent<Collider>();
+            if (col != null) col.enabled = true;
+            item.SetActive(true);
+
+            // Clear slot and UI
+            inventoryItems[i] = null;
+            inventorySlots[i].SetItem(null, emptySlotSprite);
+        }
+
+        UpdateInventoryUI();
+    }
 } 

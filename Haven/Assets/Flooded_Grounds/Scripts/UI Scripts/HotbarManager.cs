@@ -503,4 +503,39 @@ public class HotbarManager : MonoBehaviour
             Debug.LogWarning("[HotbarManager] selectedItemNameText is not assigned. Cannot update item name display.");
         }
     }
+
+    // Drop all hotbar items into the world near a center position (e.g., death spot)
+    public void DropAllHotbarItems(Vector3 center)
+    {
+        if (hotbarSlots == null) return;
+        for (int i = 0; i < hotbarSlots.Length; i++)
+        {
+            GameObject item = GetItem(i);
+            if (item == null) continue;
+
+            // Clear slot first
+            SetItem(i, null);
+
+            // Unparent from hand and enable physics
+            item.transform.SetParent(null);
+            Vector2 offset2D = Random.insideUnitCircle * 1.5f;
+            Vector3 dropPos = new Vector3(center.x + offset2D.x, center.y + 1f, center.z + offset2D.y);
+            item.transform.position = dropPos;
+            item.transform.rotation = Quaternion.identity;
+
+            Rigidbody rb = item.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.isKinematic = false;
+                rb.useGravity = true;
+                rb.AddForce(Vector3.up * 2f, ForceMode.Impulse);
+            }
+            Collider col = item.GetComponent<Collider>();
+            if (col != null) col.enabled = true;
+            item.SetActive(true);
+        }
+
+        UpdateHotbarUI();
+        UpdateSelectedItemNameDisplay();
+    }
 } 

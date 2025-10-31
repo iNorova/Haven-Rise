@@ -44,6 +44,7 @@ public class TemperatureVisualEffects : MonoBehaviour
 	private float targetMaxAlpha;
 	private bool shouldBlink;
 	private float blinkPhase;
+    private bool isPaused;
 
 	private void Awake()
 	{
@@ -70,6 +71,12 @@ public class TemperatureVisualEffects : MonoBehaviour
 
 	private void Update()
 	{
+		if (isPaused)
+		{
+			// Ensure overlay is hidden while paused
+			SetOverlayAlphaImmediate(0f);
+			return;
+		}
 		// Update blink phase
 		if (shouldBlink && targetBlinkSpeed > 0f)
 		{
@@ -138,5 +145,15 @@ public class TemperatureVisualEffects : MonoBehaviour
 		Color c = overlayImage.color;
 		c.a = Mathf.Clamp01(a);
 		overlayImage.color = c;
+	}
+
+	// Public: Pause/resume effects (used by death panel)
+	public void SetPaused(bool paused)
+	{
+		isPaused = paused;
+		if (paused)
+		{
+			SetOverlayAlphaImmediate(0f);
+		}
 	}
 }
