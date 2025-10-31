@@ -67,6 +67,19 @@ namespace Haven.CraftingUI
 					}
 				}
 			}
+			
+			// CRITICAL: Update inventory UI immediately after crafting to fix white slots
+			if (inventoryManager != null)
+			{
+				inventoryManager.UpdateInventoryUI();
+			}
+			
+			// Also update hotbar UI in case items were consumed from hotbar
+			if (hotbarManager != null)
+			{
+				hotbarManager.UpdateHotbarUI();
+			}
+			
 			return true;
 		}
 

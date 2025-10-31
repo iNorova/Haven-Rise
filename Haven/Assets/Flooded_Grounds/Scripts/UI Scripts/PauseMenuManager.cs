@@ -45,6 +45,23 @@ public class PauseMenuManager : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.Escape))
         {
+            // Check if inventory is open first - if so, don't handle pause menu (inventory will close itself)
+            InventoryUIManager inventoryUI = FindFirstObjectByType<InventoryUIManager>();
+            if (inventoryUI != null && inventoryUI.IsInventoryOpen())
+            {
+                // Inventory is open, let InventoryUIManager handle closing it
+                // Don't open pause menu yet - wait for next ESC press
+                return;
+            }
+            
+            // Check if inventory was just closed via ESC this frame - if so, don't open pause menu yet
+            if (InventoryUIManager.WasInventoryJustClosedViaEsc())
+            {
+                // Inventory was just closed, skip opening pause menu - wait for next ESC press
+                return;
+            }
+            
+            // Only toggle pause menu if inventory is not open and wasn't just closed
             if (isPaused)
                 ResumeGame();
             else

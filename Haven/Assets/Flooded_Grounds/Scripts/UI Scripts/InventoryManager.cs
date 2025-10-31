@@ -88,7 +88,7 @@ public class InventoryManager : MonoBehaviour
         {
             GameObject removedItem = inventoryItems[slotIndex];
             inventoryItems[slotIndex] = null;
-            inventorySlots[slotIndex].SetItem(null); // Clear the InventorySlot and its visual
+            inventorySlots[slotIndex].SetItem(null, emptySlotSprite); // Clear the InventorySlot with empty sprite
             Debug.Log($"[InventoryManager] RemoveItem: Successfully removed {removedItem.name} from slot {slotIndex}");
             return removedItem;
         }
