@@ -52,6 +52,13 @@ public class ObjectInteractionController : MonoBehaviour
 
     void TryInteractWithObject()
     {
+        // Check if player has a valid item (axe or rock) equipped
+        if (!IsValidItemEquipped())
+        {
+            Debug.Log("Cannot interact with destroyable objects: No axe or rock equipped.");
+            return;
+        }
+        
         RaycastHit hit;
         Ray ray = playerCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0)); // Center of screen
 
@@ -82,6 +89,25 @@ public class ObjectInteractionController : MonoBehaviour
         {
             Debug.Log("No destroyable object in range");
         }
+    }
+    
+    // Check if a valid item (axe or rock) is currently equipped
+    private bool IsValidItemEquipped()
+    {
+        if (hotbarManager == null) return false;
+        
+        GameObject currentItem = hotbarManager.GetItem(hotbarManager.selectedSlot);
+        if (currentItem == null) return false;
+        
+        ItemIconProvider iconProvider = currentItem.GetComponent<ItemIconProvider>();
+        if (iconProvider == null) return false;
+        
+        string itemName = iconProvider.itemName;
+        if (string.IsNullOrEmpty(itemName)) return false;
+        
+        // Check if item name contains "axe", "rock", or "stone" (case-insensitive)
+        string itemNameLower = itemName.ToLower();
+        return itemNameLower.Contains("axe") || itemNameLower.Contains("rock") || itemNameLower.Contains("stone");
     }
     
     // Get the damage value based on the currently equipped item
