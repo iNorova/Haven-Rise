@@ -254960,6 +254960,7 @@ MonoBehaviour:
   rockDamage: 14.29
   hitEffectPrefab: {fileID: 0}
   effectDuration: 0.2
+  itemBreakSound: {fileID: 8300000, guid: 0ce111756c74b4ddba3b44bd00659866, type: 3}
 --- !u!95 &1780305050
 Animator:
   serializedVersion: 7

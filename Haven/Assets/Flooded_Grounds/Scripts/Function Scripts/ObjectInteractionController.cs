@@ -16,16 +16,27 @@ public class ObjectInteractionController : MonoBehaviour
     public GameObject hitEffectPrefab;  // Optional: visual feedback when hitting object
     public float effectDuration = 0.2f;
 
+    [Header("Audio Settings")]
+    public AudioClip itemBreakSound;  // Sound effect to play when an item breaks (e.g., axe)
+    
     private Camera playerCamera;
     private float nextHitTime;
     private CharController_Motor motorController;
     private HotbarManager hotbarManager;
+    private AudioSource audioSource;
 
     void Start()
     {
         playerCamera = GetComponentInChildren<Camera>();
         motorController = GetComponent<CharController_Motor>();
         hotbarManager = FindObjectOfType<HotbarManager>();
+        
+        // Setup audio source for break sound
+        audioSource = GetComponent<AudioSource>();
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+        }
         
         if (playerCamera == null)
         {
@@ -217,6 +228,13 @@ public class ObjectInteractionController : MonoBehaviour
             
             // Reset animation state when item breaks (allows slot switching)
             hotbarManager.ResetAnimationState();
+            
+            // Play break sound effect
+            if (itemBreakSound != null && audioSource != null)
+            {
+                audioSource.PlayOneShot(itemBreakSound);
+                Debug.Log("Item break sound played");
+            }
             
             // Update hotbar UI to reflect the empty slot
             hotbarManager.UpdateHotbarUI();
