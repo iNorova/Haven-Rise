@@ -202,6 +202,13 @@ public class HotbarManager : MonoBehaviour
         heldItems[slot] = item;
         hotbarSlots[slot].SetItem(item); // Update the InventorySlot with the actual item
 
+        // Mark item as DontDestroyOnLoad so it persists across scene loads
+        if (item.scene.name != null && item.scene.name != "DontDestroyOnLoad")
+        {
+            DontDestroyOnLoad(item);
+            Debug.Log($"[HotbarManager] PickupItem: Marked {item.name} as DontDestroyOnLoad");
+        }
+
         // Parent the item to the hand holder immediately
         item.transform.SetParent(handHolder);
         item.transform.localPosition = Vector3.zero;
@@ -247,6 +254,13 @@ public class HotbarManager : MonoBehaviour
 		// Attempt to add to inventory; AddItem returns false if full
 		bool added = inventoryManager.AddItem(item);
 		if (!added) return false;
+
+		// Mark item as DontDestroyOnLoad so it persists across scene loads
+		if (item.scene.name != null && item.scene.name != "DontDestroyOnLoad")
+		{
+			DontDestroyOnLoad(item);
+			Debug.Log($"[HotbarManager] TryPickupIntoInventory: Marked {item.name} as DontDestroyOnLoad");
+		}
 
 		// Parent to hidden items and deactivate for storage
 		if (inventoryManager.hiddenItemsParent != null)

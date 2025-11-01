@@ -64,6 +64,13 @@ public class InventoryManager : MonoBehaviour
                 inventoryItems[i] = itemToAdd;
                 inventorySlots[i].SetItem(itemToAdd); // Update the InventorySlot with the actual item
                 
+                // Mark item as DontDestroyOnLoad so it persists across scene loads
+                if (itemToAdd.scene.name != null && itemToAdd.scene.name != "DontDestroyOnLoad")
+                {
+                    DontDestroyOnLoad(itemToAdd);
+                    Debug.Log($"[InventoryManager] AddItem: Marked {itemToAdd.name} as DontDestroyOnLoad");
+                }
+                
                 // Parenting and deactivation will be handled by InventorySystem for transfers
                 // if (itemToAdd != null)
                 // {

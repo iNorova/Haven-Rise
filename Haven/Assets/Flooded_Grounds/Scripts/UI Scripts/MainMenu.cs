@@ -45,9 +45,34 @@ public class MainMenu : MonoBehaviour
         PlayerPrefs.DeleteKey(PauseMenuManager.LastPlayerRotYKey);
         PlayerPrefs.DeleteKey(PauseMenuManager.LastPlayerRotZKey);
         PlayerPrefs.DeleteKey(PauseMenuManager.LastPlayerRotWKey);
+        
+        // Clear inventory and hotbar data
+        PlayerPrefs.DeleteKey(PauseMenuManager.SavedHotbarCountKey);
+        PlayerPrefs.DeleteKey(PauseMenuManager.SavedInventoryCountKey);
+        
+        // Clear all hotbar and inventory item slots
+        if (InventorySystem.Instance != null && InventorySystem.Instance.hotbarManager != null && InventorySystem.Instance.hotbarManager.hotbarSlots != null)
+        {
+            for (int i = 0; i < InventorySystem.Instance.hotbarManager.hotbarSlots.Length; i++)
+            {
+                PlayerPrefs.DeleteKey(PauseMenuManager.SavedHotbarItemPrefix + i);
+            }
+        }
+        if (InventorySystem.Instance != null && InventorySystem.Instance.inventoryManager != null && InventorySystem.Instance.inventoryManager.inventorySlots != null)
+        {
+            for (int i = 0; i < InventorySystem.Instance.inventoryManager.inventorySlots.Length; i++)
+            {
+                PlayerPrefs.DeleteKey(PauseMenuManager.SavedInventoryItemPrefix + i);
+            }
+        }
+
+        // Clear temperature data
+        PlayerPrefs.DeleteKey(PauseMenuManager.SavedTemperatureKey);
+        PlayerPrefs.DeleteKey(PauseMenuManager.SavedPermanentTemperatureIncreaseKey);
+        
         PlayerPrefs.Save();
         
-        Debug.Log("[MainMenu] Starting new game - cleared all saved data");
+        Debug.Log("[MainMenu] Starting new game - cleared all saved data including inventory");
         
         // Load scene 1 like PlayGame() does (complete fresh start)
         SceneManager.LoadSceneAsync(1);

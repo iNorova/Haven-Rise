@@ -63,6 +63,17 @@ public class TemperatureVisualEffects : MonoBehaviour
 		if (uiManager != null && autoSubscribeToUIManager)
 		{
 			uiManager.onTemperatureChanged.AddListener(SetTemperature);
+			
+			// If UIManager already has a temperature value (from loaded save), restore it immediately
+			// This ensures visual effects are restored even if component initializes before/after load
+			if (UIManager.Instance != null)
+			{
+				float currentTemp = UIManager.Instance.GetCurrentTemperature();
+				if (currentTemp > 0f)
+				{
+					SetTemperature(currentTemp);
+				}
+			}
 		}
 
 		if (startHidden) SetOverlayAlphaImmediate(0f);

@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 
 public class ApplySavedPlayerState : MonoBehaviour
 {
@@ -28,7 +29,20 @@ public class ApplySavedPlayerState : MonoBehaviour
 				t.position = new Vector3(px, py, pz);
 				t.rotation = new Quaternion(rx, ry, rz, rw);
 			}
+
+			// Load inventory and hotbar data
+			PauseMenuManager.LoadInventoryData();
+
+			// Load temperature data with a small delay to ensure all components are initialized
+			StartCoroutine(LoadTemperatureDataDelayed());
 		}
+	}
+
+	private IEnumerator LoadTemperatureDataDelayed()
+	{
+		// Wait a frame to ensure all components are initialized
+		yield return null;
+		PauseMenuManager.LoadTemperatureData();
 	}
 }
 
