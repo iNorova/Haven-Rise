@@ -281,6 +281,24 @@ public class AnimalAIManager : MonoBehaviour
         rb.isKinematic = true;
         capsuleCollider.enabled = false;
 
+        // Spawn drops before destroying
+        AnimalDropRateManager dropManager = GetComponent<AnimalDropRateManager>();
+        if (dropManager == null)
+        {
+            // Try to find it in children in case it's attached to a child object
+            dropManager = GetComponentInChildren<AnimalDropRateManager>();
+        }
+        
+        if (dropManager != null)
+        {
+            Debug.Log($"AnimalAIManager: Found AnimalDropRateManager on {dropManager.gameObject.name}, spawning drops...");
+            dropManager.SpawnDrop();
+        }
+        else
+        {
+            Debug.LogWarning($"AnimalAIManager: No AnimalDropRateManager component found on {gameObject.name} or its children!");
+        }
+
         // Start death sequence
         StartCoroutine(DeathSequence());
     }

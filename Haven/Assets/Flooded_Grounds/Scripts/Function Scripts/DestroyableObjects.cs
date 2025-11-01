@@ -136,7 +136,28 @@ public class DestroyableObject : MonoBehaviour
             Debug.Log("Destroy sound played");
         }
 
-        // Spawn drops
+        // Spawn drops from AnimalDropRateManager if present (for special drop rates like leather)
+        AnimalDropRateManager[] dropManagers = GetComponents<AnimalDropRateManager>();
+        if (dropManagers == null || dropManagers.Length == 0)
+        {
+            // Try to find in children in case it's attached to a child object
+            dropManagers = GetComponentsInChildren<AnimalDropRateManager>();
+        }
+        
+        if (dropManagers != null && dropManagers.Length > 0)
+        {
+            // Spawn drops from AnimalDropRateManager system
+            Debug.Log($"DestroyableObject: Found {dropManagers.Length} AnimalDropRateManager component(s), spawning drop rate items...");
+            foreach (AnimalDropRateManager dropManager in dropManagers)
+            {
+                if (dropManager != null)
+                {
+                    dropManager.SpawnDrop();
+                }
+            }
+        }
+        
+        // Also spawn legacy drops (for items like meat that use the old system)
         SpawnDrops();
 
         // Spawn destroyed prefab if we have one
