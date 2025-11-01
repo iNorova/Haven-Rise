@@ -55,7 +55,8 @@ public class InventoryUIManager : MonoBehaviour
     void FixedUpdate()
     {
         // Also enforce cursor lock in FixedUpdate for immediate effect
-        if (inventoryPanel != null && !inventoryPanel.activeSelf)
+        // But only if inventory is closed AND pause menu is not open
+        if (inventoryPanel != null && !inventoryPanel.activeSelf && !PauseMenuManager.IsPauseMenuOpen())
         {
             // Force cursor lock immediately in FixedUpdate too
             Cursor.visible = false;
@@ -71,7 +72,8 @@ public class InventoryUIManager : MonoBehaviour
         // CRITICAL: ALWAYS enforce cursor state when inventory is closed
         // This must run after ALL other scripts to override any conflicting changes
         // We enforce it every frame, not just when we detect an issue, to handle any interference
-        if (inventoryPanel != null && !inventoryPanel.activeSelf)
+        // BUT: Don't lock cursor if pause menu is open
+        if (inventoryPanel != null && !inventoryPanel.activeSelf && !PauseMenuManager.IsPauseMenuOpen())
         {
             // Inventory is closed - ALWAYS lock cursor (don't check condition, just do it)
             // This ensures it works even if something else is interfering
@@ -281,9 +283,13 @@ public class InventoryUIManager : MonoBehaviour
         }
         
         // Force cursor lock multiple times
+        // But only if pause menu is not open
         for (int i = 0; i < 3; i++)
         {
-            LockCursor();
+            if (!PauseMenuManager.IsPauseMenuOpen())
+            {
+                LockCursor();
+            }
             yield return null; // Wait one frame
         }
         
@@ -302,8 +308,11 @@ public class InventoryUIManager : MonoBehaviour
             eventSystem.enabled = true;
         }
         
-        // Final cursor lock
-        LockCursor();
+        // Final cursor lock (only if pause menu is not open)
+        if (!PauseMenuManager.IsPauseMenuOpen())
+        {
+            LockCursor();
+        }
         
         closedViaEsc = false; // Reset flag
     }
@@ -314,14 +323,15 @@ public class InventoryUIManager : MonoBehaviour
         // First, wait for end of current frame
         yield return new WaitForEndOfFrame();
         // Force lock cursor again after all frame updates are complete
-        if (inventoryPanel != null && !inventoryPanel.activeSelf)
+        // But only if pause menu is not open
+        if (inventoryPanel != null && !inventoryPanel.activeSelf && !PauseMenuManager.IsPauseMenuOpen())
         {
             LockCursor();
         }
         
         // Also enforce it again next frame to handle Unity's cursor lock quirks
         yield return null; // Wait one frame
-        if (inventoryPanel != null && !inventoryPanel.activeSelf)
+        if (inventoryPanel != null && !inventoryPanel.activeSelf && !PauseMenuManager.IsPauseMenuOpen())
         {
             LockCursor();
         }

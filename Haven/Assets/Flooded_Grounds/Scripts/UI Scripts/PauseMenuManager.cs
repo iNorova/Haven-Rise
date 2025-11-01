@@ -14,6 +14,7 @@ public class PauseMenuManager : MonoBehaviour
     public Button loadButton;
 
     private bool isPaused = false;
+    private static PauseMenuManager instance;
 
     // PlayerPrefs key used by Main Menu "Continue" to know which scene to load
     public const string LastSaveSceneKey = "LastSaveScene";
@@ -26,6 +27,11 @@ public class PauseMenuManager : MonoBehaviour
 	public const string LastPlayerRotYKey = "LastPlayerRotY";
 	public const string LastPlayerRotZKey = "LastPlayerRotZ";
 	public const string LastPlayerRotWKey = "LastPlayerRotW";
+
+    void Awake()
+    {
+        instance = this;
+    }
 
     void Start()
     {
@@ -156,6 +162,16 @@ public class PauseMenuManager : MonoBehaviour
         {
             Debug.LogWarning("No saved scene found. Save once from Pause Menu first.");
         }
+    }
+
+    // Static method for other scripts to check if pause menu is open
+    public static bool IsPauseMenuOpen()
+    {
+        if (instance != null && instance.pauseMenuPanel != null)
+        {
+            return instance.isPaused && instance.pauseMenuPanel.activeSelf;
+        }
+        return false;
     }
 
     void OnDestroy()
