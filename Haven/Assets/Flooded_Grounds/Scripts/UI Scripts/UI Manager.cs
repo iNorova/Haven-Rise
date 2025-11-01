@@ -192,7 +192,22 @@ public class UIManager : MonoBehaviour
                 return;
             }
             
-            // Only toggle pause menu if inventory is not open and wasn't just closed
+            // Check if player is sleeping in a bed - if so, let BedInteraction handle it
+            if (BedInteraction.IsAnyBedActive())
+            {
+                // Player is sleeping, let BedInteraction handle waking up
+                // Don't open pause menu yet - wait for next ESC press
+                return;
+            }
+            
+            // Check if bed was just exited via ESC this frame - if so, don't open pause menu yet
+            if (BedInteraction.WasBedJustExitedViaEsc())
+            {
+                // Bed was just exited, skip opening pause menu - wait for next ESC press
+                return;
+            }
+            
+            // Only toggle pause menu if inventory/bed is not active and wasn't just exited
             Debug.Log("ESC key pressed");
             TogglePauseMenu();
         }

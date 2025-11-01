@@ -48,6 +48,12 @@ namespace Haven.CraftingUI
 				var instance = Instantiate(recipe.OutputPrefab);
 				var iconProvider = instance.GetComponent<ItemIconProvider>();
 				if (iconProvider != null) instance.name = iconProvider.itemName;
+				
+				// If this is a bed, add BedPlacement script so it can be placed
+				if (instance.name.ToLower().Contains("bed") && instance.GetComponent<BedPlacement>() == null)
+				{
+					instance.AddComponent<BedPlacement>();
+				}
 				if (!inventoryManager.AddItem(instance))
 				{
 					// If inventory full, try add to an empty hotbar slot

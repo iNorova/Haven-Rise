@@ -196,7 +196,7 @@ public class HotbarManager : MonoBehaviour
         return -1;
     }
 
-    void PickupItem(GameObject item, int slot)
+    public void PickupItem(GameObject item, int slot)
     {
         Debug.Log($"Picking up {item.name} into slot {slot}");
         heldItems[slot] = item;
