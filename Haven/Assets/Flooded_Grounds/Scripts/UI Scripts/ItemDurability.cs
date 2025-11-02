@@ -72,8 +72,8 @@ public class ItemDurability : MonoBehaviour
         return isBroken || currentDurability <= 0f;
     }
     
-    // Update UI to reflect current durability
-    private void UpdateUI()
+    // Update UI to reflect current durability (made public for save/load system)
+    public void UpdateUI()
     {
         if (!showUI || durabilitySlider == null) return;
         

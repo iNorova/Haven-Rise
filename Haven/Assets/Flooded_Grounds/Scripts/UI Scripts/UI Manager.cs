@@ -510,7 +510,7 @@ public class UIManager : MonoBehaviour
         {
             float regenRate = GetStaminaRegenRate();
             currentStamina = Mathf.Min(currentStamina + regenRate * Time.deltaTime, maxStamina);
-            Debug.Log($"Regenerating stamina: {currentStamina} at rate {regenRate}");
+            // Removed debug log - was looping every frame
         }
 
         // Update stamina UI
@@ -534,18 +534,15 @@ public class UIManager : MonoBehaviour
         if (currentTemp >= criticalThreshold)
         {
             regenRate -= criticalTempStaminaDebuff;
-            Debug.Log($"Temperature in critical zone ({currentTemp} >= {criticalThreshold}). Stamina regen reduced by {criticalTempStaminaDebuff}. New rate: {regenRate}");
+            // Removed debug log - was looping every frame
         }
         // Check if temperature is in danger zone
         else if (currentTemp >= dangerThreshold)
         {
             regenRate -= dangerTempStaminaDebuff;
-            Debug.Log($"Temperature in danger zone ({currentTemp} >= {dangerThreshold}). Stamina regen reduced by {dangerTempStaminaDebuff}. New rate: {regenRate}");
+            // Removed debug log - was looping every frame
         }
-        else
-        {
-            Debug.Log($"Temperature in safe zone ({currentTemp} < {dangerThreshold}). Stamina regen at normal rate: {regenRate}");
-        }
+        // Removed debug log for safe zone - was looping every frame
         
         // Ensure regeneration rate doesn't go below 1
         return Mathf.Max(1f, regenRate);
@@ -555,13 +552,13 @@ public class UIManager : MonoBehaviour
     {
         isUsingStamina = true;
         currentStamina = Mathf.Max(currentStamina - staminaUseRate * Time.deltaTime, 0f);
-        Debug.Log($"Using stamina: {currentStamina}");
+        // Removed debug log - was looping every frame
     }
 
     public void StopUsingStamina()
     {
         isUsingStamina = false;
-        Debug.Log("Stopped using stamina, will start regenerating");
+        // Removed debug log - was looping every frame
     }
 
     private void TakeHealthDamage()

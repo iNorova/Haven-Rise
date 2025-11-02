@@ -69,6 +69,24 @@ public class MainMenu : MonoBehaviour
         // Clear temperature data
         PlayerPrefs.DeleteKey(PauseMenuManager.SavedTemperatureKey);
         PlayerPrefs.DeleteKey(PauseMenuManager.SavedPermanentTemperatureIncreaseKey);
+
+        // Clear durability data
+        if (InventorySystem.Instance != null && InventorySystem.Instance.hotbarManager != null && InventorySystem.Instance.hotbarManager.hotbarSlots != null)
+        {
+            for (int i = 0; i < InventorySystem.Instance.hotbarManager.hotbarSlots.Length; i++)
+            {
+                PlayerPrefs.DeleteKey(PauseMenuManager.SavedHotbarDurabilityPrefix + i);
+                PlayerPrefs.DeleteKey(PauseMenuManager.SavedHotbarDurabilityPrefix + i + "_max");
+            }
+        }
+        if (InventorySystem.Instance != null && InventorySystem.Instance.inventoryManager != null && InventorySystem.Instance.inventoryManager.inventorySlots != null)
+        {
+            for (int i = 0; i < InventorySystem.Instance.inventoryManager.inventorySlots.Length; i++)
+            {
+                PlayerPrefs.DeleteKey(PauseMenuManager.SavedInventoryDurabilityPrefix + i);
+                PlayerPrefs.DeleteKey(PauseMenuManager.SavedInventoryDurabilityPrefix + i + "_max");
+            }
+        }
         
         PlayerPrefs.Save();
         

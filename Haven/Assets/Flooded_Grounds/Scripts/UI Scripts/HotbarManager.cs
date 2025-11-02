@@ -326,6 +326,44 @@ public class HotbarManager : MonoBehaviour
         if (heldItems[selectedSlot] != null)
         {
             heldItems[selectedSlot].SetActive(true);
+            
+            // Special handling for beds - ensure BedPlacement initializes properly
+            BedPlacement bedPlacement = heldItems[selectedSlot].GetComponent<BedPlacement>();
+            
+            // Check if this is a bed (by name, even if BedPlacement is missing)
+            string itemName = heldItems[selectedSlot].name.ToLower();
+            bool isBed = itemName.Contains("bed");
+            
+            // If no BedPlacement found but this is a bed, try to add it
+            // (This handles cases where the bed was restored but BedPlacement wasn't added properly)
+            if (bedPlacement == null && isBed)
+            {
+                Debug.LogWarning($"[HotbarManager] Bed '{heldItems[selectedSlot].name}' selected but missing BedPlacement component. Adding it now...");
+                bedPlacement = heldItems[selectedSlot].AddComponent<BedPlacement>();
+                if (bedPlacement != null)
+                {
+                    bedPlacement.InitializeReferences();
+                    bedPlacement.enabled = true;
+                    Debug.Log($"[HotbarManager] SelectSlot: Added and initialized BedPlacement for '{heldItems[selectedSlot].name}'");
+                }
+            }
+            
+            // If BedPlacement exists, initialize it and clean up the name
+            if (bedPlacement != null)
+            {
+                bedPlacement.InitializeReferences();
+                Debug.Log($"[HotbarManager] SelectSlot: Initialized BedPlacement for '{heldItems[selectedSlot].name}'");
+                
+                // Also clean up the name if it still has "_Placed" suffix (happens if name cleanup failed during pickup)
+                string currentName = heldItems[selectedSlot].name;
+                if (currentName.Contains("_Placed") || currentName.Contains("_placed"))
+                {
+                    string cleanedName = currentName.Replace("_Placed", "").Replace("_placed", "").Trim();
+                    heldItems[selectedSlot].name = cleanedName;
+                    Debug.Log($"[HotbarManager] SelectSlot: Cleaned bed name from '{currentName}' to '{cleanedName}'");
+                }
+            }
+            
             ResetHeldItemPosition(); // Ensure correct position/rotation in hand
             
             Rigidbody newRb = heldItems[selectedSlot].GetComponent<Rigidbody>();

@@ -40,6 +40,10 @@ public class PauseMenuManager : MonoBehaviour
 	public const string SavedTemperatureKey = "SavedTemperature";
 	public const string SavedPermanentTemperatureIncreaseKey = "SavedPermanentTemperatureIncrease";
 
+	// Durability save keys
+	public const string SavedHotbarDurabilityPrefix = "SavedHotbarDurability_";
+	public const string SavedInventoryDurabilityPrefix = "SavedInventoryDurability_";
+
     void Awake()
     {
         instance = this;
@@ -165,6 +169,9 @@ public class PauseMenuManager : MonoBehaviour
 
 		// Save inventory and hotbar items
 		SaveInventoryData();
+
+		// Save durability data for items
+		SaveDurabilityData();
 
 		// Save temperature state
 		SaveTemperatureData();
@@ -431,6 +438,190 @@ public class PauseMenuManager : MonoBehaviour
 		Debug.Log($"[PauseMenuManager] Temperature data loaded: Base={savedBaseTemp}, Permanent={savedPermanentIncrease}, Final={finalTemperature}");
 	}
 
+	// Save durability data for items in inventory and hotbar
+	private void SaveDurabilityData()
+	{
+		InventorySystem invSystem = InventorySystem.Instance;
+		if (invSystem == null)
+		{
+			Debug.LogWarning("[PauseMenuManager] InventorySystem not found. Cannot save durability data.");
+			return;
+		}
+
+		// Save hotbar item durability
+		if (invSystem.hotbarManager != null && invSystem.hotbarManager.hotbarSlots != null)
+		{
+			for (int i = 0; i < invSystem.hotbarManager.hotbarSlots.Length; i++)
+			{
+				GameObject item = invSystem.hotbarManager.GetItem(i);
+				if (item != null)
+				{
+					ItemDurability durability = item.GetComponent<ItemDurability>();
+					if (durability == null)
+					{
+						durability = item.GetComponentInChildren<ItemDurability>();
+					}
+					if (durability != null)
+					{
+						PlayerPrefs.SetFloat(SavedHotbarDurabilityPrefix + i, durability.currentDurability);
+						PlayerPrefs.SetFloat(SavedHotbarDurabilityPrefix + i + "_max", durability.maxDurability);
+					}
+					else
+					{
+						PlayerPrefs.DeleteKey(SavedHotbarDurabilityPrefix + i);
+						PlayerPrefs.DeleteKey(SavedHotbarDurabilityPrefix + i + "_max");
+					}
+				}
+				else
+				{
+					PlayerPrefs.DeleteKey(SavedHotbarDurabilityPrefix + i);
+					PlayerPrefs.DeleteKey(SavedHotbarDurabilityPrefix + i + "_max");
+				}
+			}
+		}
+
+		// Save inventory item durability
+		if (invSystem.inventoryManager != null && invSystem.inventoryManager.inventorySlots != null)
+		{
+			for (int i = 0; i < invSystem.inventoryManager.inventorySlots.Length; i++)
+			{
+				GameObject item = invSystem.inventoryManager.GetItem(i);
+				if (item != null)
+				{
+					ItemDurability durability = item.GetComponent<ItemDurability>();
+					if (durability == null)
+					{
+						durability = item.GetComponentInChildren<ItemDurability>();
+					}
+					if (durability != null)
+					{
+						PlayerPrefs.SetFloat(SavedInventoryDurabilityPrefix + i, durability.currentDurability);
+						PlayerPrefs.SetFloat(SavedInventoryDurabilityPrefix + i + "_max", durability.maxDurability);
+					}
+					else
+					{
+						PlayerPrefs.DeleteKey(SavedInventoryDurabilityPrefix + i);
+						PlayerPrefs.DeleteKey(SavedInventoryDurabilityPrefix + i + "_max");
+					}
+				}
+				else
+				{
+					PlayerPrefs.DeleteKey(SavedInventoryDurabilityPrefix + i);
+					PlayerPrefs.DeleteKey(SavedInventoryDurabilityPrefix + i + "_max");
+				}
+			}
+		}
+
+		Debug.Log("[PauseMenuManager] Durability data saved successfully.");
+	}
+
+	// Load durability data for items in inventory and hotbar
+	private static void LoadDurabilityData(InventorySystem invSystem)
+	{
+		// Load hotbar item durability
+		if (invSystem.hotbarManager != null && invSystem.hotbarManager.hotbarSlots != null)
+		{
+			for (int i = 0; i < invSystem.hotbarManager.hotbarSlots.Length; i++)
+			{
+				GameObject item = invSystem.hotbarManager.GetItem(i);
+				if (item != null)
+				{
+					string durabilityKey = SavedHotbarDurabilityPrefix + i;
+					if (PlayerPrefs.HasKey(durabilityKey))
+					{
+						ItemDurability durability = item.GetComponent<ItemDurability>();
+						if (durability == null)
+						{
+							durability = item.GetComponentInChildren<ItemDurability>();
+						}
+						if (durability != null)
+						{
+							float savedDurability = PlayerPrefs.GetFloat(durabilityKey, durability.maxDurability);
+							float savedMaxDurability = PlayerPrefs.GetFloat(durabilityKey + "_max", durability.maxDurability);
+							
+							// Update max if it changed (might have been modified)
+							if (Mathf.Abs(savedMaxDurability - durability.maxDurability) > 0.01f)
+							{
+								durability.maxDurability = savedMaxDurability;
+							}
+							
+							durability.currentDurability = Mathf.Clamp(savedDurability, 0f, durability.maxDurability);
+							
+							// Update broken state
+							if (durability.currentDurability <= 0f)
+							{
+								// Item was broken, restore broken state via reflection
+								var isBrokenField = typeof(ItemDurability).GetField("isBroken", 
+									BindingFlags.NonPublic | BindingFlags.Instance);
+								if (isBrokenField != null)
+								{
+									isBrokenField.SetValue(durability, true);
+								}
+							}
+							
+							// Call UpdateUI to refresh display
+							durability.UpdateUI();
+							
+							Debug.Log($"[PauseMenuManager] Restored durability for hotbar item {i}: {durability.currentDurability}/{durability.maxDurability}");
+						}
+					}
+				}
+			}
+		}
+
+		// Load inventory item durability
+		if (invSystem.inventoryManager != null && invSystem.inventoryManager.inventorySlots != null)
+		{
+			for (int i = 0; i < invSystem.inventoryManager.inventorySlots.Length; i++)
+			{
+				GameObject item = invSystem.inventoryManager.GetItem(i);
+				if (item != null)
+				{
+					string durabilityKey = SavedInventoryDurabilityPrefix + i;
+					if (PlayerPrefs.HasKey(durabilityKey))
+					{
+						ItemDurability durability = item.GetComponent<ItemDurability>();
+						if (durability == null)
+						{
+							durability = item.GetComponentInChildren<ItemDurability>();
+						}
+						if (durability != null)
+						{
+							float savedDurability = PlayerPrefs.GetFloat(durabilityKey, durability.maxDurability);
+							float savedMaxDurability = PlayerPrefs.GetFloat(durabilityKey + "_max", durability.maxDurability);
+							
+							// Update max if it changed
+							if (Mathf.Abs(savedMaxDurability - durability.maxDurability) > 0.01f)
+							{
+								durability.maxDurability = savedMaxDurability;
+							}
+							
+							durability.currentDurability = Mathf.Clamp(savedDurability, 0f, durability.maxDurability);
+							
+							// Update broken state
+							if (durability.currentDurability <= 0f)
+							{
+								var isBrokenField = typeof(ItemDurability).GetField("isBroken", 
+									BindingFlags.NonPublic | BindingFlags.Instance);
+								if (isBrokenField != null)
+								{
+									isBrokenField.SetValue(durability, true);
+								}
+							}
+							
+							// Call UpdateUI to refresh display
+							durability.UpdateUI();
+							
+							Debug.Log($"[PauseMenuManager] Restored durability for inventory item {i}: {durability.currentDurability}/{durability.maxDurability}");
+						}
+					}
+				}
+			}
+		}
+
+		Debug.Log("[PauseMenuManager] Durability data loaded successfully.");
+	}
+
 	// Helper method to get item name from ItemIconProvider or GameObject name
 	private string GetItemName(GameObject item)
 	{
@@ -632,6 +823,9 @@ public class PauseMenuManager : MonoBehaviour
 				}
 			}
 		}
+
+		// Load durability data for restored items
+		LoadDurabilityData(invSystem);
 
 		Debug.Log("[PauseMenuManager] Inventory data loaded successfully.");
 	}

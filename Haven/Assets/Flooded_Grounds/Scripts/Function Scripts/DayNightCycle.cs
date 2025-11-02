@@ -23,77 +23,230 @@ public class DayNightCycle : MonoBehaviour
     [Tooltip("Color of the fog over the 24-hour cycle.")]
     public Gradient fogColor;
 
+    [Header("Smoothing Settings")]
+    [Tooltip("Smooth factor for light transitions (higher = smoother, prevents flickering).")]
+    [Range(0.1f, 10f)]
+    public float smoothingSpeed = 5f;
+    [Tooltip("Update frequency - higher values reduce flicker but may look less responsive.")]
+    [Range(0.01f, 0.1f)]
+    public float updateInterval = 0.02f; // Update every 0.02 seconds instead of every frame
+    [Tooltip("Shadow update interval - shadows update less frequently to prevent flickering (higher = more stable shadows).")]
+    [Range(0.05f, 0.5f)]
+    public float shadowUpdateInterval = 0.1f; // Update shadows every 0.1 seconds
+
     private float _timeScale;
+    private float _updateTimer = 0f;
+    
+    // Cached values for smooth interpolation
+    private Color _targetSunColor;
+    private float _targetSunIntensity;
+    private Color _currentSunColor;
+    private float _currentSunIntensity;
+    private Color _targetAmbientColor;
+    private Color _currentAmbientColor;
+    private Color _targetFogColor;
+    private Color _currentFogColor;
+    private float _targetXRotation;
+    private float _currentXRotation;
+    private float _shadowXRotation; // Separate rotation for shadows (updates less frequently)
+    
+    // Transition state
+    private bool isTransitioning = false;
+    private float targetTransitionTime = 0f;
+    private float transitionDuration = 0f;
+    private float transitionStartTime = 0f;
+    private float transitionStartValue = 0f;
 
     void Start()
     {
         // Calculate time scale: (24 hours / dayDurationInMinutes) * minutes_in_hour (60) for a full day
         _timeScale = 24f / dayDurationInMinutes; // Now represents hours per minute
+        
+        // Initialize cached values
+        float normalizedTime = timeOfDay / 24f;
+        _targetSunColor = sunColor.Evaluate(normalizedTime);
+        _currentSunColor = _targetSunColor;
+        _targetSunIntensity = sunIntensity.Evaluate(normalizedTime);
+        _currentSunIntensity = _targetSunIntensity;
+        _targetAmbientColor = ambientColor.Evaluate(normalizedTime);
+        _currentAmbientColor = _targetAmbientColor;
+        _targetFogColor = fogColor.Evaluate(normalizedTime);
+        _currentFogColor = _targetFogColor;
+        _targetXRotation = Mathf.Lerp(-90f, 270f, normalizedTime);
+        _currentXRotation = _targetXRotation;
+        _shadowXRotation = _targetXRotation;
+        
         UpdateEnvironment(); // Initial update
+        
+        // Configure light for stable shadows
+        if (sunLight != null)
+        {
+            // Use StableFit shadow projection for smoother transitions
+            sunLight.shadows = LightShadows.Soft;
+            // Reduce shadow flicker by using stable shadow settings
+            QualitySettings.shadowProjection = ShadowProjection.StableFit;
+        }
     }
 
     void Update()
     {
-        // Advance time of day
-        timeOfDay += Time.deltaTime * _timeScale; // timeOfDay is in hours
-        if (timeOfDay >= 24f) // If we pass midnight, loop back
+        // Only advance time if not transitioning
+        if (!isTransitioning)
         {
-            timeOfDay -= 24f;
+            // Advance time of day
+            timeOfDay += Time.deltaTime * _timeScale; // timeOfDay is in hours
+            if (timeOfDay >= 24f) // If we pass midnight, loop back
+            {
+                timeOfDay -= 24f;
+            }
         }
 
-        UpdateEnvironment();
+        // Update target values less frequently to reduce flicker
+        _updateTimer += Time.deltaTime;
+        if (_updateTimer >= updateInterval)
+        {
+            _updateTimer = 0f;
+            UpdateTargetValues();
+        }
+        
+        // Smoothly interpolate shadow rotation towards visual rotation every frame
+        // Use slower interpolation to reduce shadow update frequency and prevent flicker
+        float shadowLerpSpeed = 1f / shadowUpdateInterval; // Convert interval to speed
+        float shadowLerpFactor = 1f - Mathf.Exp(-shadowLerpSpeed * Time.deltaTime);
+        _shadowXRotation = Mathf.LerpAngle(_shadowXRotation, _currentXRotation, shadowLerpFactor);
+        
+        // Smoothly interpolate towards target values every frame
+        SmoothUpdateEnvironment();
     }
 
-    void UpdateEnvironment()
+    void UpdateTargetValues()
     {
         // Normalize time to a 0-1 range for gradients and curves
         float normalizedTime = timeOfDay / 24f;
 
+        // Update target values (these change less frequently)
+        _targetSunColor = sunColor.Evaluate(normalizedTime);
+        _targetSunIntensity = sunIntensity.Evaluate(normalizedTime);
+        _targetAmbientColor = ambientColor.Evaluate(normalizedTime);
+        _targetFogColor = fogColor.Evaluate(normalizedTime);
+        _targetXRotation = Mathf.Lerp(-90f, 270f, normalizedTime);
+    }
+
+    void SmoothUpdateEnvironment()
+    {
+        // Smooth interpolation factor based on smoothing speed
+        float lerpFactor = 1f - Mathf.Exp(-smoothingSpeed * Time.deltaTime);
+
         // Update Sun Light (Directional Light)
         if (sunLight != null)
         {
-            // Rotate the sun light. 0 degrees for noon, -90 for sunrise, 90 for sunset.
-            // A full 24-hour cycle is 360 degrees rotation around the X-axis for the light.
-            // 0 (midnight) -> 0 degrees
-            // 6 (sunrise)   -> -90 degrees
-            // 12 (noon)     -> 0 degrees
-            // 18 (sunset)   -> 90 degrees
-            // This logic assumes the sunLight starts facing straight down at noon (x=0, y=0, z=0 rotation).
-            // We need it to rotate from -90 (morning) through 0 (noon) to 90 (evening) relative to its initial x-axis.
-            // A simpler way is to rotate it from 0 to 360 over the day.
-            // At 6 AM (0.25 normalized) it should be rising (e.g., -90 degrees X rotation).
-            // At 12 PM (0.5 normalized) it should be at its peak (e.g., 0 degrees X rotation).
-            // At 18 PM (0.75 normalized) it should be setting (e.g., 90 degrees X rotation).
-            // At 0 AM (0 or 1 normalized) it should be at its lowest point (e.g., 180 degrees X rotation for moon/night).
+            // Smoothly interpolate rotation for visual updates
+            _currentXRotation = Mathf.LerpAngle(_currentXRotation, _targetXRotation, lerpFactor);
             
-            // Let's make it simpler: rotate 360 degrees over 24 hours.
-            // At 0 hours, let's say sun is at -90 degrees (just before sunrise).
-            // At 12 hours, sun is at 90 degrees (just after sunset).
-            // A 360-degree rotation maps 0-1 normalized time to 0-360 degrees.
-            // For sun, typical approach is: start from sun below horizon, rise, set, then go back below horizon.
-            // If 0-1 normalized time maps to 0-360 degrees, 0.25 (6am) is 90 deg, 0.5 (12pm) is 180 deg, 0.75 (6pm) is 270 deg.
-            // To get a natural looking sun/moon cycle, the directional light should rotate around the X-axis.
-            // 0 degrees for light means pointing straight down. So at noon, it should be pointing down.
-            // At 6 AM, it should be at -90 degrees (coming from right side if light is global x-rot).
-            // At 18 PM, it should be at 90 degrees (going to left side).
+            // Apply rotation to light - use shadow rotation which updates less frequently to reduce shadow flicker
+            // The shadow rotation smoothly follows the visual rotation but updates at a lower frequency
+            sunLight.transform.localRotation = Quaternion.Euler(_shadowXRotation, sunLight.transform.localEulerAngles.y, sunLight.transform.localEulerAngles.z);
 
-            // Let's consider 0 degrees X rotation as midday sun.
-            // So, -90 for 6am, +90 for 6pm. Full rotation 0-360 means:
-            // Normalized time 0: (midnight, sun lowest) = 0 degrees (pointing up)
-            // Normalized time 0.25 (6am): = 90 degrees (horizontal from right)
-            // Normalized time 0.5 (12pm): = 180 degrees (pointing down, sun at peak)
-            // Normalized time 0.75 (6pm): = 270 degrees (horizontal from left)
+            // Smoothly interpolate color and intensity
+            _currentSunColor = Color.Lerp(_currentSunColor, _targetSunColor, lerpFactor);
+            _currentSunIntensity = Mathf.Lerp(_currentSunIntensity, _targetSunIntensity, lerpFactor);
+            
+            sunLight.color = _currentSunColor;
+            sunLight.intensity = _currentSunIntensity;
+        }
 
-            // This is simplest: sun rotation from -90 to 270 degrees. This will move it from morning to night.
-            float xRotation = Mathf.Lerp(-90f, 270f, normalizedTime); // Rotates 360 degrees. -90 is rising, 270 is after setting.
+        // Smoothly interpolate Ambient Light and Fog
+        _currentAmbientColor = Color.Lerp(_currentAmbientColor, _targetAmbientColor, lerpFactor);
+        _currentFogColor = Color.Lerp(_currentFogColor, _targetFogColor, lerpFactor);
+        
+        RenderSettings.ambientLight = _currentAmbientColor;
+        RenderSettings.fogColor = _currentFogColor;
+    }
+
+    void UpdateEnvironment()
+    {
+        // Direct update (used only on Start)
+        float normalizedTime = timeOfDay / 24f;
+
+        if (sunLight != null)
+        {
+            float xRotation = Mathf.Lerp(-90f, 270f, normalizedTime);
             sunLight.transform.localRotation = Quaternion.Euler(xRotation, sunLight.transform.localEulerAngles.y, sunLight.transform.localEulerAngles.z);
-
             sunLight.color = sunColor.Evaluate(normalizedTime);
             sunLight.intensity = sunIntensity.Evaluate(normalizedTime);
         }
 
-        // Update Ambient Light and Fog
         RenderSettings.ambientLight = ambientColor.Evaluate(normalizedTime);
         RenderSettings.fogColor = fogColor.Evaluate(normalizedTime);
+        
+        // Handle time transition
+        if (isTransitioning)
+        {
+            float elapsed = Time.time - transitionStartTime;
+            if (elapsed < transitionDuration)
+            {
+                // Calculate progress (0 to 1)
+                float progress = elapsed / transitionDuration;
+                
+                // Handle time wrapping (e.g., transitioning from 22 to 2 = going through midnight)
+                float currentTime = Mathf.Lerp(transitionStartValue, targetTransitionTime, progress);
+                
+                // Ensure time wraps around 24 hours correctly
+                if (Mathf.Abs(targetTransitionTime - transitionStartValue) > 12f)
+                {
+                    // Take shorter path (wrap around)
+                    if (transitionStartValue > targetTransitionTime)
+                    {
+                        currentTime = Mathf.Lerp(transitionStartValue, targetTransitionTime + 24f, progress);
+                        if (currentTime >= 24f) currentTime -= 24f;
+                    }
+                    else
+                    {
+                        currentTime = Mathf.Lerp(transitionStartValue - 24f, targetTransitionTime, progress);
+                        if (currentTime < 0f) currentTime += 24f;
+                    }
+                }
+                
+                timeOfDay = currentTime;
+                
+                // Force immediate update of environment during transition
+                UpdateTargetValues();
+            }
+            else
+            {
+                // Transition complete
+                timeOfDay = targetTransitionTime;
+                if (timeOfDay >= 24f) timeOfDay -= 24f;
+                if (timeOfDay < 0f) timeOfDay += 24f;
+                isTransitioning = false;
+                UpdateTargetValues();
+            }
+        }
+    }
+    
+    // Public method to transition to a specific time of day
+    public void TransitionToTime(float targetTime, float duration)
+    {
+        if (duration <= 0f)
+        {
+            // Instant transition
+            timeOfDay = targetTime;
+            if (timeOfDay >= 24f) timeOfDay -= 24f;
+            if (timeOfDay < 0f) timeOfDay += 24f;
+            UpdateTargetValues();
+            return;
+        }
+        
+        // Normalize target time
+        targetTime = targetTime % 24f;
+        if (targetTime < 0f) targetTime += 24f;
+        
+        isTransitioning = true;
+        targetTransitionTime = targetTime;
+        transitionDuration = duration;
+        transitionStartTime = Time.time;
+        transitionStartValue = timeOfDay;
+        
+        Debug.Log($"[DayNightCycle] Transitioning from {transitionStartValue:F2} to {targetTransitionTime:F2} over {duration} seconds");
     }
 } 
