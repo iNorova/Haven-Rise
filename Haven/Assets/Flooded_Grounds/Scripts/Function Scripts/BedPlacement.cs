@@ -15,7 +15,7 @@ public class BedPlacement : MonoBehaviour
     [Tooltip("How often to update preview (higher = less lag but less responsive).")]
     [Range(0.1f, 1f)]
     public float previewUpdateInterval = 0.3f; // Update every 0.3 seconds for performance
-   image.png 
+    
     private Camera playerCamera;
     private HotbarManager hotbarManager;
     private InventoryManager inventoryManager;

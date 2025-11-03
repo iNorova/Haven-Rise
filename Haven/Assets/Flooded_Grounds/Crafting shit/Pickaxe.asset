@@ -17,6 +17,6 @@ MonoBehaviour:
     quantity: 3
   - itemName: Wood
     quantity: 2
-  outputPrefab: {fileID: 4344391803625242696, guid: 07ac7efe8abc54bb9b6bef67b1ddee7e, type: 3}
+  outputPrefab: {fileID: 4099295827044930107, guid: b59e5a877aa2f47c187cfe85218420f9, type: 3}
   outputQuantity: 1
-  iconOverride: {fileID: 21300000, guid: 1984e7c0986dd4839ae29ffa94dfa465, type: 3}
+  iconOverride: {fileID: 21300000, guid: 311d16f7294ee42b5bee61543fc71290, type: 3}

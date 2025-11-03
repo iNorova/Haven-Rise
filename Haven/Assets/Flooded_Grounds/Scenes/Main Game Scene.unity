@@ -142778,6 +142778,11 @@ MonoBehaviour:
     m_Bits: 256
   groundOffset: -1
   raycastHeight: 10
+  sfxSource: {fileID: 0}
+  plantSeedSfx: {fileID: 8300000, guid: 2f6b465b791414519addfc2beb582940, type: 3}
+  plantSeedSfxVolume: 1
+  seedGrowSfx: {fileID: 8300000, guid: 1519f3835ab1e4b0186003762c13cee1, type: 3}
+  seedGrowSfxVolume: 0.85
 --- !u!4 &1008990084
 Transform:
   m_ObjectHideFlags: 0

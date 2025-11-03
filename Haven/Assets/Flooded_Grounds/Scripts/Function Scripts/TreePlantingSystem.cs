@@ -19,6 +19,13 @@ public class TreePlantingSystem : MonoBehaviour
     public float groundOffset = 0.1f; // Adjust this value to place the tree correctly on the ground
     public float raycastHeight = 10f; // Height from which to cast the ray downwards
 
+    [Header("Audio")]
+    public AudioSource sfxSource; // Optional; if null we will use PlayClipAtPoint
+    public AudioClip plantSeedSfx;   // Sound effect when seed is planted
+    [Range(0f, 1f)] public float plantSeedSfxVolume = 0.85f;
+    public AudioClip seedGrowSfx;   // Sound effect when seed grows into tree
+    [Range(0f, 1f)] public float seedGrowSfxVolume = 0.85f;
+
     // Method called by DestroyableObject when a tree is cut
     public void OnTreeCut(Vector3 treePosition)
     {
@@ -46,6 +53,10 @@ public class TreePlantingSystem : MonoBehaviour
     public void PlantSeedOnSoil(GameObject soilGameObject)
     {
         Debug.Log("TreePlantingSystem: Planting seed on detected soil.");
+        
+        // Play planting sound effect
+        PlayPlantSeedSfx();
+        
         // Hide the original soil object
         soilGameObject.SetActive(false);
 
@@ -72,6 +83,9 @@ public class TreePlantingSystem : MonoBehaviour
         newPlantedTree.transform.localScale = plantedTreeScale;
         newPlantedTree.transform.localRotation = Quaternion.Euler(plantedTreeRotation);
 
+        // Play growth sound effect when tree spawns
+        PlaySeedGrowSfx(newPlantedTree.transform.position);
+
         // Optionally, destroy the original soil object after a short delay or immediately
         // You might want to keep it if you plan to re-use it later, but for simple hide/replace, destroy is fine.
         Destroy(soilGameObject); // Destroy the soil GameObject after planting
@@ -82,6 +96,34 @@ public class TreePlantingSystem : MonoBehaviour
         {
             UIManager.Instance.OnSproutSeedPlanted();
             Debug.Log("TreePlantingSystem: Notified UIManager of sprout seed planting.");
+        }
+    }
+
+    // --- Audio helpers ---
+    private void PlayPlantSeedSfx()
+    {
+        if (plantSeedSfx == null) return;
+        if (sfxSource != null)
+        {
+            sfxSource.PlayOneShot(plantSeedSfx, plantSeedSfxVolume);
+        }
+        else if (Camera.main != null)
+        {
+            AudioSource.PlayClipAtPoint(plantSeedSfx, Camera.main.transform.position, plantSeedSfxVolume);
+        }
+    }
+
+    private void PlaySeedGrowSfx(Vector3 position)
+    {
+        if (seedGrowSfx == null) return;
+        if (sfxSource != null)
+        {
+            sfxSource.PlayOneShot(seedGrowSfx, seedGrowSfxVolume);
+        }
+        else
+        {
+            // Play at the position where the tree was planted
+            AudioSource.PlayClipAtPoint(seedGrowSfx, position, seedGrowSfxVolume);
         }
     }
 } 
