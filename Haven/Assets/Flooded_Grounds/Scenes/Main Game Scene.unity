@@ -105271,6 +105271,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   tooltipText: {fileID: 0}
+  tooltipTextTop: {fileID: 0}
   tooltipTextLegacy: {fileID: 0}
   tooltipPanel: {fileID: 0}
   textOnly: 1
@@ -226736,6 +226737,8 @@ MonoBehaviour:
   nightLight: {fileID: 1676699557}
   fadeOverlay: {fileID: 0}
   fadeDuration: 2
+  daySkybox: {fileID: 2100000, guid: 1612dc54605b67947bed7b6e6b4f48c4, type: 2}
+  nightSkybox: {fileID: 2100000, guid: 992a308c87edd6d429cdf8048835d8b3, type: 2}
   isTransitioning: 0
 --- !u!1001 &1583455222
 PrefabInstance:

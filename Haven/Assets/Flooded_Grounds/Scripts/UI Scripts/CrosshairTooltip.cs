@@ -9,7 +9,8 @@ using System.Reflection;
 public class CrosshairTooltip : MonoBehaviour
 {
     [Header("UI References")]
-    public TextMeshProUGUI tooltipText; // TextMeshPro text component for tooltip
+    public TextMeshProUGUI tooltipText; // TextMeshPro text component for tooltip (bottom/primary)
+    public TextMeshProUGUI tooltipTextTop; // Optional top text component (for bed interactions)
     public Text tooltipTextLegacy; // Fallback for legacy Text component
     public GameObject tooltipPanel; // Optional panel background (can be left null for text only)
     [Tooltip("If true, only text will show without panel background.")]
@@ -330,7 +331,7 @@ public class CrosshairTooltip : MonoBehaviour
             {
                 GameObject hitObject = groundHit.collider.gameObject;
                 
-                // Check if it's a placed bed first - if so, show sleep tooltip instead of placement tooltip
+                // Check if it's a placed bed first - if so, show both texts (sleep top, pick up bottom if applicable)
                 BedInteraction placedBed = hitObject.GetComponent<BedInteraction>();
                 if (placedBed == null)
                 {
@@ -338,8 +339,13 @@ public class CrosshairTooltip : MonoBehaviour
                 }
                 if (placedBed != null && !placedBed.isTransitioning)
                 {
-                    // This is a placed bed - show sleep tooltip even when holding a bed
-                    ShowTooltip(bedText); // "Press [G] to Sleep"
+                    // This is a placed bed - show sleep tooltip on top, pick up on bottom if it has Pickupable tag
+                    string bottomText = "";
+                    if (hitObject.CompareTag("Pickupable"))
+                    {
+                        bottomText = pickupableText;
+                    }
+                    ShowTooltip(bottomText, bedText); // Top: "Press [G] to Sleep", Bottom: "Press [F] to Pick Up" (if applicable)
                     lastHitObject = hitObject;
                     lastHit = groundHit;
                     return;
@@ -381,6 +387,24 @@ public class CrosshairTooltip : MonoBehaviour
             
             lastHitObject = hitObject;
             lastHit = hit;
+            
+            // Check for bed interaction first (needs special handling for two texts)
+            BedInteraction bedInteraction = hitObject.GetComponent<BedInteraction>();
+            if (bedInteraction == null)
+            {
+                bedInteraction = hitObject.GetComponentInParent<BedInteraction>();
+            }
+            if (bedInteraction != null && !bedInteraction.isTransitioning)
+            {
+                // Show both texts: top = sleep, bottom = pick up (if it has Pickupable tag)
+                string bottomText = "";
+                if (hitObject.CompareTag("Pickupable"))
+                {
+                    bottomText = pickupableText;
+                }
+                ShowTooltip(bottomText, bedText); // Top: "Press [G] to Sleep", Bottom: "Press [F] to Pick Up" (if applicable)
+                return;
+            }
             
             // Determine what type of object this is and show appropriate text
             string tooltip = GetTooltipText(hitObject, false);
@@ -531,7 +555,21 @@ public class CrosshairTooltip : MonoBehaviour
             return bedPlacementText;
         }
         
-        // Check tags first (fastest)
+        // PRIORITY: Check for BedInteraction FIRST (before tag checks)
+        // This ensures placed beds show sleep text even if they have Pickupable tag
+        BedInteraction bedInteraction = obj.GetComponent<BedInteraction>();
+        if (bedInteraction == null)
+        {
+            bedInteraction = obj.GetComponentInParent<BedInteraction>();
+        }
+        if (bedInteraction != null && !bedInteraction.isTransitioning)
+        {
+            // This is a placed bed - handled specially in CheckForInteractables
+            // Return empty string here since beds are handled before this function is called
+            return ""; // Handled in CheckForInteractables
+        }
+        
+        // Check tags after component checks
         if (obj.CompareTag("Pickupable"))
         {
             // Check if it's meat/food
@@ -577,27 +615,6 @@ public class CrosshairTooltip : MonoBehaviour
             return destroyableText;
         }
         
-        // Check components - placed beds have BedInteraction component
-        BedInteraction bedInteraction = obj.GetComponent<BedInteraction>();
-        if (bedInteraction == null)
-        {
-            bedInteraction = obj.GetComponentInParent<BedInteraction>();
-        }
-        if (bedInteraction != null)
-        {
-            // Only show sleep text if bed is placed (not transitioning)
-            // This is a placed bed, show sleep tooltip
-            if (!bedInteraction.isTransitioning)
-            {
-                return bedText; // "Press [G] to Sleep"
-            }
-            else
-            {
-                // Bed is transitioning, don't show tooltip
-                return "";
-            }
-        }
-        
         // Check if it's an NPC (you might need to add an NPC tag or component)
         if (obj.CompareTag("NPC") || obj.GetComponent("NPCController") != null)
         {
@@ -632,17 +649,21 @@ public class CrosshairTooltip : MonoBehaviour
         return ""; // No tooltip for this object
     }
     
-    void ShowTooltip(string text)
+    private string currentTopTooltipText = ""; // Track top text separately
+    
+    void ShowTooltip(string text, string topText = "")
     {
-        if (currentTooltipText == text && targetAlpha == 1f)
+        // Check if both texts match what we're already showing
+        if (currentTooltipText == text && currentTopTooltipText == topText && targetAlpha == 1f)
         {
-            return; // Already showing this text
+            return; // Already showing these texts
         }
         
         currentTooltipText = text;
+        currentTopTooltipText = topText;
         targetAlpha = 1f;
         
-        // Update text component
+        // Update bottom/primary text component
         if (tooltipText != null)
         {
             tooltipText.text = text;
@@ -654,11 +675,68 @@ public class CrosshairTooltip : MonoBehaviour
             tooltipTextLegacy.gameObject.SetActive(true);
         }
         
+        // Update top text component (for bed interactions)
+        if (!string.IsNullOrEmpty(topText))
+        {
+            // Create top text if it doesn't exist
+            if (tooltipTextTop == null && tooltipText != null)
+            {
+                CreateTopTextComponent();
+            }
+            
+            if (tooltipTextTop != null)
+            {
+                tooltipTextTop.text = topText;
+                tooltipTextTop.gameObject.SetActive(true);
+            }
+        }
+        else
+        {
+            // Hide top text if empty
+            if (tooltipTextTop != null)
+            {
+                tooltipTextTop.gameObject.SetActive(false);
+            }
+        }
+        
         // Show panel only if textOnly is false and panel exists
         if (!textOnly && tooltipPanel != null)
         {
             tooltipPanel.SetActive(true);
         }
+    }
+    
+    void CreateTopTextComponent()
+    {
+        if (tooltipText == null) return; // Need base text to position relative to
+        
+        // Create top text as a sibling of the main text
+        GameObject topTextObj = new GameObject("TooltipTextTop");
+        topTextObj.transform.SetParent(tooltipText.transform.parent, false);
+        
+        tooltipTextTop = topTextObj.AddComponent<TextMeshProUGUI>();
+        tooltipTextTop.text = "";
+        tooltipTextTop.fontSize = tooltipText.fontSize;
+        tooltipTextTop.color = tooltipText.color;
+        tooltipTextTop.alignment = TextAlignmentOptions.Center;
+        tooltipTextTop.enableWordWrapping = false;
+        tooltipTextTop.overflowMode = TextOverflowModes.Overflow;
+        
+        // Position above the main text
+        RectTransform topRect = tooltipTextTop.rectTransform;
+        RectTransform mainRect = tooltipText.rectTransform;
+        
+        topRect.anchorMin = new Vector2(0.5f, 0.5f);
+        topRect.anchorMax = new Vector2(0.5f, 0.5f);
+        topRect.pivot = new Vector2(0.5f, 0.5f);
+        topRect.sizeDelta = mainRect.sizeDelta;
+        
+        // Position it above the main text (with spacing)
+        float spacing = 30f; // Pixels between texts
+        topRect.anchoredPosition = new Vector2(
+            mainRect.anchoredPosition.x,
+            mainRect.anchoredPosition.y + mainRect.sizeDelta.y / 2 + spacing + topRect.sizeDelta.y / 2
+        );
     }
     
     void HideTooltip()
@@ -670,6 +748,7 @@ public class CrosshairTooltip : MonoBehaviour
         
         targetAlpha = 0f;
         currentTooltipText = "";
+        currentTopTooltipText = "";
         
         // Clear text
         if (tooltipText != null)
@@ -681,6 +760,11 @@ public class CrosshairTooltip : MonoBehaviour
         {
             tooltipTextLegacy.text = "";
             tooltipTextLegacy.gameObject.SetActive(false);
+        }
+        if (tooltipTextTop != null)
+        {
+            tooltipTextTop.text = "";
+            tooltipTextTop.gameObject.SetActive(false);
         }
         
         // Hide panel if not textOnly
@@ -717,6 +801,12 @@ public class CrosshairTooltip : MonoBehaviour
                 tooltipTextLegacy.color = textColor;
                 tooltipTextLegacy.gameObject.SetActive(currentAlpha > 0.01f);
             }
+            // Apply fade to top text as well
+            if (tooltipTextTop != null)
+            {
+                tooltipTextTop.color = textColor;
+                tooltipTextTop.gameObject.SetActive(currentAlpha > 0.01f);
+            }
         }
         else
         {
@@ -734,6 +824,10 @@ public class CrosshairTooltip : MonoBehaviour
                 if (tooltipTextLegacy != null)
                 {
                     tooltipTextLegacy.gameObject.SetActive(false);
+                }
+                if (tooltipTextTop != null)
+                {
+                    tooltipTextTop.gameObject.SetActive(false);
                 }
                 
                 // Hide panel

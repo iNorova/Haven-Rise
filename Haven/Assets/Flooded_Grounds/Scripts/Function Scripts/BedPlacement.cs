@@ -585,11 +585,81 @@ public class BedPlacement : MonoBehaviour
         {
             bedInteraction = placedBed.AddComponent<BedInteraction>();
             Debug.Log("BedPlacement: Added BedInteraction component to placed bed.");
+            
+            // Copy skybox materials from this bed (the one being placed from hotbar) to the new instance
+            // First, try to get skybox from this bed's BedInteraction component
+            BedInteraction sourceBedInteraction = GetComponent<BedInteraction>();
+            if (sourceBedInteraction != null)
+            {
+                bedInteraction.daySkybox = sourceBedInteraction.daySkybox;
+                bedInteraction.nightSkybox = sourceBedInteraction.nightSkybox;
+                Debug.Log($"BedPlacement: Copied skybox materials from source bed. Day: {bedInteraction.daySkybox?.name ?? "NULL"}, Night: {bedInteraction.nightSkybox?.name ?? "NULL"}");
+            }
+            else
+            {
+                // If this bed doesn't have BedInteraction, try to find skybox from another bed in the scene
+                BedInteraction[] allBeds = FindObjectsOfType<BedInteraction>();
+                foreach (BedInteraction bed in allBeds)
+                {
+                    if (bed != null && bed != bedInteraction && bed.daySkybox != null && bed.nightSkybox != null)
+                    {
+                        bedInteraction.daySkybox = bed.daySkybox;
+                        bedInteraction.nightSkybox = bed.nightSkybox;
+                        Debug.Log($"BedPlacement: Copied skybox materials from another bed in scene. Day: {bed.daySkybox.name}, Night: {bed.nightSkybox.name}");
+                        break;
+                    }
+                }
+            }
+            
+            // Immediately try to assign lights before Start() runs
+            // This helps ensure lights are found even if Start() doesn't find them
+            GameObject sunObj = GameObject.Find("Directional Light");
+            if (sunObj != null && bedInteraction.sunLight == null)
+            {
+                bedInteraction.sunLight = sunObj.GetComponent<Light>();
+            }
+            
+            GameObject nightObj = GameObject.Find("NIGHT");
+            if (nightObj != null && bedInteraction.nightLight == null)
+            {
+                bedInteraction.nightLight = nightObj.GetComponent<Light>();
+                if (bedInteraction.nightLight == null)
+                {
+                    bedInteraction.nightLight = nightObj.GetComponentInChildren<Light>();
+                }
+            }
+            
+            // Give Unity a moment to initialize the component's Start() method
+            // Then force initialization of lights and state
+            StartCoroutine(InitializeBedInteractionDelayed(bedInteraction));
         }
         else
         {
             // If BedInteraction already exists, make sure it initializes properly
             Debug.Log("BedPlacement: Placed bed already has BedInteraction component.");
+            
+            // Ensure lights are assigned
+            if (bedInteraction.sunLight == null || bedInteraction.nightLight == null)
+            {
+                GameObject sunObj = GameObject.Find("Directional Light");
+                if (sunObj != null && bedInteraction.sunLight == null)
+                {
+                    bedInteraction.sunLight = sunObj.GetComponent<Light>();
+                }
+                
+                GameObject nightObj = GameObject.Find("NIGHT");
+                if (nightObj != null && bedInteraction.nightLight == null)
+                {
+                    bedInteraction.nightLight = nightObj.GetComponent<Light>();
+                    if (bedInteraction.nightLight == null)
+                    {
+                        bedInteraction.nightLight = nightObj.GetComponentInChildren<Light>();
+                    }
+                }
+            }
+            
+            // Still update the state in case lights changed
+            bedInteraction.UpdateNightStateFromLights();
         }
         
         // Add BedPickup component if not already present
@@ -619,6 +689,55 @@ public class BedPlacement : MonoBehaviour
             Destroy(previewBed);
         }
         Destroy(this.gameObject);
+    }
+    
+    // Coroutine to ensure BedInteraction is fully initialized before syncing light state
+    // This is critical for beds that are re-placed after being picked up
+    IEnumerator InitializeBedInteractionDelayed(BedInteraction bedInteraction)
+    {
+        // Wait one frame to ensure Start() has been called
+        yield return null;
+        
+        // Wait another frame to ensure all initialization is complete
+        yield return null;
+        
+        if (bedInteraction != null && bedInteraction.gameObject != null)
+        {
+            // Force re-find lights in case they weren't found during Start()
+            // This is important for re-placed beds
+            
+            // First, ensure lights are found by manually setting them if needed
+            if (bedInteraction.sunLight == null || bedInteraction.nightLight == null)
+            {
+                // Use reflection or direct assignment to find lights
+                GameObject sunObj = GameObject.Find("Directional Light");
+                if (sunObj != null && bedInteraction.sunLight == null)
+                {
+                    bedInteraction.sunLight = sunObj.GetComponent<Light>();
+                }
+                
+                GameObject nightObj = GameObject.Find("NIGHT");
+                if (nightObj != null && bedInteraction.nightLight == null)
+                {
+                    bedInteraction.nightLight = nightObj.GetComponent<Light>();
+                    if (bedInteraction.nightLight == null)
+                    {
+                        bedInteraction.nightLight = nightObj.GetComponentInChildren<Light>();
+                    }
+                }
+                
+                Debug.Log($"BedPlacement: Manually found lights - Sun: {(bedInteraction.sunLight != null ? bedInteraction.sunLight.name : "NULL")}, NIGHT: {(bedInteraction.nightLight != null ? bedInteraction.nightLight.name : "NULL")}");
+            }
+            
+            // Now sync the state
+            bedInteraction.UpdateNightStateFromLights();
+            
+            Debug.Log($"BedPlacement: Delayed initialization complete for BedInteraction on bed '{bedInteraction.gameObject.name}'. Sun: {(bedInteraction.sunLight != null)}, NIGHT: {(bedInteraction.nightLight != null)}");
+        }
+        else
+        {
+            Debug.LogWarning("BedPlacement: BedInteraction was destroyed before delayed initialization could complete.");
+        }
     }
     
     void DropBed()
