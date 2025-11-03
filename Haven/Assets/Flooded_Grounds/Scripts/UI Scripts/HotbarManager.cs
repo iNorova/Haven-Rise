@@ -1,5 +1,3 @@
-// This script manages the player's hotbar, including selecting items, picking up into hotbar slots, and dropping.
-// Ensure that the 'hotbarSlots' array is populated with only the hotbar UI InventorySlot components.
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
@@ -91,31 +89,41 @@ public class HotbarManager : MonoBehaviour
                 }
                 else
                 {
-                    RockAnimationHandler rockAnimHandler = heldItems[selectedSlot].GetComponentInChildren<RockAnimationHandler>();
-                    if (rockAnimHandler != null)
+                    // Try Pickaxe handler (uses the same "Swing" trigger)
+                    PickaxeAnimationHandler pickaxeAnimHandler = heldItems[selectedSlot].GetComponentInChildren<PickaxeAnimationHandler>();
+                    if (pickaxeAnimHandler != null)
                     {
-                        rockAnimHandler.PlaySwingAnimation();
+                        pickaxeAnimHandler.PlaySwingAnimation();
                         _isItemAnimating = true; // Set flag when animation starts
                     }
-                    // NEW: Check for WoodAnimationHandler or other item-specific handlers
                     else
                     {
-                        WoodAnimationHandler woodAnimHandler = heldItems[selectedSlot].GetComponentInChildren<WoodAnimationHandler>();
-                        if (woodAnimHandler != null)
+                        RockAnimationHandler rockAnimHandler = heldItems[selectedSlot].GetComponentInChildren<RockAnimationHandler>();
+                        if (rockAnimHandler != null)
                         {
-                            woodAnimHandler.PlayWoodActionAnimation(); // Call the specific wood animation method
+                            rockAnimHandler.PlaySwingAnimation();
                             _isItemAnimating = true; // Set flag when animation starts
                         }
-                        // Add more item-specific handlers here as needed
+                        // NEW: Check for WoodAnimationHandler or other item-specific handlers
                         else
                         {
-                            // NEW: Check for GenericItemHandler (no animation needed)
-                            GenericItemHandler genericHandler = heldItems[selectedSlot].GetComponentInChildren<GenericItemHandler>();
-                            if (genericHandler != null)
+                            WoodAnimationHandler woodAnimHandler = heldItems[selectedSlot].GetComponentInChildren<WoodAnimationHandler>();
+                            if (woodAnimHandler != null)
                             {
-                                // If it's a generic item with no specific animation, we don't set _isItemAnimating to true.
-                                // We can add a debug log or specific non-animation action here if needed.
-                                Debug.Log($"Using generic item: {heldItems[selectedSlot].name} (no animation triggered).");
+                                woodAnimHandler.PlayWoodActionAnimation(); // Call the specific wood animation method
+                                _isItemAnimating = true; // Set flag when animation starts
+                            }
+                            // Add more item-specific handlers here as needed
+                            else
+                            {
+                                // NEW: Check for GenericItemHandler (no animation needed)
+                                GenericItemHandler genericHandler = heldItems[selectedSlot].GetComponentInChildren<GenericItemHandler>();
+                                if (genericHandler != null)
+                                {
+                                    // If it's a generic item with no specific animation, we don't set _isItemAnimating to true.
+                                    // We can add a debug log or specific non-animation action here if needed.
+                                    Debug.Log($"Using generic item: {heldItems[selectedSlot].name} (no animation triggered).");
+                                }
                             }
                         }
                     }
