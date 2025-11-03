@@ -12,7 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f71c3dc3dccaedb43b582dda40af8512, type: 3}
   m_Name: Campfire
   m_EditorClassIdentifier: 
-  requirements: []
-  outputPrefab: {fileID: 0}
+  requirements:
+  - itemName: Wood
+    quantity: 7
+  outputPrefab: {fileID: 6540687526093916089, guid: 9622d618dd35a4bb0a1a84ed325bce60, type: 3}
   outputQuantity: 1
-  iconOverride: {fileID: 0}
+  iconOverride: {fileID: 21300000, guid: 0b0d891b3d2b244febcf287afa056982, type: 3}
