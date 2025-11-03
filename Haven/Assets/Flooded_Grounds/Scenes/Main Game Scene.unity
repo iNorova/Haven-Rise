@@ -24681,6 +24681,9 @@ MonoBehaviour:
   emptySlotSprite: {fileID: 10917, guid: 0000000000000000f000000000000000, type: 0}
   selectedItemNameText: {fileID: 1868370463}
   inventoryManager: {fileID: 2074610105}
+  sfxSource: {fileID: 0}
+  pickupSfx: {fileID: 8300000, guid: be8c3b1e1b98b41d59aaa58051fd0cc9, type: 3}
+  pickupSfxVolume: 1
   selectedSlot: 0
 --- !u!4 &173586499
 Transform:
@@ -56693,7 +56696,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 50, y: -50}
+  m_AnchoredPosition: {x: 43, y: -7.8}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &398270381
@@ -56705,7 +56708,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 398270379}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 59f8146938fff824cb5fd77236b75775, type: 3}
+  m_Script: {fileID: 11500000, guid: 8a8695521f0d02e499659fee002a26c2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   m_Padding:
@@ -56714,14 +56717,12 @@ MonoBehaviour:
     m_Top: 0
     m_Bottom: 0
   m_ChildAlignment: 0
-  m_Spacing: 0
-  m_ChildForceExpandWidth: 1
-  m_ChildForceExpandHeight: 0
-  m_ChildControlWidth: 0
-  m_ChildControlHeight: 0
-  m_ChildScaleWidth: 0
-  m_ChildScaleHeight: 0
-  m_ReverseArrangement: 0
+  m_StartCorner: 0
+  m_StartAxis: 0
+  m_CellSize: {x: 100, y: 100}
+  m_Spacing: {x: -105, y: -105}
+  m_Constraint: 1
+  m_ConstraintCount: 4
 --- !u!4 &398308924 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 482554, guid: b3c489c06c04c1d4d835d20adc6ab60a, type: 3}
@@ -226088,6 +226089,10 @@ MonoBehaviour:
   listContainer: {fileID: 398270380}
   recipeButtonPrefab: {fileID: 3260492214139653307, guid: 212cfc387060f664b996d0be5d7b767d, type: 3}
   tooltip: {fileID: 1294347019}
+  useGridLayout: 1
+  gridColumns: 4
+  cellSize: {x: 128, y: 128}
+  spacing: {x: -105, y: -105}
 --- !u!114 &1579254360
 MonoBehaviour:
   m_ObjectHideFlags: 0
