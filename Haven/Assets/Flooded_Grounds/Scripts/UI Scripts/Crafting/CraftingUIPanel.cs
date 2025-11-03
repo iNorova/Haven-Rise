@@ -16,6 +16,12 @@ namespace Haven.CraftingUI
 		[SerializeField] private Button recipeButtonPrefab;
 		[SerializeField] private CraftingTooltip tooltip;
 
+		[Header("Layout")]
+		[SerializeField] private bool useGridLayout = true;
+		[SerializeField] private int gridColumns = 4;
+		[SerializeField] private Vector2 cellSize = new Vector2(128, 128);
+		[SerializeField] private Vector2 spacing = new Vector2(12, 12);
+
 		private readonly List<Button> _spawnedButtons = new List<Button>();
 
 		private void OnEnable()
@@ -33,6 +39,26 @@ namespace Haven.CraftingUI
 			_spawnedButtons.Clear();
 
 			if (listContainer == null || recipeButtonPrefab == null || craftingService == null) return;
+
+			// Ensure a GridLayoutGroup exists and is configured for rows/columns
+			if (useGridLayout)
+			{
+				var vGroup = listContainer.GetComponent<VerticalLayoutGroup>();
+				if (vGroup != null) vGroup.enabled = false; // disable vertical stacking if present
+
+				var grid = listContainer.GetComponent<GridLayoutGroup>();
+				if (grid == null)
+				{
+					grid = listContainer.gameObject.AddComponent<GridLayoutGroup>();
+				}
+				grid.cellSize = cellSize;
+				grid.spacing = spacing;
+				grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
+				grid.startAxis = GridLayoutGroup.Axis.Horizontal; // fill rows first
+				grid.childAlignment = TextAnchor.UpperLeft;
+				grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+				grid.constraintCount = Mathf.Max(1, gridColumns);
+			}
 
 			foreach (var recipe in recipes)
 			{
