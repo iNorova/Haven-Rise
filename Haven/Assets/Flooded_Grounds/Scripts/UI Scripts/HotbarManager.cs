@@ -15,6 +15,11 @@ public class HotbarManager : MonoBehaviour
 	[Header("Inventory Fallback")]
 	public InventoryManager inventoryManager; // Assign to allow pickup into inventory when hotbar is full
 
+    [Header("Audio")]
+    public AudioSource sfxSource; // Optional; if null we will use PlayClipAtPoint
+    public AudioClip pickupSfx;   // Assign a pickup sound from Sound Effects
+    [Range(0f,1f)] public float pickupSfxVolume = 0.85f;
+
     private GameObject[] heldItems;
     // private Sprite[] itemIcons; // Item icons will be managed by InventorySlot itself
     public int selectedSlot = 0; // Made public for InventorySystem access
@@ -156,43 +161,108 @@ public class HotbarManager : MonoBehaviour
     {
 		int slot = FindFirstEmptySlot(); // -1 if hotbar full
 
-        RaycastHit hit;
-        float sphereRadius = 0.5f;
+        Camera cam = Camera.main;
+        if (cam == null) return;
+
+        Vector3 cameraPos = cam.transform.position;
+        Vector3 cameraForward = cam.transform.forward;
         float pickupRange = 5f;
-		if (Physics.SphereCast(Camera.main.transform.position, sphereRadius, Camera.main.transform.forward, out hit, pickupRange))
+        float sphereRadius = 0.5f;
+
+        // Use OverlapSphere to find all nearby pickupable items
+        Collider[] nearbyColliders = Physics.OverlapSphere(cameraPos + cameraForward * (pickupRange * 0.5f), sphereRadius + pickupRange * 0.5f);
+        
+        List<GameObject> validPickupables = new List<GameObject>();
+        
+        foreach (Collider col in nearbyColliders)
         {
-            if (hit.collider.CompareTag("Pickupable"))
+            if (!col.CompareTag("Pickupable")) continue;
+            
+            GameObject item = col.gameObject;
+            
+            // Skip if item is already in hotbar
+            bool isHeld = false;
+            for (int i = 0; i < hotbarSlots.Length; i++)
             {
-                GameObject itemToPickUp = hit.collider.gameObject;
-
-                // NEW CHECK: Ensure the item is not already in our hotbar
-                for (int i = 0; i < hotbarSlots.Length; i++)
+                if (heldItems[i] == item)
                 {
-                    if (heldItems[i] == itemToPickUp)
-                    {
-                        Debug.Log($"Item {itemToPickUp.name} is already in hotbar slot {i}. Not picking up again.");
-                        return; // Item is already in the hotbar, do nothing
-                    }
+                    isHeld = true;
+                    break;
                 }
+            }
+            if (isHeld) continue;
+            
+            // Skip if item is currently selected and active in hand
+            if (heldItems[selectedSlot] == item && item.activeSelf) continue;
+            
+            // Check if item is within pickup range and roughly in front of camera
+            Vector3 toItem = (item.transform.position - cameraPos);
+            float distance = toItem.magnitude;
+            if (distance > pickupRange) continue;
+            
+            // Check if item is in front of camera (dot product check)
+            float dot = Vector3.Dot(cameraForward.normalized, toItem.normalized);
+            if (dot < 0.3f) continue; // Only pick up items roughly in front (30 degree cone)
+            
+            // Also do a raycast to make sure nothing is blocking (but ignore held items and trees)
+            RaycastHit hit;
+            Vector3 rayDirection = toItem.normalized;
+            float rayDistance = distance;
+            
+            // Raycast but ignore held items and certain layers
+            int layerMask = ~(LayerMask.GetMask("Ignore Raycast")); // Exclude ignore raycast layer
+            if (Physics.Raycast(cameraPos, rayDirection, out hit, rayDistance, layerMask))
+            {
+                // If we hit the item itself, it's valid
+                if (hit.collider.gameObject == item)
+                {
+                    validPickupables.Add(item);
+                }
+                // If we hit something else, check if it's a tree/structure that we can pick through
+                else if (hit.collider.CompareTag("Pickupable") || hit.collider.CompareTag("Destroyable"))
+                {
+                    // Allow picking through destroyable objects (trees, etc.)
+                    // But prefer the closer item
+                    validPickupables.Add(item);
+                }
+                // Otherwise, something solid is blocking - skip this item
+            }
+            else
+            {
+                // No hit, item should be visible
+                validPickupables.Add(item);
+            }
+        }
+        
+        // Sort by distance to camera (closest first)
+        if (validPickupables.Count > 0)
+        {
+            validPickupables.Sort((a, b) => 
+            {
+                float distA = Vector3.Distance(cameraPos, a.transform.position);
+                float distB = Vector3.Distance(cameraPos, b.transform.position);
+                return distA.CompareTo(distB);
+            });
+            
+            GameObject itemToPickUp = validPickupables[0];
 
-				if (slot != -1)
+			if (slot != -1)
+			{
+				Debug.Log($"Found pickupable: {itemToPickUp.name}, first empty hotbar slot: {slot}");
+				PickupItem(itemToPickUp, slot);
+			}
+			else
+			{
+				// Hotbar full – try to place directly into inventory
+				if (TryPickupIntoInventory(itemToPickUp))
 				{
-					Debug.Log($"Found pickupable: {itemToPickUp.name}, first empty hotbar slot: {slot}");
-					PickupItem(itemToPickUp, slot);
+					Debug.Log($"Picked up {itemToPickUp.name} into inventory (hotbar full).");
 				}
 				else
 				{
-					// Hotbar full – try to place directly into inventory
-					if (TryPickupIntoInventory(itemToPickUp))
-					{
-						Debug.Log($"Picked up {itemToPickUp.name} into inventory (hotbar full).");
-					}
-					else
-					{
-						Debug.Log("Hotbar and inventory are full. Cannot pick up item.");
-					}
+					Debug.Log("Hotbar and inventory are full. Cannot pick up item.");
 				}
-            }
+			}
         }
     }
 
@@ -231,17 +301,41 @@ public class HotbarManager : MonoBehaviour
             Debug.Log($"[HotbarManager] PickupItem: {item.name} Rigidbody set to Kinematic and Gravity OFF."); // Debug Log
         }
 
-        Collider itemCollider = item.GetComponent<Collider>();
-        if (itemCollider != null)
+        // Disable ALL colliders (items can have multiple colliders)
+        Collider[] allColliders = item.GetComponents<Collider>();
+        foreach (Collider col in allColliders)
         {
-            itemCollider.enabled = false; // Disable collider to prevent self-collision with player
-            Debug.Log($"[HotbarManager] PickupItem: {item.name} Collider disabled."); // Debug Log
+            if (col != null)
+            {
+                col.enabled = false; // Disable collider to prevent self-collision and raycast interference
+            }
         }
+        
+        // Also disable colliders in children
+        Collider[] childColliders = item.GetComponentsInChildren<Collider>();
+        foreach (Collider col in childColliders)
+        {
+            if (col != null)
+            {
+                col.enabled = false;
+            }
+        }
+        
+        if (allColliders.Length > 0 || childColliders.Length > 0)
+        {
+            Debug.Log($"[HotbarManager] PickupItem: {item.name} - Disabled {allColliders.Length + childColliders.Length} collider(s).");
+        }
+        
+        // Move to Ignore Raycast layer to prevent interference with pickup detection
+        item.layer = LayerMask.NameToLayer("Ignore Raycast");
         
         item.SetActive(false); // Item will be activated in SelectSlot when its slot is chosen
 
         // After picking up, ensure the item name display is updated
         UpdateSelectedItemNameDisplay();
+
+        // Play pickup SFX
+        PlayPickupSfx();
 
         // After picking up, ensure the item is selected if it's in the currently active slot
         // or if it's the first item being picked up into the default selected slot.
@@ -284,12 +378,18 @@ public class HotbarManager : MonoBehaviour
 			rb2.isKinematic = true;
 			rb2.useGravity = false;
 		}
-		Collider itemCollider2 = item.GetComponent<Collider>();
-		if (itemCollider2 != null)
+		// Disable ALL colliders (including children)
+		Collider[] allColliders2 = item.GetComponentsInChildren<Collider>();
+		foreach (Collider col in allColliders2)
 		{
-			itemCollider2.enabled = false;
+			if (col != null) col.enabled = false;
 		}
+		// Move to Ignore Raycast layer
+		item.layer = LayerMask.NameToLayer("Ignore Raycast");
 		item.SetActive(false);
+
+        // Play pickup SFX (for inventory fallback case)
+        PlayPickupSfx();
 		return true;
 	}
 
@@ -320,11 +420,17 @@ public class HotbarManager : MonoBehaviour
                 prevRb.useGravity = false;
                 Debug.Log($"[HotbarManager] SelectSlot: {heldItems[selectedSlot].name} (prev) Rigidbody set to Kinematic and Gravity OFF."); // Debug Log
             }
-            Collider prevCollider = heldItems[selectedSlot].GetComponent<Collider>();
-            if (prevCollider != null)
+            // Disable ALL colliders on previous item (including children)
+            Collider[] prevColliders = heldItems[selectedSlot].GetComponentsInChildren<Collider>();
+            foreach (Collider col in prevColliders)
             {
-                prevCollider.enabled = false; // Keep disabled while stored
-                Debug.Log($"[HotbarManager] SelectSlot: {heldItems[selectedSlot].name} (prev) Collider disabled."); // Debug Log
+                if (col != null) col.enabled = false;
+            }
+            // Ensure it's on Ignore Raycast layer
+            heldItems[selectedSlot].layer = LayerMask.NameToLayer("Ignore Raycast");
+            if (prevColliders.Length > 0)
+            {
+                Debug.Log($"[HotbarManager] SelectSlot: {heldItems[selectedSlot].name} (prev) - Disabled {prevColliders.Length} collider(s).");
             }
         }
 
@@ -381,11 +487,17 @@ public class HotbarManager : MonoBehaviour
                 newRb.useGravity = false;
                 Debug.Log($"[HotbarManager] SelectSlot: {heldItems[selectedSlot].name} (new) Rigidbody set to Kinematic and Gravity OFF."); // Debug Log
             }
-            Collider newCollider = heldItems[selectedSlot].GetComponent<Collider>();
-            if (newCollider != null)
+            // Disable ALL colliders on newly selected item (including children)
+            Collider[] newColliders = heldItems[selectedSlot].GetComponentsInChildren<Collider>();
+            foreach (Collider col in newColliders)
             {
-                newCollider.enabled = false; // Disable collider when active in hand
-                Debug.Log($"[HotbarManager] SelectSlot: {heldItems[selectedSlot].name} (new) Collider disabled."); // Debug Log
+                if (col != null) col.enabled = false;
+            }
+            // Ensure it's on Ignore Raycast layer to prevent pickup interference
+            heldItems[selectedSlot].layer = LayerMask.NameToLayer("Ignore Raycast");
+            if (newColliders.Length > 0)
+            {
+                Debug.Log($"[HotbarManager] SelectSlot: {heldItems[selectedSlot].name} (new) - Disabled {newColliders.Length} collider(s).");
             }
 
             // Force the Animator to its Idle state and reset all its triggers for a clean start
@@ -459,11 +571,19 @@ public class HotbarManager : MonoBehaviour
             Debug.Log($"[HotbarManager] DropSelectedItem: {itemToDrop.name} Rigidbody set to NOT Kinematic and Gravity ON."); // Debug Log
         }
 
-        Collider itemCollider = itemToDrop.GetComponent<Collider>();
-        if (itemCollider != null)
+        // Enable ALL colliders (including children) when dropping
+        Collider[] allDropColliders = itemToDrop.GetComponentsInChildren<Collider>();
+        foreach (Collider col in allDropColliders)
         {
-            itemCollider.enabled = true; // Enable collider
-            Debug.Log($"[HotbarManager] DropSelectedItem: {itemToDrop.name} Collider enabled."); // Debug Log
+            if (col != null) col.enabled = true;
+        }
+        // Restore to Default layer (or Pickup layer if it exists)
+        int pickupLayer = LayerMask.NameToLayer("Pickup");
+        itemToDrop.layer = (pickupLayer != -1) ? pickupLayer : LayerMask.NameToLayer("Default");
+        
+        if (allDropColliders.Length > 0)
+        {
+            Debug.Log($"[HotbarManager] DropSelectedItem: {itemToDrop.name} - Enabled {allDropColliders.Length} collider(s) and restored layer.");
         }
 
         itemToDrop.SetActive(true); // Ensure the dropped item is active
@@ -605,5 +725,19 @@ public class HotbarManager : MonoBehaviour
 
         UpdateHotbarUI();
         UpdateSelectedItemNameDisplay();
+    }
+
+    // --- Audio helpers ---
+    private void PlayPickupSfx()
+    {
+        if (pickupSfx == null) return;
+        if (sfxSource != null)
+        {
+            sfxSource.PlayOneShot(pickupSfx, pickupSfxVolume);
+        }
+        else if (Camera.main != null)
+        {
+            AudioSource.PlayClipAtPoint(pickupSfx, Camera.main.transform.position, pickupSfxVolume);
+        }
     }
 } 
