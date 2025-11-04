@@ -441,24 +441,73 @@ public class BedInteraction : MonoBehaviour
     {
         // Check if player is close enough and looking at the bed
         if (player == null || playerCamera == null)
+        {
+            Debug.LogWarning("BedInteraction: Player or camera is null!");
             return;
+        }
 
         float distanceToPlayer = Vector3.Distance(transform.position, player.transform.position);
         if (distanceToPlayer > interactionRange)
         {
+            Debug.Log($"BedInteraction: Player too far away. Distance: {distanceToPlayer:F2}m, Range: {interactionRange}m");
             return;
         }
 
+        // Use a longer raycast range to ensure we can detect the bed even if slightly off-center
+        float raycastRange = interactionRange * 2f; // Double the range for more forgiving detection
+        
+        // Create layer mask that excludes "Ignore Raycast" layer to ensure we can detect the bed
+        LayerMask raycastLayerMask = ~LayerMask.GetMask("Ignore Raycast");
+        
         // Raycast to check if player is looking at this bed
         RaycastHit hit;
         Ray ray = playerCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
         
-        if (Physics.Raycast(ray, out hit, interactionRange))
+        // First try: Check if raycast hits this bed or its children
+        if (Physics.Raycast(ray, out hit, raycastRange, raycastLayerMask))
         {
+            // Check if we hit this bed or any of its children
             if (hit.collider.gameObject == this.gameObject || hit.collider.transform.IsChildOf(transform))
             {
+                Debug.Log($"BedInteraction: Raycast hit bed '{hit.collider.gameObject.name}'. Starting sleep...");
+                StartToggleDayNight();
+                return;
+            }
+        }
+        
+        // Fallback: If player is within range and raycast didn't hit anything blocking, allow interaction
+        // This makes it more forgiving - if you're close enough and roughly looking at the bed, it works
+        if (distanceToPlayer <= interactionRange)
+        {
+            // Check if there's anything blocking the line of sight to the bed
+            Vector3 directionToBed = (transform.position - playerCamera.transform.position).normalized;
+            float distanceToBed = Vector3.Distance(playerCamera.transform.position, transform.position);
+            
+            // Raycast from camera to bed center to check for obstacles (reuse raycastLayerMask declared above)
+            if (Physics.Raycast(playerCamera.transform.position, directionToBed, out hit, distanceToBed, raycastLayerMask))
+            {
+                // If we hit this bed or its children, allow interaction
+                if (hit.collider.gameObject == this.gameObject || hit.collider.transform.IsChildOf(transform))
+                {
+                    Debug.Log($"BedInteraction: Fallback check - player is close enough and bed is visible. Starting sleep...");
+                    StartToggleDayNight();
+                    return;
+                }
+                else
+                {
+                    Debug.Log($"BedInteraction: Something is blocking the bed: {hit.collider.gameObject.name}");
+                }
+            }
+            else
+            {
+                // No obstacle found, player is close enough - allow interaction
+                Debug.Log($"BedInteraction: Fallback check - player is close enough with clear line of sight. Starting sleep...");
                 StartToggleDayNight();
             }
+        }
+        else
+        {
+            Debug.Log($"BedInteraction: Player not close enough. Distance: {distanceToPlayer:F2}m, Range: {interactionRange}m");
         }
     }
 

@@ -576,6 +576,23 @@ public class BedPlacement : MonoBehaviour
             col.enabled = true;
         }
         
+        // Ensure bed is on a raycastable layer (not "Ignore Raycast")
+        // This is critical for BedInteraction raycast detection
+        if (placedBed.layer == LayerMask.NameToLayer("Ignore Raycast"))
+        {
+            placedBed.layer = LayerMask.NameToLayer("Default");
+            Debug.Log("BedPlacement: Changed bed layer from 'Ignore Raycast' to 'Default' for raycast detection.");
+        }
+        
+        // Also ensure all child objects are on raycastable layers
+        foreach (Transform child in placedBed.GetComponentsInChildren<Transform>())
+        {
+            if (child.gameObject.layer == LayerMask.NameToLayer("Ignore Raycast"))
+            {
+                child.gameObject.layer = placedBed.layer;
+            }
+        }
+        
         // Make sure placed bed is active
         placedBed.SetActive(true);
         
