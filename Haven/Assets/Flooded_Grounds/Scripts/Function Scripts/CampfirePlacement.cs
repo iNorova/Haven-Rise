@@ -599,6 +599,13 @@ public class CampfirePlacement : MonoBehaviour
             Debug.Log("CampfirePlacement: Added CampfirePickup component to placed campfire.");
         }
         
+        // Add CampfireFuel component if not already present
+        if (placedCampfire.GetComponent<CampfireFuel>() == null)
+        {
+            placedCampfire.AddComponent<CampfireFuel>();
+            Debug.Log("CampfirePlacement: Added CampfireFuel component to placed campfire.");
+        }
+        
         // Remove CampfirePlacement component from placed campfire (only the held one should have it)
         CampfirePlacement placementScript = placedCampfire.GetComponent<CampfirePlacement>();
         if (placementScript != null)
