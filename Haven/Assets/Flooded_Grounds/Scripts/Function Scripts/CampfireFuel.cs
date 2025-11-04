@@ -28,7 +28,10 @@ public class CampfireFuel : MonoBehaviour
     [Tooltip("Offset above campfire for fuel bar")]
     public Vector3 fuelBarOffset = new Vector3(0, 2f, 0);
     [Tooltip("Size of the fuel bar")]
-    public Vector2 fuelBarSize = new Vector2(200f, 20f);
+    public Vector2 fuelBarSize = new Vector2(400f, 40f);
+    [Tooltip("Scale multiplier for the fuel bar (higher = bigger)")]
+    [Range(0.5f, 3f)]
+    public float fuelBarScale = 1.5f;
     
     [Header("Fire Effects")]
     [Tooltip("GameObjects that represent the fire (will be enabled/disabled based on lit state). Leave empty if no visual effects needed.")]
@@ -78,6 +81,10 @@ public class CampfireFuel : MonoBehaviour
     private float contactCheckTimer = 0f;
     private System.Collections.Generic.HashSet<GameObject> processedWood = new System.Collections.Generic.HashSet<GameObject>(); // Track wood we've already processed
     
+    // Track previous values for change detection
+    private Vector2 previousFuelBarSize;
+    private float previousFuelBarScale;
+    
     void Start()
     {
         playerCamera = Camera.main;
@@ -107,6 +114,10 @@ public class CampfireFuel : MonoBehaviour
         
         // Update initial fuel bar
         UpdateFuelBar();
+        
+        // Store initial values
+        previousFuelBarSize = fuelBarSize;
+        previousFuelBarScale = fuelBarScale;
     }
     
     void CreateFireLight()
@@ -197,6 +208,14 @@ public class CampfireFuel : MonoBehaviour
         {
             // Fire went out
             SetLitState(false);
+        }
+        
+        // Check if fuel bar size or scale changed in Inspector
+        if (fuelBarSize != previousFuelBarSize || fuelBarScale != previousFuelBarScale)
+        {
+            UpdateFuelBarSize();
+            previousFuelBarSize = fuelBarSize;
+            previousFuelBarScale = fuelBarScale;
         }
         
         // Update fuel bar position to face camera
@@ -316,11 +335,52 @@ public class CampfireFuel : MonoBehaviour
         fuelBarText.color = Color.white;
         fuelBarText.alignment = TextAlignmentOptions.Center;
         
-        // Scale canvas to world size
-        float scale = 0.001f; // Adjust this to make the UI larger/smaller
+        // Scale canvas to world size - use fuelBarScale multiplier
+        float scale = 0.001f * fuelBarScale; // Adjust this to make the UI larger/smaller
         canvasObj.transform.localScale = Vector3.one * scale;
         
         fuelBarUI = panelObj;
+    }
+    
+    void OnValidate()
+    {
+        // Update fuel bar size/scale when values change in Inspector (only works in editor during play)
+        // Don't call UpdateFuelBarSize here to avoid issues - it will be detected in Update()
+    }
+    
+    void UpdateFuelBarSize()
+    {
+        // Safety check - only update if UI is created
+        if (fuelBarUI == null || fuelBarCanvas == null || !Application.isPlaying)
+            return;
+        
+        try
+        {
+            // Update panel size
+            RectTransform panelRect = fuelBarUI.GetComponent<RectTransform>();
+            if (panelRect != null)
+            {
+                panelRect.sizeDelta = fuelBarSize;
+            }
+            
+            // Update canvas scale
+            if (fuelBarCanvas.transform != null)
+            {
+                float scale = 0.001f * fuelBarScale;
+                fuelBarCanvas.transform.localScale = Vector3.one * scale;
+            }
+            
+            // Update text font size to match new scale
+            if (fuelBarText != null)
+            {
+                // Scale font size proportionally
+                fuelBarText.fontSize = 14 * fuelBarScale;
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"CampfireFuel: Error updating fuel bar size: {e.Message}");
+        }
     }
     
     void CheckForWoodDrop()

@@ -119379,6 +119379,46 @@ MonoBehaviour:
   dropKey: 113
   showPreview: 1
   previewUpdateInterval: 0.3
+--- !u!114 &839618314
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 839618297}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0f956b8ffd542463db72719abc678153, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxFuel: 100
+  currentFuel: 0
+  fuelPerLog: 5
+  fuelConsumptionRate: 0.1
+  interactionRange: 2
+  contactDistance: 2
+  woodKeywords:
+  - wood
+  - log
+  - stick
+  contactCheckInterval: 0.1
+  fuelBarOffset: {x: 0, y: 2, z: 0}
+  fuelBarSize: {x: 500, y: 60}
+  fuelBarScale: 3
+  fireEffects: []
+  fireParticles: []
+  fireLight: {fileID: 0}
+  lightIntensity: 6
+  lightRange: 7
+  lightColor: {r: 1, g: 0.5, b: 0.2, a: 1}
+  sfxSource: {fileID: 0}
+  loopSource: {fileID: 0}
+  addWoodSfx: {fileID: 8300000, guid: f8916010fcef74fa880acda878c14f8a, type: 3}
+  addWoodSfxVolume: 0.7
+  fireLitSfx: {fileID: 8300000, guid: 2690b7b42b21741fab67fcfa818bd597, type: 3}
+  fireLitSfxVolume: 0.8
+  campfireLoopSfx: {fileID: 8300000, guid: a318ba7320ab64697bc5dce9b74e8c84, type: 3}
+  campfireLoopVolume: 0.6
 --- !u!4 &840416953 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 427490, guid: eaaa713946d21c349acbc0f8b739f316, type: 3}
@@ -316725,6 +316765,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 6540687526093916089, guid: 9622d618dd35a4bb0a1a84ed325bce60, type: 3}
       insertIndex: -1
       addedObject: {fileID: 839618305}
+    - targetCorrespondingSourceObject: {fileID: 6540687526093916089, guid: 9622d618dd35a4bb0a1a84ed325bce60, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 839618314}
   m_SourcePrefab: {fileID: 100100000, guid: 9622d618dd35a4bb0a1a84ed325bce60, type: 3}
 --- !u!1 &5501296232935470924
 GameObject:
