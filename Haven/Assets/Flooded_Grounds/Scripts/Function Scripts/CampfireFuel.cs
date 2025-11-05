@@ -2,6 +2,22 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
+[System.Serializable]
+public class CookingRecipe
+{
+    [Tooltip("Name or keyword to identify the input item (e.g., 'meat', 'raw')")]
+    public string inputItemName;
+    
+    [Tooltip("Prefab to spawn as the cooked/result item (e.g., cooked steak)")]
+    public GameObject cookedItemPrefab;
+    
+    [Tooltip("Cooking time in seconds (how long before item transforms)")]
+    public float cookingTime = 3f;
+    
+    [Tooltip("Does this item require the fire to be lit?")]
+    public bool requiresFireLit = true;
+}
+
 public class CampfireFuel : MonoBehaviour
 {
     [Header("Fuel Settings")]
@@ -47,6 +63,20 @@ public class CampfireFuel : MonoBehaviour
     [Tooltip("Light color (warm orange/yellow for fire)")]
     public Color lightColor = new Color(1f, 0.5f, 0.2f); // Warm orange
     
+    [Header("Cooking System")]
+    [Tooltip("List of cooking recipes - items that can be cooked on the campfire")]
+    public CookingRecipe[] cookingRecipes = new CookingRecipe[0];
+    
+    [Tooltip("Sound effect to play when cooking starts")]
+    public AudioClip cookingStartSfx;
+    
+    [Tooltip("Sound effect to play when item is cooked (transforms)")]
+    public AudioClip cookingCompleteSfx;
+    
+    [Tooltip("Volume for cooking sound effects (0-1)")]
+    [Range(0f, 1f)]
+    public float cookingSfxVolume = 0.7f;
+    
     [Header("Audio")]
     [Tooltip("Audio source for playing sound effects. Will be created automatically if not assigned.")]
     public AudioSource sfxSource;
@@ -80,6 +110,17 @@ public class CampfireFuel : MonoBehaviour
     private Camera playerCamera;
     private float contactCheckTimer = 0f;
     private System.Collections.Generic.HashSet<GameObject> processedWood = new System.Collections.Generic.HashSet<GameObject>(); // Track wood we've already processed
+    
+    // Cooking system
+    [System.Serializable]
+    public class CookingItem
+    {
+        public GameObject item;
+        public CookingRecipe recipe;
+        public float cookTimer;
+    }
+    private System.Collections.Generic.List<CookingItem> itemsBeingCooked = new System.Collections.Generic.List<CookingItem>();
+    private System.Collections.Generic.HashSet<GameObject> processedCookableItems = new System.Collections.Generic.HashSet<GameObject>(); // Track items being cooked
     
     // Track previous values for change detection
     private Vector2 previousFuelBarSize;
@@ -183,13 +224,18 @@ public class CampfireFuel : MonoBehaviour
         {
             contactCheckTimer = 0f;
             CheckForWoodContact();
+            CheckForCookableItems(); // Also check for cookable items
         }
         
         // Also check on mouse release (for drag-and-drop)
         if (Input.GetMouseButtonUp(0))
         {
             CheckForWoodDrop();
+            CheckForCookableItemsDrop(); // Check for dropped cookable items
         }
+        
+        // Update cooking items
+        UpdateCookingItems();
         
         // Consume fuel if lit
         if (isLit && currentFuel > 0f)
@@ -241,6 +287,15 @@ public class CampfireFuel : MonoBehaviour
             // Skip if we've already processed this wood object
             if (processedWood.Contains(obj))
                 continue;
+            
+            // Skip if it's being cooked (cooking takes priority over fuel)
+            if (processedCookableItems.Contains(obj))
+                continue;
+            
+            // Check if it's a cookable item first (cooking takes priority)
+            CookingRecipe recipe = GetCookingRecipe(obj);
+            if (recipe != null)
+                continue; // Let CheckForCookableItems handle it
             
             // Check if it's wood
             if (IsWoodItem(obj))
@@ -403,6 +458,15 @@ public class CampfireFuel : MonoBehaviour
             if (processedWood.Contains(obj))
                 continue;
             
+            // Skip if it's being cooked (cooking takes priority over fuel)
+            if (processedCookableItems.Contains(obj))
+                continue;
+            
+            // Check if it's a cookable item first (cooking takes priority)
+            CookingRecipe recipe = GetCookingRecipe(obj);
+            if (recipe != null)
+                continue; // Let CheckForCookableItemsDrop handle it
+            
             if (IsWoodItem(obj))
             {
                 float distance = Vector3.Distance(obj.transform.position, transform.position);
@@ -508,6 +572,306 @@ public class CampfireFuel : MonoBehaviour
     {
         currentFuel = Mathf.Max(currentFuel - fuelConsumptionRate * Time.deltaTime, 0f);
         UpdateFuelBar();
+    }
+    
+    void CheckForCookableItems()
+    {
+        // Check for cookable items in contact with the campfire
+        Collider[] nearbyObjects = Physics.OverlapSphere(transform.position, contactDistance);
+        
+        foreach (Collider col in nearbyObjects)
+        {
+            GameObject obj = col.gameObject;
+            
+            // Skip if it's the campfire itself
+            if (obj == gameObject || obj.transform.IsChildOf(transform))
+                continue;
+            
+            // Skip if already being cooked
+            if (processedCookableItems.Contains(obj))
+                continue;
+            
+            // Skip if already processed as wood
+            if (processedWood.Contains(obj))
+                continue;
+            
+            // Check if it's a cookable item
+            CookingRecipe recipe = GetCookingRecipe(obj);
+            if (recipe != null)
+            {
+                // Check if fire needs to be lit
+                if (recipe.requiresFireLit && !isLit)
+                    continue;
+                
+                float distance = Vector3.Distance(obj.transform.position, transform.position);
+                
+                // If item is in contact range, start cooking it
+                if (distance <= contactDistance)
+                {
+                    StartCookingItem(obj, recipe);
+                    return; // Only process one item per check
+                }
+            }
+        }
+        
+        // Clean up destroyed objects from processed set
+        processedCookableItems.RemoveWhere(item => item == null);
+    }
+    
+    void CheckForCookableItemsDrop()
+    {
+        // Check for cookable items near the campfire (for drag-and-drop)
+        Collider[] nearbyObjects = Physics.OverlapSphere(transform.position, interactionRange);
+        
+        GameObject closestCookable = null;
+        CookingRecipe closestRecipe = null;
+        float closestDistance = float.MaxValue;
+        
+        foreach (Collider col in nearbyObjects)
+        {
+            GameObject obj = col.gameObject;
+            
+            // Skip if it's the campfire itself
+            if (obj == gameObject || obj.transform.IsChildOf(transform))
+                continue;
+            
+            // Skip if already being processed
+            if (processedCookableItems.Contains(obj) || processedWood.Contains(obj))
+                continue;
+            
+            CookingRecipe recipe = GetCookingRecipe(obj);
+            if (recipe != null)
+            {
+                // Check if fire needs to be lit
+                if (recipe.requiresFireLit && !isLit)
+                    continue;
+                
+                float distance = Vector3.Distance(obj.transform.position, transform.position);
+                
+                // Find the closest cookable item within drop range
+                if (distance < interactionRange * 0.5f && distance < closestDistance)
+                {
+                    closestCookable = obj;
+                    closestRecipe = recipe;
+                    closestDistance = distance;
+                }
+            }
+        }
+        
+        // If we found a cookable item close enough, start cooking it
+        if (closestCookable != null && closestRecipe != null)
+        {
+            StartCookingItem(closestCookable, closestRecipe);
+        }
+    }
+    
+    CookingRecipe GetCookingRecipe(GameObject obj)
+    {
+        if (cookingRecipes == null || cookingRecipes.Length == 0)
+            return null;
+        
+        string objName = obj.name.ToLower();
+        string itemName = "";
+        
+        // Check ItemIconProvider first
+        ItemIconProvider iconProvider = obj.GetComponent<ItemIconProvider>();
+        if (iconProvider != null && !string.IsNullOrEmpty(iconProvider.itemName))
+        {
+            itemName = iconProvider.itemName.ToLower();
+        }
+        
+        // Check all recipes
+        foreach (CookingRecipe recipe in cookingRecipes)
+        {
+            if (recipe == null || string.IsNullOrEmpty(recipe.inputItemName))
+                continue;
+            
+            string recipeName = recipe.inputItemName.ToLower();
+            
+            // Check if object name matches recipe
+            if (objName.Contains(recipeName))
+                return recipe;
+            
+            // Check if item name matches recipe
+            if (!string.IsNullOrEmpty(itemName) && itemName.Contains(recipeName))
+                return recipe;
+            
+            // Check parent objects
+            Transform parent = obj.transform.parent;
+            while (parent != null)
+            {
+                string parentName = parent.name.ToLower();
+                if (parentName.Contains(recipeName))
+                    return recipe;
+                parent = parent.parent;
+            }
+        }
+        
+        return null;
+    }
+    
+    void StartCookingItem(GameObject item, CookingRecipe recipe)
+    {
+        if (item == null)
+        {
+            Debug.LogWarning("CampfireFuel: StartCookingItem - item is null!");
+            return;
+        }
+        
+        if (recipe == null)
+        {
+            Debug.LogWarning($"CampfireFuel: StartCookingItem - recipe is null for item '{item.name}'!");
+            return;
+        }
+        
+        if (recipe.cookedItemPrefab == null)
+        {
+            Debug.LogError($"CampfireFuel: StartCookingItem - cookedItemPrefab is null for recipe '{recipe.inputItemName}'! Please assign a prefab in the Inspector.");
+            return;
+        }
+        
+        // Mark as being cooked
+        processedCookableItems.Add(item);
+        
+        // Create cooking item entry
+        CookingItem cookingItem = new CookingItem
+        {
+            item = item,
+            recipe = recipe,
+            cookTimer = 0f
+        };
+        itemsBeingCooked.Add(cookingItem);
+        
+        // Play cooking start sound
+        if (sfxSource != null && cookingStartSfx != null)
+        {
+            sfxSource.PlayOneShot(cookingStartSfx, cookingSfxVolume);
+        }
+        
+        Debug.Log($"<color=yellow>CampfireFuel: Started cooking '{item.name}' -> '{recipe.cookedItemPrefab.name}' (cooking time: {recipe.cookingTime}s)</color>");
+    }
+    
+    void UpdateCookingItems()
+    {
+        // Update all cooking items
+        for (int i = itemsBeingCooked.Count - 1; i >= 0; i--)
+        {
+            CookingItem cookingItem = itemsBeingCooked[i];
+            
+            // Check if item still exists
+            if (cookingItem.item == null)
+            {
+                itemsBeingCooked.RemoveAt(i);
+                continue;
+            }
+            
+            // Check if fire is still lit (if required)
+            if (cookingItem.recipe.requiresFireLit && !isLit)
+            {
+                // Fire went out - stop cooking
+                processedCookableItems.Remove(cookingItem.item);
+                itemsBeingCooked.RemoveAt(i);
+                Debug.Log($"CampfireFuel: Cooking stopped - fire went out for '{cookingItem.item.name}'");
+                continue;
+            }
+            
+            // Update cooking timer (modify the item in the list directly)
+            cookingItem.cookTimer += Time.deltaTime;
+            itemsBeingCooked[i] = cookingItem; // Update the list with modified timer
+            
+            // Debug progress
+            float progress = cookingItem.cookTimer / cookingItem.recipe.cookingTime;
+            if (progress >= 0.5f && progress < 0.51f) // Log once when halfway
+            {
+                Debug.Log($"CampfireFuel: Cooking '{cookingItem.item.name}' - {progress * 100f:F0}% complete");
+            }
+            
+            // Check if cooking is complete
+            if (cookingItem.cookTimer >= cookingItem.recipe.cookingTime)
+            {
+                Debug.Log($"CampfireFuel: Cooking complete! Timer: {cookingItem.cookTimer:F2}s / {cookingItem.recipe.cookingTime:F2}s");
+                CompleteCooking(cookingItem);
+                itemsBeingCooked.RemoveAt(i);
+            }
+        }
+    }
+    
+    void CompleteCooking(CookingItem cookingItem)
+    {
+        if (cookingItem.item == null)
+        {
+            Debug.LogWarning("CampfireFuel: CompleteCooking - item is null!");
+            return;
+        }
+        
+        if (cookingItem.recipe == null)
+        {
+            Debug.LogWarning($"CampfireFuel: CompleteCooking - recipe is null for item '{cookingItem.item.name}'!");
+            return;
+        }
+        
+        if (cookingItem.recipe.cookedItemPrefab == null)
+        {
+            Debug.LogError($"CampfireFuel: CompleteCooking - cookedItemPrefab is null for recipe '{cookingItem.recipe.inputItemName}'! Please assign a prefab in the Inspector.");
+            return;
+        }
+        
+        // Get position and rotation of the item being cooked
+        Vector3 cookedPosition = cookingItem.item.transform.position;
+        Quaternion cookedRotation = cookingItem.item.transform.rotation;
+        
+        Debug.Log($"CampfireFuel: Spawning cooked item '{cookingItem.recipe.cookedItemPrefab.name}' at position {cookedPosition}");
+        
+        // Spawn the cooked item
+        GameObject cookedItem = Instantiate(cookingItem.recipe.cookedItemPrefab, cookedPosition, cookedRotation);
+        
+        // Make sure the cooked item is active
+        cookedItem.SetActive(true);
+        
+        // Copy physics properties if both have rigidbodies
+        Rigidbody originalRb = cookingItem.item.GetComponent<Rigidbody>();
+        Rigidbody cookedRb = cookedItem.GetComponent<Rigidbody>();
+        if (originalRb != null && cookedRb != null)
+        {
+            cookedRb.linearVelocity = originalRb.linearVelocity;
+            cookedRb.angularVelocity = originalRb.angularVelocity;
+            cookedRb.isKinematic = originalRb.isKinematic;
+            cookedRb.useGravity = originalRb.useGravity;
+        }
+        else if (originalRb != null && cookedRb == null)
+        {
+            // If original had physics but cooked doesn't, add a rigidbody
+            cookedRb = cookedItem.AddComponent<Rigidbody>();
+            cookedRb.linearVelocity = originalRb.linearVelocity;
+            cookedRb.angularVelocity = originalRb.angularVelocity;
+            cookedRb.isKinematic = originalRb.isKinematic;
+            cookedRb.useGravity = originalRb.useGravity;
+        }
+        
+        // Ensure cooked item has colliders enabled
+        Collider[] cookedColliders = cookedItem.GetComponentsInChildren<Collider>();
+        foreach (Collider col in cookedColliders)
+        {
+            if (col != null)
+                col.enabled = true;
+        }
+        
+        // Play cooking complete sound
+        if (sfxSource != null && cookingCompleteSfx != null)
+        {
+            sfxSource.PlayOneShot(cookingCompleteSfx, cookingSfxVolume);
+        }
+        
+        // Store reference to item for cleanup
+        GameObject itemToDestroy = cookingItem.item;
+        
+        // Destroy the original item
+        Destroy(itemToDestroy);
+        
+        // Remove from processed set
+        processedCookableItems.Remove(itemToDestroy);
+        
+        Debug.Log($"<color=green>CampfireFuel: ✓ Completed cooking! Created '{cookedItem.name}' at {cookedPosition}</color>");
     }
     
     void SetLitState(bool lit)
