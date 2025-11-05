@@ -105784,7 +105784,7 @@ MonoBehaviour:
   bedPlacementText: Press [Left Click] to Place Bed
   treeText: Press [Left Click] to Chop Tree
   rockText: Press [Left Click] to Mine Rock
-  destroyableText: Press [Left Click] to Break
+  destroyableText: Press [Left Click] to Hit
 --- !u!4 &740319103 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 480730, guid: 1893b7edd0ad11b4e9f6f17eeb9455b6, type: 3}
@@ -316603,6 +316603,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 9183723942935459283, guid: 4d12a277b04794cb99b55e9ce1f9e82a, type: 3}
+      propertyPath: m_Enabled
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -316750,6 +316754,18 @@ PrefabInstance:
     - target: {fileID: 7117390679449304791, guid: 64a059110847d4ba8b8ed36da806afcf, type: 3}
       propertyPath: m_Enabled
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8696428876670003824, guid: 64a059110847d4ba8b8ed36da806afcf, type: 3}
+      propertyPath: m_Size.x
+      value: 0.31
+      objectReference: {fileID: 0}
+    - target: {fileID: 8696428876670003824, guid: 64a059110847d4ba8b8ed36da806afcf, type: 3}
+      propertyPath: m_Size.y
+      value: 0.08
+      objectReference: {fileID: 0}
+    - target: {fileID: 8696428876670003824, guid: 64a059110847d4ba8b8ed36da806afcf, type: 3}
+      propertyPath: m_Size.z
+      value: 0.2
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
