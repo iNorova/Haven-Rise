@@ -114,6 +114,15 @@ namespace Controller
         private const float STUCK_THRESHOLD = 0.2f; // If moved less than 0.2 units, considered stuck
         private float m_LastStuckTime = 0f;
         private Vector3 m_LastStuckAvoidDirection; // Remember last avoidance direction when stuck
+        private float m_TimeFleeing = 0f; // Track how long we've been fleeing
+        private float m_PlayerStationaryTime = 0f; // Track how long player has been stationary
+        private const float MAX_FLEE_TIME = 10f; // Maximum time to flee before forcing idle
+        private const float PLAYER_STATIONARY_THRESHOLD = 0.1f; // Player movement threshold to consider stationary
+        private const float PLAYER_STATIONARY_TIME_FOR_IDLE = 2f; // If player stationary for 2s, easier to go idle
+        private Vector3 m_FleeStartPosition; // Track where we started fleeing
+        private float m_CircleCheckTimer = 0f; // Timer for checking if circling
+        private const float CIRCLE_CHECK_INTERVAL = 3f; // Check every 3 seconds
+        private const float CIRCLE_DETECTION_RADIUS = 5f; // If we're within this radius of start position, might be circling
 
         // Public properties for debugging
         public bool IsFleeing => m_IsFleeing;
@@ -171,6 +180,10 @@ namespace Controller
             m_StuckCheckTimer = 0f;
             m_LastStuckTime = 0f;
             m_LastStuckAvoidDirection = Vector3.zero;
+            m_TimeFleeing = 0f;
+            m_PlayerStationaryTime = 0f;
+            m_FleeStartPosition = m_Transform.position;
+            m_CircleCheckTimer = 0f;
             
             // Auto-setup structure layer mask if not configured (Tree and Structure layers)
             if (m_StructureLayerMask == 0)
@@ -227,17 +240,25 @@ namespace Controller
 
             float distanceToPlayer = Vector3.Distance(m_Transform.position, m_PlayerTransform.position);
             
-            // Check if player has moved significantly (only skip if not fleeing, to avoid jittering)
-            if (!m_IsFleeing)
+            // Track player movement to detect if stationary
+            float playerMovement = Vector3.Distance(m_LastPlayerPosition, m_PlayerTransform.position);
+            if (playerMovement < PLAYER_STATIONARY_THRESHOLD)
             {
-                float playerMovement = Vector3.Distance(m_LastPlayerPosition, m_PlayerTransform.position);
-                if (playerMovement < m_PlayerMovementThreshold)
-                {
-                    return;
-                }
+                m_PlayerStationaryTime += Time.deltaTime;
             }
-            // Always update last player position (for distance calculations)
+            else
+            {
+                m_PlayerStationaryTime = 0f; // Reset if player moved
+            }
+            
+            // Always update last player position
             m_LastPlayerPosition = m_PlayerTransform.position;
+            
+            // Skip proximity check if player hasn't moved and we're not fleeing (to save performance)
+            if (!m_IsFleeing && playerMovement < PLAYER_STATIONARY_THRESHOLD && m_PlayerStationaryTime > 1f)
+            {
+                return; // Player is stationary, we're not fleeing, no need to check
+            }
 
             CharController_Motor playerController = m_PlayerTransform.GetComponent<CharController_Motor>();
 
@@ -245,34 +266,103 @@ namespace Controller
             {
                 if (m_IsFleeing)
                 {
-                    // When fleeing, check if we've reached a safe distance
-                    // We need to be beyond the flee stop radius AND have increased distance from when we started fleeing
+                    // Track time spent fleeing
+                    m_TimeFleeing += Time.deltaTime;
+                    m_CircleCheckTimer += Time.deltaTime;
+                    
+                    // Check if we're circling (back near where we started fleeing)
+                    bool isCircling = false;
+                    if (m_CircleCheckTimer >= CIRCLE_CHECK_INTERVAL && m_TimeFleeing > 3f)
+                    {
+                        float distanceFromStart = Vector3.Distance(m_Transform.position, m_FleeStartPosition);
+                        if (distanceFromStart < CIRCLE_DETECTION_RADIUS && distanceToPlayer < m_FleeStopRadius * 0.8f)
+                        {
+                            // We're back near where we started and player is still close - likely circling
+                            isCircling = true;
+                            Debug.LogWarning($"CreatureMover: Detected circling behavior! Distance from start: {distanceFromStart:F1}m, Player distance: {distanceToPlayer:F1}m");
+                        }
+                        m_CircleCheckTimer = 0f;
+                    }
+                    
+                    // PRIORITY: Check if player is stationary and far enough - go idle immediately
+                    bool playerIsStationary = m_PlayerStationaryTime > PLAYER_STATIONARY_TIME_FOR_IDLE;
                     bool playerIsFarEnough = false;
+                    float requiredDistance = m_FleeStopRadius;
                     
                     if (playerController.IsCrouching())
                     {
-                        playerIsFarEnough = distanceToPlayer > m_CloseFleeStopRadius;
+                        requiredDistance = m_CloseFleeStopRadius;
+                    }
+                    
+                    // If player is stationary, reduce distance requirement significantly
+                    if (playerIsStationary)
+                    {
+                        requiredDistance = m_DetectionRadius * 1.2f; // Only need to be 20% beyond detection radius
+                        playerIsFarEnough = distanceToPlayer > requiredDistance;
+                        
+                        Debug.Log($"CreatureMover: Player stationary for {m_PlayerStationaryTime:F1}s. Distance: {distanceToPlayer:F1}m, Required: {requiredDistance:F1}m");
                     }
                     else
                     {
-                        playerIsFarEnough = distanceToPlayer > m_FleeStopRadius;
+                        // Normal check - player is moving
+                        playerIsFarEnough = distanceToPlayer > requiredDistance;
+                        
+                        // Also check if we've increased distance from when fleeing started (hysteresis)
+                        bool hasIncreasedDistance = distanceToPlayer > m_DistanceWhenFleeStarted + 3f;
+                        
+                        if (!hasIncreasedDistance && !playerIsFarEnough)
+                        {
+                            // Not far enough yet, continue fleeing
+                            return;
+                        }
                     }
                     
-                    // Also check if we've increased distance from when fleeing started (hysteresis)
-                    bool hasIncreasedDistance = distanceToPlayer > m_DistanceWhenFleeStarted + 3f; // Must be at least 3 units further
-                    
-                    // Only stop fleeing if player is far enough AND we've increased distance
-                    if (playerIsFarEnough && hasIncreasedDistance)
+                    // If player is far enough (or stationary and far enough), go idle
+                    // OR if we're circling and player is stationary, go idle
+                    if (playerIsFarEnough || (isCircling && playerIsStationary))
                     {
                         // Check if enough time has passed since last state change
                         if (Time.time - m_LastStateChangeTime >= m_StateChangeCooldown)
                         {
+                            string reason = isCircling ? "circling detected" : "player far enough";
+                            Debug.Log($"CreatureMover: Going back to idle. Distance: {distanceToPlayer:F1}m, Player stationary: {playerIsStationary}, Flee time: {m_TimeFleeing:F1}s, Reason: {reason}");
                             m_IsFleeing = false;
                             m_LastStateChangeTime = Time.time;
                             m_DistanceWhenFleeStarted = float.MaxValue;
+                            m_TimeFleeing = 0f;
+                            m_PlayerStationaryTime = 0f;
+                            m_CircleCheckTimer = 0f;
                             SetNewWanderTarget();
                             return;
                         }
+                    }
+                    
+                    // Safety: Force idle if fleeing too long (prevents infinite running)
+                    if (m_TimeFleeing > MAX_FLEE_TIME)
+                    {
+                        Debug.LogWarning($"CreatureMover: Forcing idle after {m_TimeFleeing:F1}s of fleeing (max time exceeded)");
+                        m_IsFleeing = false;
+                        m_LastStateChangeTime = Time.time;
+                        m_DistanceWhenFleeStarted = float.MaxValue;
+                        m_TimeFleeing = 0f;
+                        m_PlayerStationaryTime = 0f;
+                        m_CircleCheckTimer = 0f;
+                        SetNewWanderTarget();
+                        return;
+                    }
+                    
+                    // Force idle if circling and player has been stationary for a while
+                    if (isCircling && m_PlayerStationaryTime > PLAYER_STATIONARY_TIME_FOR_IDLE * 1.5f)
+                    {
+                        Debug.LogWarning($"CreatureMover: Forcing idle - circling detected and player stationary for {m_PlayerStationaryTime:F1}s");
+                        m_IsFleeing = false;
+                        m_LastStateChangeTime = Time.time;
+                        m_DistanceWhenFleeStarted = float.MaxValue;
+                        m_TimeFleeing = 0f;
+                        m_PlayerStationaryTime = 0f;
+                        m_CircleCheckTimer = 0f;
+                        SetNewWanderTarget();
+                        return;
                     }
                 }
                 else
@@ -305,6 +395,11 @@ namespace Controller
                         m_IsFleeing = true;
                         m_LastStateChangeTime = Time.time;
                         m_DistanceWhenFleeStarted = distanceToPlayer; // Record distance when fleeing started
+                        m_TimeFleeing = 0f; // Reset flee timer
+                        m_PlayerStationaryTime = 0f; // Reset stationary timer
+                        m_FleeStartPosition = m_Transform.position; // Record starting position
+                        m_CircleCheckTimer = 0f; // Reset circle check timer
+                        Debug.Log($"CreatureMover: Starting to flee. Distance: {distanceToPlayer:F1}m");
                     }
                 }
             }
