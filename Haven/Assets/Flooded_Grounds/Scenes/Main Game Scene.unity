@@ -258003,6 +258003,7 @@ GameObject:
   - component: {fileID: 1780305051}
   - component: {fileID: 1780305048}
   - component: {fileID: 1780305043}
+  - component: {fileID: 1780305053}
   - component: {fileID: 1780305050}
   m_Layer: 0
   m_Name: Player
@@ -258243,6 +258244,25 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   playerTransformOverride: {fileID: 0}
+--- !u!114 &1780305053
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1780305042}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0e7004620e5c1482eadb3d527e08abc4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  enableAutoPickup: 1
+  pickupRange: {x: 0.86, y: 2.21, z: 0.15}
+  checkInterval: 0.1
+  pickupCooldown: 0.19
+  excludedTags:
+  - Untagged
+  showDebugMessages: 1
 --- !u!1001 &1780574239
 PrefabInstance:
   m_ObjectHideFlags: 0

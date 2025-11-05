@@ -90,11 +90,13 @@ public class CampfirePlacement : MonoBehaviour
         previewUpdateTimer = 0f;
         loggedInvalidPlacement = false; // Reset debug log flag
         
-        // Clear preview when enabled (will be recreated when campfire is selected)
+        // Clear and reset preview when enabled (will be recreated when campfire is selected)
         if (previewCampfire != null)
         {
-            HidePreview();
-            // Don't destroy preview here - it will be reused if campfire is selected again
+            Destroy(previewCampfire);
+            previewCampfire = null;
+            cachedRenderers = null;
+            cachedMaterials = null;
         }
         
         // Small delay to ensure HotbarManager has activated the campfire before we check
@@ -187,6 +189,12 @@ public class CampfirePlacement : MonoBehaviour
             {
                 Debug.Log($"[CampfirePlacement] Creating preview for campfire '{this.gameObject.name}'");
                 CreatePreview();
+                
+                // Force an immediate update after creating preview
+                if (previewCampfire != null)
+                {
+                    UpdatePreview();
+                }
             }
             
             // Always update placement check (needed for left-click placement)
@@ -241,12 +249,14 @@ public class CampfirePlacement : MonoBehaviour
                 
                 if (isValidPlacement)
                 {
-                    Debug.Log("[CampfirePlacement] Placing campfire now...");
+                    Debug.Log("<color=green>[CampfirePlacement] ✓ CAMPFIRE CAN BE PLACED - Attempting placement...</color>");
                     PlaceCampfire();
                 }
                 else
                 {
-                    Debug.LogWarning($"[CampfirePlacement] Cannot place campfire - Invalid placement. Check: {clickPlacementCheck}, Valid: {isValidPlacement}");
+                    Debug.LogWarning("<color=red>[CampfirePlacement] ✗ CAMPFIRE CANNOT BE PLACED - Invalid placement location!</color>");
+                    Debug.LogWarning($"[CampfirePlacement] Placement check failed. Check result: {clickPlacementCheck}, Valid state: {isValidPlacement}");
+                    Debug.LogWarning($"[CampfirePlacement] Preview position: {previewPosition}, Make sure you're looking at valid ground.");
                 }
             }
         }
@@ -368,23 +378,42 @@ public class CampfirePlacement : MonoBehaviour
     
     void SetupPreviewMaterialsSimple()
     {
-        // Minimal material setup - just tint existing materials slightly
-        // Avoids expensive material creation/modification
+        // Create visible outline effect for preview
         if (cachedRenderers == null || cachedRenderers.Length == 0) return;
         
-        // Just set initial semi-transparent color - minimal changes
+        // Set materials to be semi-transparent with emission for better visibility
         for (int i = 0; i < cachedRenderers.Length; i++)
         {
             if (cachedRenderers[i] != null && cachedRenderers[i].material != null)
             {
                 Material mat = cachedRenderers[i].material;
                 
-                // Only modify if shader supports _Color (fastest path)
+                // Make material semi-transparent with glow effect
                 if (mat.HasProperty("_Color"))
                 {
                     Color col = mat.color;
-                    col.a = 0.5f; // Semi-transparent
+                    col.a = 0.6f; // Semi-transparent
                     mat.color = col;
+                }
+                
+                // Enable emission for outline/glow effect (makes it more visible)
+                if (mat.HasProperty("_EmissionColor"))
+                {
+                    mat.SetColor("_EmissionColor", new Color(0.2f, 0.8f, 0.2f, 1f) * 0.5f); // Green glow
+                    mat.EnableKeyword("_EMISSION");
+                }
+                
+                // Enable render queue for transparency
+                if (mat.HasProperty("_Mode"))
+                {
+                    mat.SetFloat("_Mode", 3); // Set to transparent mode if supported
+                    mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                    mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                    mat.SetInt("_ZWrite", 0);
+                    mat.DisableKeyword("_ALPHATEST_ON");
+                    mat.EnableKeyword("_ALPHABLEND_ON");
+                    mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+                    mat.renderQueue = 3000; // Transparent queue
                 }
             }
         }
@@ -449,11 +478,28 @@ public class CampfirePlacement : MonoBehaviour
                 ? Quaternion.identity
                 : Quaternion.FromToRotation(Vector3.up, hit.normal);
             
+            // Debug placement status (only log when state changes to avoid spam)
+            if (isValidPlacement != lastValidityState)
+            {
+                if (isValidPlacement)
+                {
+                    Debug.Log($"<color=green>[CampfirePlacement] ✓ Valid placement location found at {previewPosition}</color>");
+                }
+                else
+                {
+                    Debug.LogWarning($"<color=yellow>[CampfirePlacement] ⚠ Invalid placement location at {previewPosition} (surface too steep or invalid)</color>");
+                }
+            }
+            
             return isValidPlacement;
         }
         
         // No valid ground found
         isValidPlacement = false;
+        if (lastValidityState != false) // Only log if state changed
+        {
+            Debug.LogWarning($"<color=red>[CampfirePlacement] ✗ No valid ground found for placement (range: {placementRange})</color>");
+        }
         return false;
     }
     
@@ -550,11 +596,13 @@ public class CampfirePlacement : MonoBehaviour
     {
         if (!isValidPlacement)
         {
-            Debug.LogWarning("CampfirePlacement: Cannot place campfire - invalid placement location.");
+            Debug.LogError("<color=red>[CampfirePlacement] ✗ CAMPFIRE PLACEMENT FAILED - Invalid placement location!</color>");
+            Debug.LogError($"[CampfirePlacement] Cannot place campfire at {previewPosition}. isValidPlacement is false.");
             return;
         }
         
-        Debug.Log($"CampfirePlacement: Placing campfire at {previewPosition}.");
+        Debug.Log("<color=green>[CampfirePlacement] ✓ PLACING CAMPFIRE...</color>");
+        Debug.Log($"[CampfirePlacement] Position: {previewPosition}, Rotation: {previewRotation}");
         
         // Create the actual placed campfire
         GameObject placedCampfire = Instantiate(gameObject, previewPosition, previewRotation);
@@ -626,6 +674,10 @@ public class CampfirePlacement : MonoBehaviour
             Destroy(previewCampfire);
         }
         Destroy(this.gameObject);
+        
+        // SUCCESS MESSAGE
+        Debug.Log($"<color=green>[CampfirePlacement] ✓✓✓ CAMPFIRE SUCCESSFULLY PLACED! ✓✓✓</color>");
+        Debug.Log($"<color=green>[CampfirePlacement] Campfire '{placedCampfire.name}' placed at position: {previewPosition}</color>");
     }
     
     void DropCampfire()

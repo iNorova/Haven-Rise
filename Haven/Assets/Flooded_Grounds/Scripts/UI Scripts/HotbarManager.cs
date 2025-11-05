@@ -71,7 +71,7 @@ public class HotbarManager : MonoBehaviour
                 SelectSlot(i);
         }
 
-        // Pickup with F
+        // Manual pickup with F (works alongside auto pickup)
         if (Input.GetKeyDown(KeyCode.F))
             TryPickupItem();
 
@@ -245,6 +245,25 @@ public class HotbarManager : MonoBehaviour
             });
             
             GameObject itemToPickUp = validPickupables[0];
+            
+            // Double-check item is still valid and not already being picked up by auto-pickup
+            if (itemToPickUp == null || !itemToPickUp.activeSelf)
+            {
+                return; // Item was picked up by auto-pickup or destroyed
+            }
+            
+            // Check if AutoPickup is currently picking this up
+            AutoPickup autoPickup = FindObjectOfType<AutoPickup>();
+            if (autoPickup != null && autoPickup.itemsBeingPickedUp != null && autoPickup.itemsBeingPickedUp.Contains(itemToPickUp))
+            {
+                return; // Item is already being picked up by auto-pickup
+            }
+            
+            // Mark as being picked up manually to prevent auto-pickup from grabbing it
+            if (autoPickup != null)
+            {
+                autoPickup.itemsBeingPickedUp.Add(itemToPickUp);
+            }
 
 			if (slot != -1)
 			{
@@ -292,44 +311,112 @@ public class HotbarManager : MonoBehaviour
         item.transform.localPosition = Vector3.zero;
         item.transform.localRotation = Quaternion.identity;
 
-        // Ensure physics is disabled while held
+        // Ensure physics is disabled while held (do this FIRST to prevent phasing)
         Rigidbody rb = item.GetComponent<Rigidbody>();
         if (rb != null)
         {
             rb.isKinematic = true;
-            rb.useGravity = false; // Disable gravity while held
-            Debug.Log($"[HotbarManager] PickupItem: {item.name} Rigidbody set to Kinematic and Gravity OFF."); // Debug Log
+            rb.useGravity = false;
+            rb.linearVelocity = Vector3.zero; // Stop any movement
+            rb.angularVelocity = Vector3.zero; // Stop any rotation
         }
 
+        // IMPORTANT: Check if item has a Camera component BEFORE disabling/deactivating
+        // This prevents "No Display camera rendering" error
+        Camera itemCamera = item.GetComponentInChildren<Camera>();
+        if (itemCamera != null)
+        {
+            Debug.LogWarning($"[HotbarManager] PickupItem: Item '{item.name}' has a Camera component! This should be removed or the item should not be picked up. Camera: {itemCamera.name}");
+            // Don't disable the camera - just disable the item's colliders
+        }
+        
+        // IMPORTANT: Disable physics FIRST to prevent phasing through terrain
+        // Disable rigidbody before colliders to prevent physics interactions
+        if (rb != null)
+        {
+            rb.isKinematic = true;
+            rb.useGravity = false;
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
+        
         // Disable ALL colliders (items can have multiple colliders)
+        // But skip if this is the player or camera
         Collider[] allColliders = item.GetComponents<Collider>();
+        int disabledCount = 0;
         foreach (Collider col in allColliders)
         {
             if (col != null)
             {
-                col.enabled = false; // Disable collider to prevent self-collision and raycast interference
+                // Skip player colliders and cameras
+                if (!col.CompareTag("Player") && col.GetComponent<Camera>() == null)
+                {
+                    col.enabled = false;
+                    disabledCount++;
+                }
             }
         }
         
-        // Also disable colliders in children
+        // Also disable colliders in children (but NOT cameras or player)
         Collider[] childColliders = item.GetComponentsInChildren<Collider>();
         foreach (Collider col in childColliders)
         {
             if (col != null)
             {
-                col.enabled = false;
+                // Skip if this collider is on a camera or player
+                if (!col.CompareTag("Player") && col.GetComponent<Camera>() == null)
+                {
+                    col.enabled = false;
+                    disabledCount++;
+                }
             }
         }
         
-        if (allColliders.Length > 0 || childColliders.Length > 0)
-        {
-            Debug.Log($"[HotbarManager] PickupItem: {item.name} - Disabled {allColliders.Length + childColliders.Length} collider(s).");
-        }
+        // Removed debug log to reduce console spam
         
         // Move to Ignore Raycast layer to prevent interference with pickup detection
-        item.layer = LayerMask.NameToLayer("Ignore Raycast");
+        // But don't change layer of cameras or player
+        if (itemCamera == null && !item.CompareTag("Player"))
+        {
+            item.layer = LayerMask.NameToLayer("Ignore Raycast");
+            
+            // Set all children to Ignore Raycast layer (except cameras and player)
+            foreach (Transform child in item.GetComponentsInChildren<Transform>())
+            {
+                if (child.GetComponent<Camera>() == null && !child.CompareTag("Player"))
+                {
+                    child.gameObject.layer = LayerMask.NameToLayer("Ignore Raycast");
+                }
+            }
+        }
         
-        item.SetActive(false); // Item will be activated in SelectSlot when its slot is chosen
+        // Deactivate item immediately to prevent phasing through terrain
+        // But keep cameras active if they exist
+        if (itemCamera != null)
+        {
+            // If item has a camera, deactivate all children except the camera
+            foreach (Transform child in item.transform)
+            {
+                if (child.GetComponent<Camera>() == null)
+                {
+                    child.gameObject.SetActive(false);
+                }
+            }
+            // Disable renderers instead of deactivating the whole item
+            Renderer[] renderers = item.GetComponentsInChildren<Renderer>();
+            foreach (Renderer renderer in renderers)
+            {
+                if (renderer != null && renderer.GetComponent<Camera>() == null)
+                {
+                    renderer.enabled = false;
+                }
+            }
+        }
+        else
+        {
+            // Deactivate immediately to stop physics interactions
+            item.SetActive(false); // Item will be activated in SelectSlot when its slot is chosen
+        }
 
         // After picking up, ensure the item name display is updated
         UpdateSelectedItemNameDisplay();
@@ -345,7 +432,7 @@ public class HotbarManager : MonoBehaviour
         }
     }
 
-	bool TryPickupIntoInventory(GameObject item)
+	public bool TryPickupIntoInventory(GameObject item)
 	{
 		if (inventoryManager == null)
 		{
@@ -378,15 +465,64 @@ public class HotbarManager : MonoBehaviour
 			rb2.isKinematic = true;
 			rb2.useGravity = false;
 		}
-		// Disable ALL colliders (including children)
+		// IMPORTANT: Check if item has a Camera component BEFORE disabling/deactivating
+		Camera itemCamera2 = item.GetComponentInChildren<Camera>();
+		if (itemCamera2 != null)
+		{
+			Debug.LogWarning($"[HotbarManager] TryPickupIntoInventory: Item '{item.name}' has a Camera component! This should be removed or the item should not be picked up.");
+		}
+		
+		// Disable ALL colliders (including children, but NOT cameras)
 		Collider[] allColliders2 = item.GetComponentsInChildren<Collider>();
 		foreach (Collider col in allColliders2)
 		{
-			if (col != null) col.enabled = false;
+			if (col != null && col.GetComponent<Camera>() == null)
+			{
+				col.enabled = false;
+			}
 		}
-		// Move to Ignore Raycast layer
-		item.layer = LayerMask.NameToLayer("Ignore Raycast");
-		item.SetActive(false);
+		
+		// Move to Ignore Raycast layer (but not cameras)
+		if (itemCamera2 == null && !item.CompareTag("Player"))
+		{
+			item.layer = LayerMask.NameToLayer("Ignore Raycast");
+			
+			// Set all children to Ignore Raycast layer (except cameras and player)
+			foreach (Transform child in item.GetComponentsInChildren<Transform>())
+			{
+				if (child.GetComponent<Camera>() == null && !child.CompareTag("Player"))
+				{
+					child.gameObject.layer = LayerMask.NameToLayer("Ignore Raycast");
+				}
+			}
+		}
+		
+		// Deactivate item, but keep cameras active if they exist
+		if (itemCamera2 != null)
+		{
+			// If item has a camera, deactivate all children except the camera
+			foreach (Transform child in item.transform)
+			{
+				if (child.GetComponent<Camera>() == null)
+				{
+					child.gameObject.SetActive(false);
+				}
+			}
+			// Disable renderers instead of deactivating the whole item
+			Renderer[] renderers = item.GetComponentsInChildren<Renderer>();
+			foreach (Renderer renderer in renderers)
+			{
+				if (renderer != null && renderer.GetComponent<Camera>() == null)
+				{
+					renderer.enabled = false;
+				}
+			}
+		}
+		else
+		{
+			// Deactivate immediately to hide item and prevent it from being picked up again
+			item.SetActive(false);
+		}
 
         // Play pickup SFX (for inventory fallback case)
         PlayPickupSfx();
@@ -420,17 +556,19 @@ public class HotbarManager : MonoBehaviour
                 prevRb.useGravity = false;
                 Debug.Log($"[HotbarManager] SelectSlot: {heldItems[selectedSlot].name} (prev) Rigidbody set to Kinematic and Gravity OFF."); // Debug Log
             }
-            // Disable ALL colliders on previous item (including children)
+            // Disable ALL colliders on previous item (including children, but NOT player or cameras)
             Collider[] prevColliders = heldItems[selectedSlot].GetComponentsInChildren<Collider>();
             foreach (Collider col in prevColliders)
             {
-                if (col != null) col.enabled = false;
+                if (col != null && !col.CompareTag("Player") && col.GetComponent<Camera>() == null)
+                {
+                    col.enabled = false;
+                }
             }
-            // Ensure it's on Ignore Raycast layer
-            heldItems[selectedSlot].layer = LayerMask.NameToLayer("Ignore Raycast");
-            if (prevColliders.Length > 0)
+            // Ensure it's on Ignore Raycast layer (but not if it's player)
+            if (!heldItems[selectedSlot].CompareTag("Player"))
             {
-                Debug.Log($"[HotbarManager] SelectSlot: {heldItems[selectedSlot].name} (prev) - Disabled {prevColliders.Length} collider(s).");
+                heldItems[selectedSlot].layer = LayerMask.NameToLayer("Ignore Raycast");
             }
         }
 
@@ -444,9 +582,13 @@ public class HotbarManager : MonoBehaviour
             // Special handling for beds - ensure BedPlacement initializes properly
             BedPlacement bedPlacement = heldItems[selectedSlot].GetComponent<BedPlacement>();
             
-            // Check if this is a bed (by name, even if BedPlacement is missing)
+            // Special handling for campfires - ensure CampfirePlacement initializes properly
+            CampfirePlacement campfirePlacement = heldItems[selectedSlot].GetComponent<CampfirePlacement>();
+            
+            // Check if this is a bed or campfire (by name, even if component is missing)
             string itemName = heldItems[selectedSlot].name.ToLower();
             bool isBed = itemName.Contains("bed");
+            bool isCampfire = itemName.Contains("campfire");
             
             // If no BedPlacement found but this is a bed, try to add it
             // (This handles cases where the bed was restored but BedPlacement wasn't added properly)
@@ -459,6 +601,20 @@ public class HotbarManager : MonoBehaviour
                     bedPlacement.InitializeReferences();
                     bedPlacement.enabled = true;
                     Debug.Log($"[HotbarManager] SelectSlot: Added and initialized BedPlacement for '{heldItems[selectedSlot].name}'");
+                }
+            }
+            
+            // If no CampfirePlacement found but this is a campfire, try to add it
+            // (This handles cases where the campfire was restored but CampfirePlacement wasn't added properly)
+            if (campfirePlacement == null && isCampfire)
+            {
+                Debug.LogWarning($"[HotbarManager] Campfire '{heldItems[selectedSlot].name}' selected but missing CampfirePlacement component. Adding it now...");
+                campfirePlacement = heldItems[selectedSlot].AddComponent<CampfirePlacement>();
+                if (campfirePlacement != null)
+                {
+                    campfirePlacement.InitializeReferences();
+                    campfirePlacement.enabled = true;
+                    Debug.Log($"[HotbarManager] SelectSlot: Added and initialized CampfirePlacement for '{heldItems[selectedSlot].name}'");
                 }
             }
             
@@ -478,6 +634,23 @@ public class HotbarManager : MonoBehaviour
                 }
             }
             
+            // If CampfirePlacement exists, initialize it and clean up the name
+            if (campfirePlacement != null)
+            {
+                campfirePlacement.InitializeReferences();
+                campfirePlacement.enabled = true; // Ensure it's enabled
+                Debug.Log($"[HotbarManager] SelectSlot: Initialized CampfirePlacement for '{heldItems[selectedSlot].name}'");
+                
+                // Also clean up the name if it still has "_Placed" suffix (happens if name cleanup failed during pickup)
+                string currentName = heldItems[selectedSlot].name;
+                if (currentName.Contains("_Placed") || currentName.Contains("_placed"))
+                {
+                    string cleanedName = currentName.Replace("_Placed", "").Replace("_placed", "").Trim();
+                    heldItems[selectedSlot].name = cleanedName;
+                    Debug.Log($"[HotbarManager] SelectSlot: Cleaned campfire name from '{currentName}' to '{cleanedName}'");
+                }
+            }
+            
             ResetHeldItemPosition(); // Ensure correct position/rotation in hand
             
             Rigidbody newRb = heldItems[selectedSlot].GetComponent<Rigidbody>();
@@ -487,17 +660,19 @@ public class HotbarManager : MonoBehaviour
                 newRb.useGravity = false;
                 Debug.Log($"[HotbarManager] SelectSlot: {heldItems[selectedSlot].name} (new) Rigidbody set to Kinematic and Gravity OFF."); // Debug Log
             }
-            // Disable ALL colliders on newly selected item (including children)
+            // Disable ALL colliders on newly selected item (including children, but NOT player or cameras)
             Collider[] newColliders = heldItems[selectedSlot].GetComponentsInChildren<Collider>();
             foreach (Collider col in newColliders)
             {
-                if (col != null) col.enabled = false;
+                if (col != null && !col.CompareTag("Player") && col.GetComponent<Camera>() == null)
+                {
+                    col.enabled = false;
+                }
             }
-            // Ensure it's on Ignore Raycast layer to prevent pickup interference
-            heldItems[selectedSlot].layer = LayerMask.NameToLayer("Ignore Raycast");
-            if (newColliders.Length > 0)
+            // Ensure it's on Ignore Raycast layer to prevent pickup interference (but not if it's player)
+            if (!heldItems[selectedSlot].CompareTag("Player"))
             {
-                Debug.Log($"[HotbarManager] SelectSlot: {heldItems[selectedSlot].name} (new) - Disabled {newColliders.Length} collider(s).");
+                heldItems[selectedSlot].layer = LayerMask.NameToLayer("Ignore Raycast");
             }
 
             // Force the Animator to its Idle state and reset all its triggers for a clean start
@@ -559,6 +734,13 @@ public class HotbarManager : MonoBehaviour
         // Ensure the item name display is updated after dropping
         UpdateSelectedItemNameDisplay();
 
+        // CRITICAL: Clear item from AutoPickup tracking systems so it can be picked up again
+        AutoPickup autoPickup = FindObjectOfType<AutoPickup>();
+        if (autoPickup != null)
+        {
+            autoPickup.ClearItemTracking(itemToDrop);
+        }
+
         // Reset parent and enable physics for dropping
         itemToDrop.transform.SetParent(null); // Unparent from hand holder
 
@@ -567,26 +749,43 @@ public class HotbarManager : MonoBehaviour
         {
             rb.isKinematic = false; // Enable physics
             rb.useGravity = true; // Enable gravity
+            rb.linearVelocity = Vector3.zero; // Clear any velocity
+            rb.angularVelocity = Vector3.zero; // Clear any angular velocity
             rb.AddForce(Camera.main.transform.forward * 5f, ForceMode.Impulse); // Add a forward force
-            Debug.Log($"[HotbarManager] DropSelectedItem: {itemToDrop.name} Rigidbody set to NOT Kinematic and Gravity ON."); // Debug Log
         }
 
-        // Enable ALL colliders (including children) when dropping
+        // Enable ALL colliders (including children, but NOT player or cameras) when dropping
         Collider[] allDropColliders = itemToDrop.GetComponentsInChildren<Collider>();
+        int enabledCount = 0;
         foreach (Collider col in allDropColliders)
         {
-            if (col != null) col.enabled = true;
+            if (col != null && !col.CompareTag("Player") && col.GetComponent<Camera>() == null)
+            {
+                col.enabled = true;
+                enabledCount++;
+            }
         }
-        // Restore to Default layer (or Pickup layer if it exists)
-        int pickupLayer = LayerMask.NameToLayer("Pickup");
-        itemToDrop.layer = (pickupLayer != -1) ? pickupLayer : LayerMask.NameToLayer("Default");
         
-        if (allDropColliders.Length > 0)
+        // Restore to Default layer (or Pickup layer if it exists) - but NOT if it's player
+        if (!itemToDrop.CompareTag("Player"))
         {
-            Debug.Log($"[HotbarManager] DropSelectedItem: {itemToDrop.name} - Enabled {allDropColliders.Length} collider(s) and restored layer.");
+            int pickupLayer = LayerMask.NameToLayer("Pickup");
+            itemToDrop.layer = (pickupLayer != -1) ? pickupLayer : LayerMask.NameToLayer("Default");
+            
+            // Also set all children to the same layer (except cameras and player)
+            foreach (Transform child in itemToDrop.GetComponentsInChildren<Transform>())
+            {
+                if (child.GetComponent<Camera>() == null && !child.CompareTag("Player"))
+                {
+                    child.gameObject.layer = itemToDrop.layer;
+                }
+            }
         }
 
-        itemToDrop.SetActive(true); // Ensure the dropped item is active
+        // Ensure the dropped item is active
+        itemToDrop.SetActive(true);
+        
+        Debug.Log($"[HotbarManager] DropSelectedItem: {itemToDrop.name} - Enabled {enabledCount} collider(s), restored layer, and cleared from pickup tracking.");
     }
 
     public void UpdateHotbarUI() // Made public for InventoryUIManager access

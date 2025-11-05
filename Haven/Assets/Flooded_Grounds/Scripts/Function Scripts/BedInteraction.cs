@@ -458,7 +458,7 @@ public class BedInteraction : MonoBehaviour
         
         // Create layer mask that excludes "Ignore Raycast" layer to ensure we can detect the bed
         LayerMask raycastLayerMask = ~LayerMask.GetMask("Ignore Raycast");
-        
+
         // Raycast to check if player is looking at this bed
         RaycastHit hit;
         Ray ray = playerCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));

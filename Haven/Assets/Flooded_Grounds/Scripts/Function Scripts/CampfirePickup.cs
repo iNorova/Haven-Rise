@@ -158,11 +158,24 @@ public class CampfirePickup : MonoBehaviour
                 // Restore campfire to original state (no cloning - use the same campfire)
                 RestoreCampfireToOriginalState(campfireToPickup);
                 
-                // Verify name is cleaned before adding to hotbar
+                // Verify name is cleaned before adding to hotbar (double-check)
                 if (campfireToPickup.name.Contains("_Placed") || campfireToPickup.name.Contains("_placed"))
                 {
                     Debug.LogWarning($"CampfirePickup: Campfire name still contains '_Placed' after restoration! Name: '{campfireToPickup.name}'. Cleaning again...");
                     campfireToPickup.name = campfireToPickup.name.Replace("_Placed", "").Replace("_placed", "").Trim();
+                }
+                
+                // Verify CampfirePlacement component exists before deactivating
+                CampfirePlacement placement = campfireToPickup.GetComponent<CampfirePlacement>();
+                if (placement == null)
+                {
+                    Debug.LogWarning($"CampfirePickup: CampfirePlacement component missing after restoration! Adding it now...");
+                    placement = campfireToPickup.AddComponent<CampfirePlacement>();
+                    if (placement != null)
+                    {
+                        placement.InitializeReferences();
+                        placement.enabled = true;
+                    }
                 }
                 
                 // Deactivate for hotbar storage
@@ -171,7 +184,7 @@ public class CampfirePickup : MonoBehaviour
                 // Pickup into hotbar
                 hotbarManager.PickupItem(campfireToPickup, emptySlot);
                 pickedUp = true;
-                Debug.Log($"CampfirePickup: Campfire '{campfireToPickup.name}' restored and picked up into hotbar slot {emptySlot}. Final name check: '{campfireToPickup.name}'");
+                Debug.Log($"CampfirePickup: Campfire '{campfireToPickup.name}' restored and picked up into hotbar slot {emptySlot}. Final name check: '{campfireToPickup.name}', HasPlacement: {campfireToPickup.GetComponent<CampfirePlacement>() != null}");
             }
         }
 
