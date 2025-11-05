@@ -32,6 +32,10 @@ namespace Controller
         private Transform m_PlayerTransform;
         [SerializeField, Tooltip("How far the animal tries to flee from the player")]
         private float m_FleeDistance = 20f;
+        [SerializeField, Tooltip("Distance player must be beyond before animal stops fleeing (prevents jittering). Should be larger than Detection Radius")]
+        private float m_FleeStopRadius = 25f;
+        [SerializeField, Tooltip("Distance player must be beyond before animal stops fleeing when crouching (prevents jittering)")]
+        private float m_CloseFleeStopRadius = 5f;
         [SerializeField, Tooltip("How quickly the animal turns when fleeing (higher = faster)")]
         private float m_FleeTurnSpeed = 180f;
         [SerializeField, Tooltip("Minimum time between state changes (in seconds)")]
@@ -40,12 +44,18 @@ namespace Controller
         private float m_ObstacleCheckDistance = 2f;
         [SerializeField, Tooltip("Layer mask for obstacle detection")]
         private LayerMask m_ObstacleLayerMask;
+        [SerializeField, Tooltip("Layer mask for structures/trees to avoid (Tree and Structure layers)")]
+        private LayerMask m_StructureLayerMask;
         [SerializeField, Tooltip("Number of raycasts to check for obstacles")]
         private int m_RaycastCount = 5;
         [SerializeField, Tooltip("Spread angle for raycasts in degrees")]
         private float m_RaycastSpread = 30f;
         [SerializeField, Tooltip("Height of raycasts from ground")]
         private float m_RaycastHeight = 0.5f;
+        [SerializeField, Tooltip("How far ahead to check for obstacles when fleeing")]
+        private float m_FleeObstacleCheckDistance = 3f;
+        [SerializeField, Tooltip("How strongly to avoid obstacles (higher = more avoidance)")]
+        private float m_ObstacleAvoidanceStrength = 2f;
         [SerializeField, Tooltip("Minimum distance to maintain from player")]
         private float m_MinPlayerDistance = 5f;
         [SerializeField, Tooltip("How quickly the animal accelerates when fleeing")]
@@ -97,6 +107,13 @@ namespace Controller
 
         private Vector3 m_WanderTarget;
         private float m_NextWanderTime;
+        private float m_DistanceWhenFleeStarted; // Track distance when fleeing began
+        private Vector3 m_LastPosition; // Track position to detect if stuck
+        private float m_StuckCheckTimer = 0f;
+        private const float STUCK_CHECK_INTERVAL = 0.5f; // Check every 0.5 seconds
+        private const float STUCK_THRESHOLD = 0.2f; // If moved less than 0.2 units, considered stuck
+        private float m_LastStuckTime = 0f;
+        private Vector3 m_LastStuckAvoidDirection; // Remember last avoidance direction when stuck
 
         // Public properties for debugging
         public bool IsFleeing => m_IsFleeing;
@@ -115,9 +132,13 @@ namespace Controller
             m_DetectionRadius = Mathf.Max(m_DetectionRadius, 0f);
             m_CloseDetectionRadius = Mathf.Max(m_CloseDetectionRadius, 0f);
             m_FleeDistance = Mathf.Max(m_FleeDistance, m_DetectionRadius);
+            m_FleeStopRadius = Mathf.Max(m_FleeStopRadius, m_DetectionRadius * 1.5f); // Ensure it's larger than detection
+            m_CloseFleeStopRadius = Mathf.Max(m_CloseFleeStopRadius, m_CloseDetectionRadius * 2f); // Ensure it's larger than close detection
             m_FleeTurnSpeed = Mathf.Max(m_FleeTurnSpeed, 0f);
             m_StateChangeCooldown = Mathf.Max(m_StateChangeCooldown, 0.1f);
             m_ObstacleCheckDistance = Mathf.Max(m_ObstacleCheckDistance, 0.5f);
+            m_FleeObstacleCheckDistance = Mathf.Max(m_FleeObstacleCheckDistance, m_ObstacleCheckDistance);
+            m_ObstacleAvoidanceStrength = Mathf.Max(m_ObstacleAvoidanceStrength, 0.1f);
 
             m_Movement?.SetStats(m_WalkSpeed / 3.6f, m_RunSpeed / 3.6f, m_RotateSpeed, m_JumpHeight, m_Space);
         }
@@ -145,6 +166,24 @@ namespace Controller
             m_SmoothedFleeDirection = m_Transform.forward;
             m_CurrentFleeSpeed = m_WalkSpeed;
             m_LastGroundedPosition = m_Transform.position;
+            m_DistanceWhenFleeStarted = float.MaxValue;
+            m_LastPosition = m_Transform.position;
+            m_StuckCheckTimer = 0f;
+            m_LastStuckTime = 0f;
+            m_LastStuckAvoidDirection = Vector3.zero;
+            
+            // Auto-setup structure layer mask if not configured (Tree and Structure layers)
+            if (m_StructureLayerMask == 0)
+            {
+                int treeLayer = LayerMask.NameToLayer("Tree");
+                int structureLayer = LayerMask.NameToLayer("Structure");
+                if (treeLayer != -1) m_StructureLayerMask |= (1 << treeLayer);
+                if (structureLayer != -1) m_StructureLayerMask |= (1 << structureLayer);
+                if (m_StructureLayerMask != 0)
+                {
+                    Debug.Log($"CreatureMover: Auto-configured Structure Layer Mask to include Tree and Structure layers");
+                }
+            }
         }
 
         private void Update()
@@ -186,58 +225,87 @@ namespace Controller
         {
             if (m_PlayerTransform == null) return;
 
-            // Check if enough time has passed since last state change
-            if (Time.time - m_LastStateChangeTime < m_StateChangeCooldown)
-            {
-                return;
-            }
-
             float distanceToPlayer = Vector3.Distance(m_Transform.position, m_PlayerTransform.position);
             
-            // Check if player has moved significantly
-            float playerMovement = Vector3.Distance(m_LastPlayerPosition, m_PlayerTransform.position);
-            if (playerMovement < m_PlayerMovementThreshold)
+            // Check if player has moved significantly (only skip if not fleeing, to avoid jittering)
+            if (!m_IsFleeing)
             {
-                return;
+                float playerMovement = Vector3.Distance(m_LastPlayerPosition, m_PlayerTransform.position);
+                if (playerMovement < m_PlayerMovementThreshold)
+                {
+                    return;
+                }
             }
+            // Always update last player position (for distance calculations)
             m_LastPlayerPosition = m_PlayerTransform.position;
 
             CharController_Motor playerController = m_PlayerTransform.GetComponent<CharController_Motor>();
 
             if (playerController != null)
             {
-                bool shouldFlee = false;
-
-                // Check if player is crouching
-                if (playerController.IsCrouching())
+                if (m_IsFleeing)
                 {
-                    if (distanceToPlayer <= m_CloseDetectionRadius)
+                    // When fleeing, check if we've reached a safe distance
+                    // We need to be beyond the flee stop radius AND have increased distance from when we started fleeing
+                    bool playerIsFarEnough = false;
+                    
+                    if (playerController.IsCrouching())
                     {
-                        shouldFlee = true;
+                        playerIsFarEnough = distanceToPlayer > m_CloseFleeStopRadius;
+                    }
+                    else
+                    {
+                        playerIsFarEnough = distanceToPlayer > m_FleeStopRadius;
+                    }
+                    
+                    // Also check if we've increased distance from when fleeing started (hysteresis)
+                    bool hasIncreasedDistance = distanceToPlayer > m_DistanceWhenFleeStarted + 3f; // Must be at least 3 units further
+                    
+                    // Only stop fleeing if player is far enough AND we've increased distance
+                    if (playerIsFarEnough && hasIncreasedDistance)
+                    {
+                        // Check if enough time has passed since last state change
+                        if (Time.time - m_LastStateChangeTime >= m_StateChangeCooldown)
+                        {
+                            m_IsFleeing = false;
+                            m_LastStateChangeTime = Time.time;
+                            m_DistanceWhenFleeStarted = float.MaxValue;
+                            SetNewWanderTarget();
+                            return;
+                        }
                     }
                 }
-                // Check if player is moving (walking or sprinting)
-                else if (playerController.IsWalking() || playerController.IsSprinting())
+                else
                 {
-                    if (distanceToPlayer <= m_DetectionRadius)
+                    // Not fleeing - check if we should start fleeing
+                    bool shouldFlee = false;
+                    float triggerRadius = m_DetectionRadius;
+                    
+                    // Check if player is crouching
+                    if (playerController.IsCrouching())
                     {
-                        shouldFlee = true;
+                        triggerRadius = m_CloseDetectionRadius;
+                        if (distanceToPlayer <= m_CloseDetectionRadius)
+                        {
+                            shouldFlee = true;
+                        }
                     }
-                }
+                    // Check if player is moving (walking or sprinting)
+                    else if (playerController.IsWalking() || playerController.IsSprinting())
+                    {
+                        if (distanceToPlayer <= m_DetectionRadius)
+                        {
+                            shouldFlee = true;
+                        }
+                    }
 
-                // Only change state if it's different and cooldown has passed
-                if (shouldFlee != m_IsFleeing)
-                {
-                    m_IsFleeing = shouldFlee;
-                    m_LastStateChangeTime = Time.time;
-                }
-
-                // Always stop fleeing if player is far away
-                if (m_IsFleeing && distanceToPlayer > m_DetectionRadius * 2f)
-                {
-                    m_IsFleeing = false;
-                    m_LastStateChangeTime = Time.time;
-                    SetNewWanderTarget();
+                    // Only change state if it's different and cooldown has passed
+                    if (shouldFlee && Time.time - m_LastStateChangeTime >= m_StateChangeCooldown)
+                    {
+                        m_IsFleeing = true;
+                        m_LastStateChangeTime = Time.time;
+                        m_DistanceWhenFleeStarted = distanceToPlayer; // Record distance when fleeing started
+                    }
                 }
             }
         }
@@ -290,17 +358,61 @@ namespace Controller
         {
             if (m_PlayerTransform == null) return;
 
+            // Check if stuck (position not changing)
+            m_StuckCheckTimer += Time.deltaTime;
+            bool isStuck = false;
+            if (m_StuckCheckTimer >= STUCK_CHECK_INTERVAL)
+            {
+                float distanceMoved = Vector3.Distance(m_Transform.position, m_LastPosition);
+                isStuck = distanceMoved < STUCK_THRESHOLD;
+                m_LastPosition = m_Transform.position;
+                m_StuckCheckTimer = 0f;
+                
+                if (isStuck)
+                {
+                    m_LastStuckTime = Time.time;
+                    Debug.Log($"CreatureMover: Deer is stuck! Distance moved: {distanceMoved:F2}m");
+                }
+            }
+
             // Calculate base flee direction (away from player)
             Vector3 toPlayer = m_PlayerTransform.position - m_Transform.position;
             toPlayer.y = 0;
             float distanceToPlayer = toPlayer.magnitude;
 
-            // If too close to player, force a stronger flee direction
             Vector3 fleeDirection;
-            if (distanceToPlayer < m_MinPlayerDistance)
+            
+            // If stuck, force a completely different direction
+            if (isStuck || (Time.time - m_LastStuckTime < 1f && Time.time - m_LastStuckTime > 0f))
             {
-                // Add some randomness to prevent direct movement
-                float randomAngle = UnityEngine.Random.Range(-30f, 30f);
+                // When stuck, try perpendicular directions first, then opposite
+                Vector3 awayFromPlayer = m_Transform.position - m_PlayerTransform.position;
+                awayFromPlayer.y = 0;
+                awayFromPlayer.Normalize();
+                
+                // Try perpendicular first (90 degrees)
+                Vector3 perpendicular = Vector3.Cross(awayFromPlayer, Vector3.up);
+                if (UnityEngine.Random.value > 0.5f) perpendicular = -perpendicular;
+                
+                // Check if perpendicular direction is clear
+                if (IsDirectionClear(perpendicular, m_FleeObstacleCheckDistance))
+                {
+                    fleeDirection = perpendicular;
+                    m_LastStuckAvoidDirection = perpendicular;
+                }
+                else
+                {
+                    // Try opposite direction
+                    fleeDirection = -awayFromPlayer;
+                    m_LastStuckAvoidDirection = fleeDirection;
+                }
+                
+                Debug.Log($"CreatureMover: Forcing new direction due to being stuck: {fleeDirection}");
+            }
+            else if (distanceToPlayer < m_MinPlayerDistance)
+            {
+                // If too close to player, force a stronger flee direction
+                float randomAngle = UnityEngine.Random.Range(-60f, 60f);
                 fleeDirection = Quaternion.Euler(0, randomAngle, 0) * -toPlayer.normalized;
             }
             else
@@ -310,8 +422,39 @@ namespace Controller
                 fleeDirection.Normalize();
             }
 
-            // Smooth the flee direction with damping
-            float smoothTime = 0.3f;
+            // ENSURE flee direction is AWAY from player (never toward)
+            Vector3 awayFromPlayerDir = m_Transform.position - m_PlayerTransform.position;
+            awayFromPlayerDir.y = 0;
+            awayFromPlayerDir.Normalize();
+            
+            // Verify fleeDirection is not toward player (dot product check)
+            float dotTowardPlayer = Vector3.Dot(fleeDirection, toPlayer.normalized);
+            if (dotTowardPlayer > 0.1f) // If more than 10% toward player, fix it
+            {
+                Debug.LogWarning($"CreatureMover: Flee direction was toward player! Fixing... Dot: {dotTowardPlayer:F2}");
+                fleeDirection = awayFromPlayerDir; // Force away from player
+            }
+
+            // Check for structures/trees DIRECTLY AHEAD in the intended flee direction
+            if (CheckForObstacleAhead(fleeDirection, m_FleeObstacleCheckDistance))
+            {
+                // Something directly ahead in flee direction - force avoidance
+                fleeDirection = GetAvoidanceDirection(fleeDirection, fleeDirection, awayFromPlayerDir);
+            }
+
+            // Check for nearby structures/trees and adjust flee direction to avoid them (more aggressive)
+            fleeDirection = AvoidNearbyStructures(fleeDirection, isStuck);
+            
+            // Final safety check: ensure we're still not moving toward player after all adjustments
+            dotTowardPlayer = Vector3.Dot(fleeDirection, toPlayer.normalized);
+            if (dotTowardPlayer > 0.1f)
+            {
+                Debug.LogWarning($"CreatureMover: After avoidance, direction still toward player! Forcing away. Dot: {dotTowardPlayer:F2}");
+                fleeDirection = awayFromPlayerDir; // Force away from player as last resort
+            }
+
+            // Smooth the flee direction with damping (less smoothing if stuck)
+            float smoothTime = isStuck ? 0.1f : 0.3f; // Faster response when stuck
             m_SmoothedFleeDirection = Vector3.SmoothDamp(
                 m_SmoothedFleeDirection,
                 fleeDirection,
@@ -320,8 +463,8 @@ namespace Controller
             );
             m_SmoothedFleeDirection.Normalize();
 
-            // Check for obstacles in the smoothed direction
-            Vector3 finalFleeDirection = GetSafeFleeDirection(m_SmoothedFleeDirection);
+            // Check for obstacles in the smoothed direction (with longer range for fleeing)
+            Vector3 finalFleeDirection = GetSafeFleeDirection(m_SmoothedFleeDirection, true);
 
             // Smoothly rotate towards the flee direction with damping
             Quaternion targetRotation = Quaternion.LookRotation(finalFleeDirection);
@@ -363,11 +506,15 @@ namespace Controller
             m_Animation.Animate(animAxis, 1f, Time.deltaTime);
         }
 
-        private Vector3 GetSafeFleeDirection(Vector3 preferredDirection)
+        private Vector3 GetSafeFleeDirection(Vector3 preferredDirection, bool isFleeing = false)
         {
-            // Create a fan of raycasts
-            float angleStep = m_RaycastSpread / (m_RaycastCount - 1);
-            float startAngle = -m_RaycastSpread / 2f;
+            // Use longer check distance when fleeing
+            float checkDistance = isFleeing ? m_FleeObstacleCheckDistance : m_ObstacleCheckDistance;
+            
+            // Create a fan of raycasts (wider spread when fleeing)
+            float spread = isFleeing ? m_RaycastSpread * 1.5f : m_RaycastSpread;
+            float angleStep = spread / (m_RaycastCount - 1);
+            float startAngle = -spread / 2f;
 
             // Store the best direction found
             Vector3 bestDirection = preferredDirection;
@@ -380,7 +527,7 @@ namespace Controller
                 Vector3 direction = Quaternion.Euler(0, currentAngle, 0) * preferredDirection;
                 
                 // Calculate score for this direction
-                float score = EvaluateDirection(direction);
+                float score = EvaluateDirection(direction, checkDistance);
                 
                 if (score > bestScore)
                 {
@@ -392,20 +539,22 @@ namespace Controller
             // If no good direction found, try to find any clear path
             if (bestScore <= 0)
             {
-                // Try more directions in a wider spread
-                for (int i = 0; i < 8; i++)
+                // Try more directions in a wider spread (360 degrees)
+                for (int i = 0; i < 16; i++)
                 {
-                    float angle = i * 45f;
-                    Vector3 direction = Quaternion.Euler(0, angle, 0) * preferredDirection;
+                    float angle = i * 22.5f; // 16 directions = 22.5 degrees each
+                    Vector3 direction = Quaternion.Euler(0, angle, 0) * Vector3.forward;
                     
-                    if (IsDirectionClear(direction))
+                    if (IsDirectionClear(direction, checkDistance))
                     {
                         return direction;
                     }
                 }
                 
                 // If still no clear path, try moving perpendicular to obstacles
-                if (Physics.Raycast(m_Transform.position, preferredDirection, out RaycastHit hit, m_ObstacleCheckDistance, m_ObstacleLayerMask))
+                RaycastHit hit;
+                LayerMask combinedMask = m_ObstacleLayerMask | m_StructureLayerMask;
+                if (Physics.Raycast(m_Transform.position + Vector3.up * m_RaycastHeight, preferredDirection, out hit, checkDistance, combinedMask))
                 {
                     Vector3 avoidDirection = Vector3.Cross(hit.normal, Vector3.up);
                     if (Vector3.Dot(avoidDirection, preferredDirection) < 0)
@@ -419,60 +568,254 @@ namespace Controller
             return bestDirection;
         }
 
-        private float EvaluateDirection(Vector3 direction)
+        private bool CheckForObstacleAhead(Vector3 direction, float distance)
+        {
+            if (m_StructureLayerMask == 0 && m_ObstacleLayerMask == 0) return false;
+            
+            LayerMask combinedMask = m_ObstacleLayerMask | m_StructureLayerMask;
+            Vector3 rayStart = m_Transform.position + Vector3.up * m_RaycastHeight;
+            
+            // Check multiple points ahead (center, left, right)
+            Vector3[] checkPoints = new Vector3[]
+            {
+                direction,
+                Quaternion.Euler(0, -15f, 0) * direction, // Left
+                Quaternion.Euler(0, 15f, 0) * direction  // Right
+            };
+            
+            foreach (Vector3 checkDir in checkPoints)
+            {
+                if (Physics.Raycast(rayStart, checkDir, distance, combinedMask))
+                {
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+
+        private Vector3 GetAvoidanceDirection(Vector3 preferredDirection, Vector3 blockedDirection, Vector3 awayFromPlayer)
+        {
+            // Try perpendicular directions relative to blocked direction (left and right)
+            Vector3 perpendicular = Vector3.Cross(blockedDirection, Vector3.up);
+            
+            // Try left first (perpendicular)
+            Vector3 leftDir = perpendicular.normalized;
+            // Ensure left direction is not toward player
+            float leftDot = Vector3.Dot(leftDir, (m_PlayerTransform.position - m_Transform.position).normalized);
+            if (leftDot < 0.1f && IsDirectionClear(leftDir, m_FleeObstacleCheckDistance))
+            {
+                return leftDir;
+            }
+            
+            // Try right (opposite perpendicular)
+            Vector3 rightDir = -perpendicular.normalized;
+            float rightDot = Vector3.Dot(rightDir, (m_PlayerTransform.position - m_Transform.position).normalized);
+            if (rightDot < 0.1f && IsDirectionClear(rightDir, m_FleeObstacleCheckDistance))
+            {
+                return rightDir;
+            }
+            
+            // Try angles around the preferred direction (away from player) - 45, 90, 135 degrees
+            for (int i = 1; i <= 4; i++)
+            {
+                float angle = i * 45f; // 45, 90, 135, 180 degrees
+                
+                // Try both left and right of preferred direction
+                Vector3 testDir1 = Quaternion.Euler(0, angle, 0) * awayFromPlayer;
+                Vector3 testDir2 = Quaternion.Euler(0, -angle, 0) * awayFromPlayer;
+                
+                // Check if these directions are away from player
+                float dot1 = Vector3.Dot(testDir1, (m_PlayerTransform.position - m_Transform.position).normalized);
+                float dot2 = Vector3.Dot(testDir2, (m_PlayerTransform.position - m_Transform.position).normalized);
+                
+                if (dot1 < 0.1f && IsDirectionClear(testDir1, m_FleeObstacleCheckDistance))
+                {
+                    return testDir1.normalized;
+                }
+                if (dot2 < 0.1f && IsDirectionClear(testDir2, m_FleeObstacleCheckDistance))
+                {
+                    return testDir2.normalized;
+                }
+            }
+            
+            // Last resort: return perpendicular (but ensure it's not toward player)
+            if (Vector3.Dot(perpendicular.normalized, (m_PlayerTransform.position - m_Transform.position).normalized) < 0.1f)
+            {
+                return perpendicular.normalized;
+            }
+            
+            // Absolute last resort: just go away from player
+            Debug.LogWarning("CreatureMover: All avoidance directions blocked, forcing away from player");
+            return awayFromPlayer;
+        }
+
+        private Vector3 AvoidNearbyStructures(Vector3 preferredDirection, bool isStuck = false)
+        {
+            if (m_StructureLayerMask == 0) return preferredDirection; // No structure layer set
+            
+            // Larger avoidance radius when stuck
+            float avoidanceRadius = isStuck ? 8f : 6f; // Increased from 5f
+            
+            Collider[] nearbyStructures = Physics.OverlapSphere(
+                m_Transform.position,
+                avoidanceRadius,
+                m_StructureLayerMask
+            );
+            
+            if (nearbyStructures.Length == 0) return preferredDirection;
+            
+            // Calculate avoidance vector (away from structures)
+            Vector3 avoidanceVector = Vector3.zero;
+            float closestStructureDistance = float.MaxValue;
+            
+            foreach (Collider structure in nearbyStructures)
+            {
+                if (structure == null) continue;
+                
+                // Get closest point on structure bounds
+                Vector3 structurePos = structure.ClosestPoint(m_Transform.position);
+                Vector3 toStructure = structurePos - m_Transform.position;
+                toStructure.y = 0;
+                float distance = toStructure.magnitude;
+                
+                if (distance < 0.1f) continue;
+                
+                // Track closest structure
+                if (distance < closestStructureDistance)
+                {
+                    closestStructureDistance = distance;
+                }
+                
+                // Much stronger avoidance - inverse square law
+                float avoidanceStrength = m_ObstacleAvoidanceStrength / (distance * distance);
+                avoidanceVector -= toStructure.normalized * avoidanceStrength;
+            }
+            
+            // If we have an avoidance vector, blend it more aggressively
+            if (avoidanceVector.sqrMagnitude > 0.01f)
+            {
+                avoidanceVector.Normalize();
+                
+                // More aggressive blending - especially if stuck or very close to structure
+                float blendRatio = isStuck ? 0.3f : 0.5f; // When stuck, only 30% preferred, 70% avoidance
+                if (closestStructureDistance < 2f)
+                {
+                    blendRatio = 0.2f; // Very close = 80% avoidance
+                }
+                
+                Vector3 blendedDirection = (preferredDirection * blendRatio + avoidanceVector * (1f - blendRatio) * m_ObstacleAvoidanceStrength).normalized;
+                
+                // Safety check: ensure blended direction is not toward player
+                if (m_PlayerTransform != null)
+                {
+                    Vector3 toPlayer = (m_PlayerTransform.position - m_Transform.position);
+                    toPlayer.y = 0;
+                    float dotTowardPlayer = Vector3.Dot(blendedDirection, toPlayer.normalized);
+                    if (dotTowardPlayer > 0.1f)
+                    {
+                        // Blended direction is toward player - fall back to preferred direction
+                        Debug.LogWarning($"CreatureMover: AvoidNearbyStructures created direction toward player! Dot: {dotTowardPlayer:F2}. Using preferred direction.");
+                        return preferredDirection;
+                    }
+                }
+                
+                return blendedDirection;
+            }
+            
+            return preferredDirection;
+        }
+
+        private float EvaluateDirection(Vector3 direction, float checkDistance)
         {
             float score = 1f;
             Vector3 rayStart = m_Transform.position + Vector3.up * m_RaycastHeight;
+            LayerMask combinedMask = m_ObstacleLayerMask | m_StructureLayerMask;
 
-            // Check for obstacles
-            if (Physics.Raycast(rayStart, direction, out RaycastHit hit, m_ObstacleCheckDistance, m_ObstacleLayerMask))
+            // Check for obstacles and structures
+            if (Physics.Raycast(rayStart, direction, out RaycastHit hit, checkDistance, combinedMask))
             {
-                // Check slope angle
-                float slopeAngle = Vector3.Angle(hit.normal, Vector3.up);
-                if (slopeAngle > m_MaxSlopeAngle)
+                // Heavily penalize structures/trees (they're solid obstacles)
+                bool isStructure = (m_StructureLayerMask != 0) && ((1 << hit.collider.gameObject.layer) & m_StructureLayerMask) != 0;
+                
+                if (isStructure)
                 {
-                    score -= 1f; // Completely avoid steep slopes
+                    // Completely avoid structures - very heavy penalty
+                    score -= 2f * m_ObstacleAvoidanceStrength;
                 }
                 else
                 {
-                    // Reduce score based on distance to obstacle and slope
-                    score -= (1f - (hit.distance / m_ObstacleCheckDistance)) * (1f + slopeAngle / m_MaxSlopeAngle);
+                    // Check slope angle for regular obstacles
+                    float slopeAngle = Vector3.Angle(hit.normal, Vector3.up);
+                    if (slopeAngle > m_MaxSlopeAngle)
+                    {
+                        score -= 1f; // Completely avoid steep slopes
+                    }
+                    else
+                    {
+                        // Reduce score based on distance to obstacle and slope
+                        score -= (1f - (hit.distance / checkDistance)) * (1f + slopeAngle / m_MaxSlopeAngle);
+                    }
                 }
             }
 
             // Check if there's ground to walk on
-            Vector3 groundCheckPos = rayStart + direction * m_ObstacleCheckDistance;
+            Vector3 groundCheckPos = rayStart + direction * checkDistance;
             if (!Physics.Raycast(groundCheckPos + Vector3.up * m_GroundCheckHeight, Vector3.down, m_GroundCheckDistance, m_GroundLayerMask))
             {
                 score -= 0.5f; // Penalize directions without ground
             }
 
-            // Check for obstacles at different heights
+            // Check for obstacles/structures at different heights
             for (float height = 0.2f; height <= 1f; height += 0.2f)
             {
                 Vector3 heightCheckPos = rayStart + Vector3.up * height;
-                if (Physics.Raycast(heightCheckPos, direction, m_ObstacleCheckDistance, m_ObstacleLayerMask))
+                if (Physics.Raycast(heightCheckPos, direction, out RaycastHit heightHit, checkDistance, combinedMask))
                 {
-                    score -= 0.2f; // Penalize directions with obstacles at different heights
+                    bool isHeightStructure = (m_StructureLayerMask != 0) && ((1 << heightHit.collider.gameObject.layer) & m_StructureLayerMask) != 0;
+                    if (isHeightStructure)
+                    {
+                        score -= 0.5f * m_ObstacleAvoidanceStrength; // Heavy penalty for structures at height
+                    }
+                    else
+                    {
+                        score -= 0.2f; // Penalize directions with obstacles at different heights
+                    }
+                }
+            }
+
+            // HEAVILY penalize directions that lead towards the player
+            if (m_PlayerTransform != null)
+            {
+                Vector3 toPlayer = (m_PlayerTransform.position - m_Transform.position);
+                toPlayer.y = 0;
+                float dotProduct = Vector3.Dot(direction, toPlayer.normalized);
+                if (dotProduct > 0.1f) // If direction is even slightly towards player (10% or more)
+                {
+                    score -= 10f; // HEAVY penalty - effectively makes this direction impossible
+                    Debug.LogWarning($"CreatureMover: Direction toward player detected! Dot: {dotProduct:F2}, Score: {score}");
                 }
             }
 
             return score;
         }
 
-        private bool IsDirectionClear(Vector3 direction)
+        private bool IsDirectionClear(Vector3 direction, float checkDistance = -1f)
         {
-            Vector3 rayStart = m_Transform.position + Vector3.up * m_RaycastHeight;
+            if (checkDistance < 0) checkDistance = m_ObstacleCheckDistance;
             
-            // Check for obstacles
-            if (Physics.Raycast(rayStart, direction, m_ObstacleCheckDistance, m_ObstacleLayerMask))
+            Vector3 rayStart = m_Transform.position + Vector3.up * m_RaycastHeight;
+            LayerMask combinedMask = m_ObstacleLayerMask | m_StructureLayerMask;
+            
+            // Check for obstacles and structures
+            if (Physics.Raycast(rayStart, direction, checkDistance, combinedMask))
             {
                 return false;
             }
 
             // Check for ground
-            Vector3 groundCheckPos = rayStart + direction * m_ObstacleCheckDistance;
-            if (!Physics.Raycast(groundCheckPos + Vector3.up * 0.1f, Vector3.down, 0.2f, m_ObstacleLayerMask))
+            Vector3 groundCheckPos = rayStart + direction * checkDistance;
+            if (!Physics.Raycast(groundCheckPos + Vector3.up * 0.1f, Vector3.down, 0.2f, m_GroundLayerMask))
             {
                 return false;
             }
