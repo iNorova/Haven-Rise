@@ -177,33 +177,97 @@ public class DestroyableObject : MonoBehaviour
 
     void SpawnDrops()
     {
-        if (dropPrefabs == null || dropPrefabs.Length == 0)
+        // Check if we should spawn drops at all
+        if (minDrops <= 0 && maxDrops <= 0)
         {
-            Debug.Log("No general drop prefabs assigned");
+            Debug.Log($"DestroyableObject: Min/Max drops are both 0 or less, skipping drop spawn.");
             return;
         }
 
+        // Validate drop prefabs array
+        if (dropPrefabs == null || dropPrefabs.Length == 0)
+        {
+            Debug.LogError($"DestroyableObject: No drop prefabs assigned for {gameObject.name}! Min drops: {minDrops}, Max drops: {maxDrops}. Please assign drop prefabs in the Inspector.");
+            return;
+        }
+
+        // Filter out null prefabs
+        System.Collections.Generic.List<GameObject> validPrefabs = new System.Collections.Generic.List<GameObject>();
+        foreach (GameObject prefab in dropPrefabs)
+        {
+            if (prefab != null)
+            {
+                validPrefabs.Add(prefab);
+            }
+        }
+
+        if (validPrefabs.Count == 0)
+        {
+            Debug.LogError($"DestroyableObject: All drop prefabs are null for {gameObject.name}! Cannot spawn drops.");
+            return;
+        }
+
+        // Calculate drop count (ensure it's at least minDrops)
         int dropCount = Random.Range(minDrops, maxDrops + 1);
-        Debug.Log($"Spawning {dropCount} general drops.");
         
+        // Safety check: ensure we spawn at least minDrops if minDrops > 0
+        if (dropCount < minDrops && minDrops > 0)
+        {
+            Debug.LogWarning($"DestroyableObject: Random drop count ({dropCount}) was less than minDrops ({minDrops}). Forcing to minDrops.");
+            dropCount = minDrops;
+        }
+        
+        Debug.Log($"DestroyableObject: Spawning {dropCount} drops (min: {minDrops}, max: {maxDrops}) from {validPrefabs.Count} valid prefab(s).");
+        
+        int successfulSpawns = 0;
         for (int i = 0; i < dropCount; i++)
         {
-            // Randomly select a prefab from the array
-            GameObject dropPrefab = dropPrefabs[Random.Range(0, dropPrefabs.Length)];
+            // Randomly select a prefab from the valid prefabs
+            GameObject dropPrefab = validPrefabs[Random.Range(0, validPrefabs.Count)];
+            
+            if (dropPrefab == null)
+            {
+                Debug.LogError($"DestroyableObject: Selected drop prefab is null at index {i}! Skipping this drop.");
+                continue;
+            }
             
             Vector3 randomOffset = Random.insideUnitSphere * dropScatterRadius;
-            randomOffset.y = 0;
+            randomOffset.y = 0; // Keep drops on ground level
             Vector3 spawnPos = transform.position + randomOffset;
             
+            // Ensure spawn position is slightly above ground to prevent falling through
+            spawnPos.y = transform.position.y + 0.2f;
+            
             GameObject drop = Instantiate(dropPrefab, spawnPos, Random.rotation);
-            Debug.Log($"Spawned general drop: {drop.name}");
+            if (drop == null)
+            {
+                Debug.LogError($"DestroyableObject: Failed to instantiate drop prefab '{dropPrefab.name}'!");
+                continue;
+            }
+            
+            successfulSpawns++;
+            Debug.Log($"DestroyableObject: Spawned drop {successfulSpawns}/{dropCount}: '{drop.name}' at position {spawnPos}");
             
             // Add force to scatter the drop
             if (drop.TryGetComponent<Rigidbody>(out Rigidbody rb))
             {
-                rb.AddForce(Random.insideUnitSphere * dropForce, ForceMode.Impulse);
-                Debug.Log("Applied force to general drop");
+                Vector3 forceDirection = Random.insideUnitSphere;
+                forceDirection.y = Mathf.Max(forceDirection.y, 0.3f); // Ensure upward force
+                rb.AddForce(forceDirection * dropForce, ForceMode.Impulse);
             }
+            else
+            {
+                Debug.LogWarning($"DestroyableObject: Drop '{drop.name}' has no Rigidbody component, cannot apply force.");
+            }
+        }
+        
+        if (successfulSpawns < dropCount)
+        {
+            Debug.LogWarning($"DestroyableObject: Only spawned {successfulSpawns} out of {dropCount} requested drops for {gameObject.name}.");
+        }
+        else
+        {
+            Debug.Log($"DestroyableObject: Successfully spawned all {successfulSpawns} drops for {gameObject.name}.");
         }
     }
 
