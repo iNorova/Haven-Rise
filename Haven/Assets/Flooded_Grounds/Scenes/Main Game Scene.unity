@@ -152833,7 +152833,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 0/3
+  m_text: 0/5
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -159465,7 +159465,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f73dfe2a4e11e624cad1a52433742bce, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  requiredSuccesses: 3
+  requiredSuccesses: 5
   hitKey: 0
   altHitKey: 101
   allowMouseClick: 0
@@ -159479,6 +159479,9 @@ MonoBehaviour:
   baseNeedleSpeed: 250
   needleSpeedPerLevel: 150
   minWindowWidth: 8
+  hitGraceDegrees: 6
+  speedAdaptiveGrace: 1
+  speedGraceFactor: 1
   worldCanvas: {fileID: 1666817144}
   dialCircle: {fileID: 878924234}
   successArc: {fileID: 1351381073}

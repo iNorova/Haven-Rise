@@ -28,6 +28,14 @@ public class ChestSkillCheck : MonoBehaviour
 	[Tooltip("Minimum window width (degrees)")]
 	public float minWindowWidth = 8f;
 
+	[Header("Hit Tuning")]
+	[Tooltip("Flat grace in degrees added to the success window when you press the key")]
+	public float hitGraceDegrees = 6f;
+	[Tooltip("Also add grace based on how far the needle moves each frame (helps at high speed)")]
+	public bool speedAdaptiveGrace = true;
+	[Tooltip("Adaptive grace = needleSpeed * deltaTime * factor (degrees)")]
+	public float speedGraceFactor = 1.0f;
+
 	[Header("UI (Worldspace)")]
 	public Canvas worldCanvas;        // Optional. If null, created automatically
 	public Image dialCircle;          // Background circle
@@ -119,7 +127,8 @@ public class ChestSkillCheck : MonoBehaviour
 		if (hitPressed)
 		{
 			Debug.Log("ChestSkillCheck: Hit input received.");
-			float half = successWindowWidth * 0.5f;
+			float adaptiveGrace = speedAdaptiveGrace ? (needleSpeed * Time.deltaTime * speedGraceFactor) : 0f;
+			float half = successWindowWidth * 0.5f + hitGraceDegrees + adaptiveGrace;
 			float diff = Mathf.DeltaAngle(angle, successWindowCenter);
 			bool ok = Mathf.Abs(diff) <= half;
 			if (ok)
