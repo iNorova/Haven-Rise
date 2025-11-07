@@ -159335,8 +159335,14 @@ MonoBehaviour:
   allowMouseClick: 0
   needleSpeed: 200
   successWindowCenter: 0
-  successWindowWidth: 40
+  successWindowWidth: 50
   showDuration: 3
+  difficultyLevel: 2
+  baseWindowWidth: 50
+  windowWidthPerLevel: -25
+  baseNeedleSpeed: 250
+  needleSpeedPerLevel: 150
+  minWindowWidth: 8
   worldCanvas: {fileID: 1666817144}
   dialCircle: {fileID: 878924234}
   successArc: {fileID: 1351381073}
@@ -196583,7 +196589,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 10905, guid: 0000000000000000f000000000000000, type: 0}
+  m_Sprite: {fileID: 7482667652216324306, guid: 1a366a7316c3a934496517e3819dde18, type: 3}
   m_Type: 3
   m_PreserveAspect: 0
   m_FillCenter: 1

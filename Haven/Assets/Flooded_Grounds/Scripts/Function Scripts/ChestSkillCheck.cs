@@ -14,6 +14,20 @@ public class ChestSkillCheck : MonoBehaviour
 	public float successWindowWidth = 40f; // degrees width
 	public float showDuration = 3f; // seconds before auto-fail if no input
 
+	[Header("Difficulty")]
+	[Tooltip("Current difficulty level (1 = easiest)")]
+	public int difficultyLevel = 1;
+	[Tooltip("Success window width at level 1 (degrees)")]
+	public float baseWindowWidth = 40f;
+	[Tooltip("Change per level for window width (negative to shrink)")]
+	public float windowWidthPerLevel = -5f;
+	[Tooltip("Needle speed at level 1 (deg/s)")]
+	public float baseNeedleSpeed = 200f;
+	[Tooltip("Change per level for needle speed (positive to speed up)")]
+	public float needleSpeedPerLevel = 40f;
+	[Tooltip("Minimum window width (degrees)")]
+	public float minWindowWidth = 8f;
+
 	[Header("UI (Worldspace)")]
 	public Canvas worldCanvas;        // Optional. If null, created automatically
 	public Image dialCircle;          // Background circle
@@ -139,6 +153,7 @@ public class ChestSkillCheck : MonoBehaviour
 		timer = 0f;
 		angle = 0f;
 		successWindowCenter = Random.Range(0f, 360f);
+		ApplyDifficulty();
 		EnsureUI();
 		UpdateSuccessArc();
 		UpdateProgress();
@@ -322,6 +337,22 @@ public class ChestSkillCheck : MonoBehaviour
 		successArc.fillAmount = Mathf.Clamp01(successWindowWidth / 360f);
 		// Shift arc origin by rotating the rect (simpler than changing origin index)
 		successArc.rectTransform.localEulerAngles = new Vector3(0, 0, -startAngle);
+	}
+
+	private void ApplyDifficulty()
+	{
+		// Evaluate level-based parameters
+		int lvl = Mathf.Max(1, difficultyLevel);
+		float w = baseWindowWidth + (lvl - 1) * windowWidthPerLevel;
+		successWindowWidth = Mathf.Max(minWindowWidth, w);
+		needleSpeed = baseNeedleSpeed + (lvl - 1) * needleSpeedPerLevel;
+	}
+
+	public void SetDifficulty(int level)
+	{
+		difficultyLevel = level;
+		ApplyDifficulty();
+		UpdateSuccessArc();
 	}
 
 	private void SetUIVisible(bool v)
