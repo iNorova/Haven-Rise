@@ -27,6 +27,10 @@ public class InventorySystem : MonoBehaviour
 
         GameObject sourceItem = sourceSlot.GetItem();
         GameObject targetItem = targetSlot.GetItem();
+        
+        // Get stack counts from source and target slots
+        int sourceStackCount = sourceSlot.GetStackCount();
+        int targetStackCount = targetSlot.GetStackCount();
 
         // Determine source and target slot indices within their respective managers
         int sourceIndex = -1;
@@ -78,17 +82,40 @@ public class InventorySystem : MonoBehaviour
                 }
             }
         }
+        
+        // Check if we should try to combine stacks (both items exist and are the same stackable type)
+        // This check must happen AFTER indices are determined
+        if (sourceItem != null && targetItem != null && sourceIndex >= 0 && targetIndex >= 0 && 
+            AreItemsSameType(sourceItem, targetItem) && IsItemStackable(sourceItem))
+        {
+            Debug.Log($"[InventorySystem] Attempting to combine stacks: Source has {sourceStackCount}, Target has {targetStackCount}");
+            if (TryCombineStacks(sourceSlot, targetSlot, sourceItem, targetItem, sourceStackCount, targetStackCount, sourceIndex, targetIndex, sourceIsHotbar, targetIsHotbar))
+            {
+                // Stack combination successful, update UI and return
+                hotbarManager.UpdateHotbarUI();
+                inventoryManager.UpdateInventoryUI();
+                if (hotbarManager.hotbarSlots.Length > 0 && hotbarManager.selectedSlot < hotbarManager.hotbarSlots.Length)
+                {
+                    hotbarManager.SelectSlot(hotbarManager.selectedSlot);
+                }
+                return;
+            }
+        }
 
         // Perform the actual item swap/transfer in the managers' internal arrays
         if (sourceIsHotbar && targetIsHotbar) // Hotbar to Hotbar swap
         {
             Debug.Log($"[InventorySystem] Hotbar to Hotbar Swap: Source {sourceIndex}, Target {targetIndex}");
-            // Store references to the actual GameObjects before modifying the arrays
+            // Store references to the actual GameObjects and stack counts before modifying the arrays
             GameObject itemAtSourceBeforeSwap = hotbarManager.GetItem(sourceIndex);
             GameObject itemAtTargetBeforeSwap = hotbarManager.GetItem(targetIndex);
+            int sourceStackBeforeSwap = hotbarManager.hotbarSlots[sourceIndex].GetStackCount();
+            int targetStackBeforeSwap = hotbarManager.hotbarSlots[targetIndex].GetStackCount();
 
             hotbarManager.SetItem(sourceIndex, itemAtTargetBeforeSwap); // Put target item in source slot
+            hotbarManager.hotbarSlots[sourceIndex].SetStackCount(targetStackBeforeSwap); // Preserve target stack count
             hotbarManager.SetItem(targetIndex, itemAtSourceBeforeSwap); // Put source item in target slot
+            hotbarManager.hotbarSlots[targetIndex].SetStackCount(sourceStackBeforeSwap); // Preserve source stack count
 
             // Deactivate both items after they have been moved. SelectSlot will handle re-activation.
             if (itemAtSourceBeforeSwap != null)
@@ -105,8 +132,14 @@ public class InventorySystem : MonoBehaviour
         else if (!sourceIsHotbar && !targetIsHotbar) // Inventory to Inventory swap
         {
             Debug.Log($"[InventorySystem] Inventory to Inventory Swap: Source {sourceIndex}, Target {targetIndex}");
+            // Store stack counts before swapping
+            int sourceStackBeforeSwap = inventoryManager.inventorySlots[sourceIndex].GetStackCount();
+            int targetStackBeforeSwap = inventoryManager.inventorySlots[targetIndex].GetStackCount();
+            
             inventoryManager.SetItem(sourceIndex, targetItem); // Put target item in source slot
+            inventoryManager.inventorySlots[sourceIndex].SetStackCount(targetStackBeforeSwap); // Preserve target stack count
             inventoryManager.SetItem(targetIndex, sourceItem); // Put source item in target slot
+            inventoryManager.inventorySlots[targetIndex].SetStackCount(sourceStackBeforeSwap); // Preserve source stack count
         }
         else if (sourceIsHotbar && !targetIsHotbar) // Hotbar to Inventory transfer/swap
         {
@@ -118,10 +151,10 @@ public class InventorySystem : MonoBehaviour
                 // Swap: Put target item in source hotbar slot
                 hotbarManager.SetItem(sourceIndex, targetItem);
                 
-                // Explicitly update the source slot visual to ensure it's correct
+                // Explicitly update the source slot visual to ensure it's correct (preserve target stack count)
                 if (sourceIndex >= 0 && sourceIndex < hotbarManager.hotbarSlots.Length && hotbarManager.hotbarSlots[sourceIndex] != null)
                 {
-                    hotbarManager.hotbarSlots[sourceIndex].SetItem(targetItem, hotbarManager.emptySlotSprite);
+                    hotbarManager.hotbarSlots[sourceIndex].SetItem(targetItem, hotbarManager.emptySlotSprite, targetStackCount);
                 }
                 
                 // Handle the target item (coming from inventory to hotbar)
@@ -141,17 +174,17 @@ public class InventorySystem : MonoBehaviour
                 // Explicitly update the slot visual to ensure empty sprite is shown
                 if (hotbarManager.hotbarSlots[sourceIndex] != null)
                 {
-                    hotbarManager.hotbarSlots[sourceIndex].SetItem(null, hotbarManager.emptySlotSprite);
+                    hotbarManager.hotbarSlots[sourceIndex].SetItem(null, hotbarManager.emptySlotSprite, 1);
                 }
             }
             
             // Place source item in target inventory slot
             inventoryManager.SetItem(targetIndex, sourceItem);
             
-            // Explicitly update the target slot visual to ensure it's correct
+            // Explicitly update the target slot visual to ensure it's correct (preserve source stack count)
             if (targetIndex >= 0 && targetIndex < inventoryManager.inventorySlots.Length && inventoryManager.inventorySlots[targetIndex] != null)
             {
-                inventoryManager.inventorySlots[targetIndex].SetItem(sourceItem, inventoryManager.emptySlotSprite);
+                inventoryManager.inventorySlots[targetIndex].SetItem(sourceItem, inventoryManager.emptySlotSprite, sourceStackCount);
             }
             
             // Handle the source item (coming from hotbar to inventory)
@@ -172,10 +205,10 @@ public class InventorySystem : MonoBehaviour
                 // Swap: Put target item in source inventory slot
                 inventoryManager.SetItem(sourceIndex, targetItem);
                 
-                // Explicitly update the source slot visual to ensure it's correct
+                // Explicitly update the source slot visual to ensure it's correct (preserve target stack count)
                 if (sourceIndex >= 0 && sourceIndex < inventoryManager.inventorySlots.Length && inventoryManager.inventorySlots[sourceIndex] != null)
                 {
-                    inventoryManager.inventorySlots[sourceIndex].SetItem(targetItem, inventoryManager.emptySlotSprite);
+                    inventoryManager.inventorySlots[sourceIndex].SetItem(targetItem, inventoryManager.emptySlotSprite, targetStackCount);
                 }
                 
                 // Handle the target item (coming from hotbar to inventory)
@@ -193,17 +226,17 @@ public class InventorySystem : MonoBehaviour
                 // Explicitly update the slot visual to ensure empty sprite is shown
                 if (inventoryManager.inventorySlots[sourceIndex] != null)
                 {
-                    inventoryManager.inventorySlots[sourceIndex].SetItem(null, inventoryManager.emptySlotSprite);
+                    inventoryManager.inventorySlots[sourceIndex].SetItem(null, inventoryManager.emptySlotSprite, 1);
                 }
             }
             
             // Place source item in target hotbar slot
             hotbarManager.SetItem(targetIndex, sourceItem);
             
-            // Explicitly update the target slot visual to ensure it's correct
+            // Explicitly update the target slot visual to ensure it's correct (preserve source stack count)
             if (targetIndex >= 0 && targetIndex < hotbarManager.hotbarSlots.Length && hotbarManager.hotbarSlots[targetIndex] != null)
             {
-                hotbarManager.hotbarSlots[targetIndex].SetItem(sourceItem, hotbarManager.emptySlotSprite);
+                hotbarManager.hotbarSlots[targetIndex].SetItem(sourceItem, hotbarManager.emptySlotSprite, sourceStackCount);
             }
             
             // Handle the source item (coming from inventory to hotbar)
@@ -227,7 +260,7 @@ public class InventorySystem : MonoBehaviour
                 hotbarManager.hotbarSlots[sourceIndex] != null && 
                 hotbarManager.emptySlotSprite != null)
             {
-                hotbarManager.hotbarSlots[sourceIndex].SetItem(null, hotbarManager.emptySlotSprite);
+                hotbarManager.hotbarSlots[sourceIndex].SetItem(null, hotbarManager.emptySlotSprite, 1);
             }
             // Check if target inventory slot is now empty (shouldn't happen in swap, but check anyway)
             if (targetIndex >= 0 && targetIndex < inventoryManager.inventorySlots.Length && 
@@ -235,7 +268,7 @@ public class InventorySystem : MonoBehaviour
                 inventoryManager.inventorySlots[targetIndex] != null && 
                 inventoryManager.emptySlotSprite != null)
             {
-                inventoryManager.inventorySlots[targetIndex].SetItem(null, inventoryManager.emptySlotSprite);
+                inventoryManager.inventorySlots[targetIndex].SetItem(null, inventoryManager.emptySlotSprite, 1);
             }
         }
         else if (!sourceIsHotbar && targetIsHotbar)
@@ -246,7 +279,7 @@ public class InventorySystem : MonoBehaviour
                 inventoryManager.inventorySlots[sourceIndex] != null && 
                 inventoryManager.emptySlotSprite != null)
             {
-                inventoryManager.inventorySlots[sourceIndex].SetItem(null, inventoryManager.emptySlotSprite);
+                inventoryManager.inventorySlots[sourceIndex].SetItem(null, inventoryManager.emptySlotSprite, 1);
             }
             // Check if target hotbar slot is now empty (shouldn't happen in swap, but check anyway)
             if (targetIndex >= 0 && targetIndex < hotbarManager.hotbarSlots.Length && 
@@ -254,7 +287,7 @@ public class InventorySystem : MonoBehaviour
                 hotbarManager.hotbarSlots[targetIndex] != null && 
                 hotbarManager.emptySlotSprite != null)
             {
-                hotbarManager.hotbarSlots[targetIndex].SetItem(null, hotbarManager.emptySlotSprite);
+                hotbarManager.hotbarSlots[targetIndex].SetItem(null, hotbarManager.emptySlotSprite, 1);
             }
         }
         
@@ -278,7 +311,8 @@ public class InventorySystem : MonoBehaviour
                 hotbarManager.emptySlotSprite != null)
             {
                 GameObject currentItemInSlot = hotbarManager.GetItem(targetIndex);
-                hotbarManager.hotbarSlots[targetIndex].SetItem(currentItemInSlot, hotbarManager.emptySlotSprite);
+                int stackCount = hotbarManager.hotbarSlots[targetIndex].GetStackCount();
+                hotbarManager.hotbarSlots[targetIndex].SetItem(currentItemInSlot, hotbarManager.emptySlotSprite, stackCount);
             }
         }
         
@@ -298,13 +332,14 @@ public class InventorySystem : MonoBehaviour
             inventoryManager.emptySlotSprite != null)
         {
             GameObject currentItemInSlot = inventoryManager.GetItem(slotIndex);
+            int stackCount = inventoryManager.inventorySlots[slotIndex].GetStackCount();
             // Verify slot's currentItem matches manager's data, force sync if needed
             if (inventoryManager.inventorySlots[slotIndex].currentItem != currentItemInSlot)
             {
                 Debug.LogWarning($"[InventorySystem] Slot {slotIndex} currentItem mismatch! Manager has {(currentItemInSlot != null ? currentItemInSlot.name : "null")}, Slot has {(inventoryManager.inventorySlots[slotIndex].currentItem != null ? inventoryManager.inventorySlots[slotIndex].currentItem.name : "null")}. Forcing sync.");
             }
-            // Force update the slot visual with correct data
-            inventoryManager.inventorySlots[slotIndex].SetItem(currentItemInSlot, inventoryManager.emptySlotSprite);
+            // Force update the slot visual with correct data (preserve stack count)
+            inventoryManager.inventorySlots[slotIndex].SetItem(currentItemInSlot, inventoryManager.emptySlotSprite, stackCount);
             Debug.Log($"[InventorySystem] Refreshed inventory slot {slotIndex} with item {(currentItemInSlot != null ? currentItemInSlot.name : "null")}");
         }
     }
@@ -357,11 +392,13 @@ public class InventorySystem : MonoBehaviour
             // We just need to refresh the visual of the slot from its manager's data
             if (isHotbar)
             {
-                itemSlot.SetItem(hotbarManager.GetItem(slotIndex), hotbarManager.emptySlotSprite);
+                int stackCount = hotbarManager.hotbarSlots[slotIndex].GetStackCount();
+                itemSlot.SetItem(hotbarManager.GetItem(slotIndex), hotbarManager.emptySlotSprite, stackCount);
             }
             else
             {
-                itemSlot.SetItem(inventoryManager.GetItem(slotIndex), inventoryManager.emptySlotSprite);
+                int stackCount = inventoryManager.inventorySlots[slotIndex].GetStackCount();
+                itemSlot.SetItem(inventoryManager.GetItem(slotIndex), inventoryManager.emptySlotSprite, stackCount);
             }
         }
 
@@ -381,5 +418,129 @@ public class InventorySystem : MonoBehaviour
             // This logic is primarily handled by ReturnItemToOriginalSlot or successful transfer
         }
         InventorySlot.itemBeingDraggedSlot = null; // Clear the static reference
+    }
+    
+    // Helper methods for stack combining
+    private const int MAX_STACK_SIZE = 12;
+    
+    private bool IsItemStackable(GameObject item)
+    {
+        if (item == null) return false;
+        
+        string itemName = GetItemName(item).ToLower();
+        
+        // Items that are NOT stackable
+        if (itemName.Contains("axe") || itemName.Contains("pickaxe") || 
+            itemName.Contains("bed") || itemName.Contains("campfire"))
+        {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    private string GetItemName(GameObject item)
+    {
+        if (item == null) return "";
+        
+        ItemIconProvider iconProvider = item.GetComponent<ItemIconProvider>();
+        if (iconProvider != null && !string.IsNullOrEmpty(iconProvider.itemName))
+        {
+            return iconProvider.itemName;
+        }
+        
+        string itemName = item.name;
+        if (itemName.Contains("(Clone)"))
+        {
+            itemName = itemName.Replace("(Clone)", "").Trim();
+        }
+        return itemName;
+    }
+    
+    private bool AreItemsSameType(GameObject item1, GameObject item2)
+    {
+        if (item1 == null || item2 == null) return false;
+        
+        string name1 = GetItemName(item1);
+        string name2 = GetItemName(item2);
+        
+        return name1 == name2;
+    }
+    
+    private bool TryCombineStacks(InventorySlot sourceSlot, InventorySlot targetSlot, 
+        GameObject sourceItem, GameObject targetItem, int sourceStackCount, int targetStackCount,
+        int sourceIndex, int targetIndex, bool sourceIsHotbar, bool targetIsHotbar)
+    {
+        int totalCount = sourceStackCount + targetStackCount;
+        
+        if (totalCount <= MAX_STACK_SIZE)
+        {
+            // Can combine fully - merge into target, clear source
+            Debug.Log($"[InventorySystem] Combining stacks fully: {sourceStackCount} + {targetStackCount} = {totalCount}");
+            
+            // Update target slot with combined count
+            if (targetIsHotbar)
+            {
+                hotbarManager.hotbarSlots[targetIndex].SetStackCount(totalCount);
+            }
+            else
+            {
+                inventoryManager.inventorySlots[targetIndex].SetStackCount(totalCount);
+            }
+            
+            // Clear source slot
+            if (sourceIsHotbar)
+            {
+                hotbarManager.SetItem(sourceIndex, null);
+                hotbarManager.hotbarSlots[sourceIndex].SetItem(null, hotbarManager.emptySlotSprite, 1);
+                if (sourceItem != null)
+                {
+                    sourceItem.SetActive(false);
+                }
+            }
+            else
+            {
+                inventoryManager.SetItem(sourceIndex, null);
+                inventoryManager.inventorySlots[sourceIndex].SetItem(null, inventoryManager.emptySlotSprite, 1);
+                if (sourceItem != null)
+                {
+                    sourceItem.SetActive(false);
+                    sourceItem.transform.SetParent(inventoryManager.hiddenItemsParent);
+                }
+            }
+            
+            // If source was destroyed, we don't need to handle it
+            // The target item remains in the target slot
+            
+            return true;
+        }
+        else
+        {
+            // Overflow - fill target to max, put remainder in source
+            int remainder = totalCount - MAX_STACK_SIZE;
+            Debug.Log($"[InventorySystem] Stack overflow: {sourceStackCount} + {targetStackCount} = {totalCount}, putting {MAX_STACK_SIZE} in target, {remainder} remains in source");
+            
+            // Update target slot to max
+            if (targetIsHotbar)
+            {
+                hotbarManager.hotbarSlots[targetIndex].SetStackCount(MAX_STACK_SIZE);
+            }
+            else
+            {
+                inventoryManager.inventorySlots[targetIndex].SetStackCount(MAX_STACK_SIZE);
+            }
+            
+            // Update source slot with remainder
+            if (sourceIsHotbar)
+            {
+                hotbarManager.hotbarSlots[sourceIndex].SetStackCount(remainder);
+            }
+            else
+            {
+                inventoryManager.inventorySlots[sourceIndex].SetStackCount(remainder);
+            }
+            
+            return true;
+        }
     }
 } 

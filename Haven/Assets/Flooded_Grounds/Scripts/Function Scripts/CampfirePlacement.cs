@@ -647,11 +647,45 @@ public class CampfirePlacement : MonoBehaviour
             Debug.Log("CampfirePlacement: Added CampfirePickup component to placed campfire.");
         }
         
-        // Add CampfireFuel component if not already present
-        if (placedCampfire.GetComponent<CampfireFuel>() == null)
+        // Add or copy CampfireFuel component - ensure it has the same recipes as the original
+        CampfireFuel originalFuel = gameObject.GetComponent<CampfireFuel>();
+        CampfireFuel placedFuel = placedCampfire.GetComponent<CampfireFuel>();
+        
+        if (placedFuel == null)
         {
-            placedCampfire.AddComponent<CampfireFuel>();
+            placedFuel = placedCampfire.AddComponent<CampfireFuel>();
             Debug.Log("CampfirePlacement: Added CampfireFuel component to placed campfire.");
+        }
+        
+        // Copy cooking recipes from original campfire if it has them
+        if (originalFuel != null && originalFuel.cookingRecipes != null && originalFuel.cookingRecipes.Length > 0)
+        {
+            placedFuel.cookingRecipes = new CookingRecipe[originalFuel.cookingRecipes.Length];
+            for (int i = 0; i < originalFuel.cookingRecipes.Length; i++)
+            {
+                placedFuel.cookingRecipes[i] = new CookingRecipe
+                {
+                    inputItemName = originalFuel.cookingRecipes[i].inputItemName,
+                    cookedItemPrefab = originalFuel.cookingRecipes[i].cookedItemPrefab,
+                    cookingTime = originalFuel.cookingRecipes[i].cookingTime,
+                    requiresFireLit = originalFuel.cookingRecipes[i].requiresFireLit
+                };
+            }
+            Debug.Log($"CampfirePlacement: Copied {placedFuel.cookingRecipes.Length} cooking recipes to placed campfire.");
+        }
+        
+        // Copy other important settings from original
+        if (originalFuel != null)
+        {
+            placedFuel.maxFuel = originalFuel.maxFuel;
+            placedFuel.fuelPerLog = originalFuel.fuelPerLog;
+            placedFuel.fuelConsumptionRate = originalFuel.fuelConsumptionRate;
+            placedFuel.addWoodSfx = originalFuel.addWoodSfx;
+            placedFuel.fireLitSfx = originalFuel.fireLitSfx;
+            placedFuel.campfireLoopSfx = originalFuel.campfireLoopSfx;
+            placedFuel.cookingStartSfx = originalFuel.cookingStartSfx;
+            placedFuel.cookingCompleteSfx = originalFuel.cookingCompleteSfx;
+            Debug.Log("CampfirePlacement: Copied CampfireFuel settings to placed campfire.");
         }
         
         // Remove CampfirePlacement component from placed campfire (only the held one should have it)

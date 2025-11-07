@@ -32,6 +32,7 @@ public class AutoPickup : MonoBehaviour
     private Dictionary<GameObject, float> pickupCooldowns = new Dictionary<GameObject, float>();
     public HashSet<GameObject> itemsBeingPickedUp = new HashSet<GameObject>(); // Track items currently being picked up (made public for manual pickup check)
     private float lastCheckTime = 0f;
+    private const int MAX_STACK_SIZE = 12; // Maximum stack size for stackable items
     
     // Public method to clear tracking for a dropped item so it can be picked up again
     public void ClearItemTracking(GameObject item)
@@ -337,6 +338,49 @@ public class AutoPickup : MonoBehaviour
         // Mark as being picked up to prevent duplicates (from manual or auto pickup)
         itemsBeingPickedUp.Add(item);
         
+        // Check if item is stackable and if there's an existing stack in hotbar
+        bool isStackable = IsItemStackable(item);
+        int stackableSlot = -1;
+        
+        if (isStackable && hotbarManager != null)
+        {
+            // Look for existing stack of the same item type
+            for (int i = 0; i < hotbarManager.hotbarSlots.Length; i++)
+            {
+                GameObject heldItem = hotbarManager.GetItem(i);
+                if (heldItem != null && AreItemsSameType(heldItem, item))
+                {
+                    InventorySlot slot = hotbarManager.hotbarSlots[i];
+                    if (slot != null && slot.GetStackCount() < MAX_STACK_SIZE)
+                    {
+                        stackableSlot = i;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // If found a stackable slot, add to stack
+        if (stackableSlot != -1)
+        {
+            InventorySlot slot = hotbarManager.hotbarSlots[stackableSlot];
+            int currentStackCount = slot.GetStackCount();
+            slot.SetStackCount(currentStackCount + 1);
+            
+            // Destroy the picked up item since we're stacking
+            Destroy(item);
+            
+            if (showDebugMessages)
+            {
+                Debug.Log($"<color=green>[AutoPickup] ✓ Stacked '{item.name}' in slot {stackableSlot}, new count: {currentStackCount + 1}</color>");
+            }
+            
+            // Remove from tracking
+            itemsBeingPickedUp.Remove(item);
+            pickupCooldowns[item] = Time.time + pickupCooldown;
+            return;
+        }
+        
         // Find empty slot in hotbar
         int emptySlot = -1;
         for (int i = 0; i < hotbarManager.hotbarSlots.Length; i++)
@@ -374,36 +418,71 @@ public class AutoPickup : MonoBehaviour
         }
         else if (inventoryManager != null && hotbarManager != null)
         {
-            // Try inventory if hotbar is full - use TryPickupIntoInventory to properly prepare the item
-            try
+            // Before trying inventory, check if item can stack in inventory
+            bool canStackInInventory = false;
+            if (isStackable && inventoryManager != null)
             {
-                if (hotbarManager.TryPickupIntoInventory(item))
+                // Check for existing stacks in inventory
+                for (int i = 0; i < inventoryManager.inventorySlots.Length; i++)
                 {
-                    if (showDebugMessages)
+                    GameObject invItem = inventoryManager.GetItem(i);
+                    if (invItem != null && AreItemsSameType(invItem, item))
                     {
-                        Debug.Log($"<color=green>[AutoPickup] ✓ Auto-picked up '{item.name}' into inventory (hotbar full)</color>");
+                        InventorySlot invSlot = inventoryManager.inventorySlots[i];
+                        if (invSlot != null && invSlot.GetStackCount() < MAX_STACK_SIZE)
+                        {
+                            // Stack in inventory
+                            int currentStackCount = invSlot.GetStackCount();
+                            invSlot.SetStackCount(currentStackCount + 1);
+                            Destroy(item);
+                            
+                            if (showDebugMessages)
+                            {
+                                Debug.Log($"<color=green>[AutoPickup] ✓ Stacked '{item.name}' in inventory slot {i}, new count: {currentStackCount + 1}</color>");
+                            }
+                            
+                            itemsBeingPickedUp.Remove(item);
+                            pickupCooldowns[item] = Time.time + pickupCooldown;
+                            canStackInInventory = true;
+                            break;
+                        }
                     }
-                    
-                    // Set cooldown
-                    pickupCooldowns[item] = Time.time + pickupCooldown;
-                    
-                    // Remove from tracking after pickup completes
-                    StartCoroutine(RemoveFromTracking(item, true));
-                }
-                else
-                {
-                    // Inventory full - remove from tracking
-                    if (showDebugMessages)
-                    {
-                        Debug.LogWarning($"<color=yellow>[AutoPickup] ⚠ Cannot auto-pickup '{item.name}' - inventory and hotbar are full</color>");
-                    }
-                    itemsBeingPickedUp.Remove(item);
                 }
             }
-            catch (System.Exception e)
+            
+            if (!canStackInInventory)
             {
-                Debug.LogError($"[AutoPickup] Error adding '{item.name}' to inventory: {e.Message}");
-                itemsBeingPickedUp.Remove(item);
+                // Try inventory if hotbar is full - use TryPickupIntoInventory to properly prepare the item
+                try
+                {
+                    if (hotbarManager.TryPickupIntoInventory(item))
+                    {
+                        if (showDebugMessages)
+                        {
+                            Debug.Log($"<color=green>[AutoPickup] ✓ Auto-picked up '{item.name}' into inventory (hotbar full)</color>");
+                        }
+                        
+                        // Set cooldown
+                        pickupCooldowns[item] = Time.time + pickupCooldown;
+                        
+                        // Remove from tracking after pickup completes
+                        StartCoroutine(RemoveFromTracking(item, true));
+                    }
+                    else
+                    {
+                        // Inventory full - remove from tracking
+                        if (showDebugMessages)
+                        {
+                            Debug.LogWarning($"<color=yellow>[AutoPickup] ⚠ Cannot auto-pickup '{item.name}' - inventory and hotbar are full</color>");
+                        }
+                        itemsBeingPickedUp.Remove(item);
+                    }
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogError($"[AutoPickup] Error adding '{item.name}' to inventory: {e.Message}");
+                    itemsBeingPickedUp.Remove(item);
+                }
             }
         }
         else
@@ -430,6 +509,53 @@ public class AutoPickup : MonoBehaviour
         {
             itemsBeingPickedUp.Remove(item);
         }
+    }
+    
+    // Helper method to check if an item is stackable (excludes axe, pickaxe, bed, campfire)
+    private bool IsItemStackable(GameObject item)
+    {
+        if (item == null) return false;
+        
+        string itemName = GetItemName(item).ToLower();
+        
+        // Items that are NOT stackable
+        if (itemName.Contains("axe") || itemName.Contains("pickaxe") || 
+            itemName.Contains("bed") || itemName.Contains("campfire"))
+        {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    // Helper method to get item name (from ItemIconProvider or GameObject name)
+    private string GetItemName(GameObject item)
+    {
+        if (item == null) return "";
+        
+        ItemIconProvider iconProvider = item.GetComponent<ItemIconProvider>();
+        if (iconProvider != null && !string.IsNullOrEmpty(iconProvider.itemName))
+        {
+            return iconProvider.itemName;
+        }
+        
+        string itemName = item.name;
+        if (itemName.Contains("(Clone)"))
+        {
+            itemName = itemName.Replace("(Clone)", "").Trim();
+        }
+        return itemName;
+    }
+    
+    // Helper method to check if two items are the same type
+    private bool AreItemsSameType(GameObject item1, GameObject item2)
+    {
+        if (item1 == null || item2 == null) return false;
+        
+        string name1 = GetItemName(item1);
+        string name2 = GetItemName(item2);
+        
+        return name1 == name2;
     }
     
     void OnDrawGizmosSelected()

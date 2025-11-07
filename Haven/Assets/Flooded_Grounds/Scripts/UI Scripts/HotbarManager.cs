@@ -23,6 +23,7 @@ public class HotbarManager : MonoBehaviour
     private GameObject[] heldItems;
     // private Sprite[] itemIcons; // Item icons will be managed by InventorySlot itself
     public int selectedSlot = 0; // Made public for InventorySystem access
+    private const int MAX_STACK_SIZE = 12; // Maximum stack size for stackable items
 
     private bool _canProcessItemInput = true; // New flag to control item input processing
     private bool _isItemAnimating = false; // NEW: Flag to track if an item animation is playing
@@ -39,7 +40,7 @@ public class HotbarManager : MonoBehaviour
             // Initialize the currentItem and visuals for each hotbar slot
             for (int i = 0; i < hotbarSlots.Length; i++)
             {
-                hotbarSlots[i].SetItem(heldItems[i], emptySlotSprite); // Set to null initially, with empty sprite
+                hotbarSlots[i].SetItem(heldItems[i], emptySlotSprite, 1); // Set to null initially, with empty sprite and stack count 1
             }
             UpdateHotbarUI();
 
@@ -265,7 +266,36 @@ public class HotbarManager : MonoBehaviour
                 autoPickup.itemsBeingPickedUp.Add(itemToPickUp);
             }
 
-			if (slot != -1)
+			// Check if item is stackable and if there's an existing stack in hotbar
+			bool isStackable = IsItemStackable(itemToPickUp);
+			int stackableSlot = -1;
+			
+			if (isStackable)
+			{
+				// Look for existing stack of the same item type
+				for (int i = 0; i < heldItems.Length; i++)
+				{
+					if (heldItems[i] != null && AreItemsSameType(heldItems[i], itemToPickUp))
+					{
+						int currentStackCount = hotbarSlots[i].GetStackCount();
+						if (currentStackCount < MAX_STACK_SIZE)
+						{
+							stackableSlot = i;
+							break;
+						}
+					}
+				}
+			}
+			
+			// Use stackable slot if found, otherwise use empty slot
+			if (stackableSlot != -1)
+			{
+				int currentStackCount = hotbarSlots[stackableSlot].GetStackCount();
+				hotbarSlots[stackableSlot].SetStackCount(currentStackCount + 1);
+				Destroy(itemToPickUp);
+				Debug.Log($"[HotbarManager] TryPickupItem: Stacked {itemToPickUp.name} in slot {stackableSlot}, new count: {currentStackCount + 1}");
+			}
+			else if (slot != -1)
 			{
 				Debug.Log($"Found pickupable: {itemToPickUp.name}, first empty hotbar slot: {slot}");
 				PickupItem(itemToPickUp, slot);
@@ -293,11 +323,79 @@ public class HotbarManager : MonoBehaviour
         return -1;
     }
 
+    // Helper method to check if an item is stackable (excludes axe, pickaxe, bed, campfire)
+    private bool IsItemStackable(GameObject item)
+    {
+        if (item == null) return false;
+        
+        string itemName = GetItemName(item).ToLower();
+        
+        // Items that are NOT stackable
+        if (itemName.Contains("axe") || itemName.Contains("pickaxe") || 
+            itemName.Contains("bed") || itemName.Contains("campfire"))
+        {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    // Helper method to get item name (from ItemIconProvider or GameObject name)
+    private string GetItemName(GameObject item)
+    {
+        if (item == null) return "";
+        
+        ItemIconProvider iconProvider = item.GetComponent<ItemIconProvider>();
+        if (iconProvider != null && !string.IsNullOrEmpty(iconProvider.itemName))
+        {
+            return iconProvider.itemName;
+        }
+        
+        string itemName = item.name;
+        if (itemName.Contains("(Clone)"))
+        {
+            itemName = itemName.Replace("(Clone)", "").Trim();
+        }
+        return itemName;
+    }
+    
+    // Helper method to check if two items are the same type
+    private bool AreItemsSameType(GameObject item1, GameObject item2)
+    {
+        if (item1 == null || item2 == null) return false;
+        
+        string name1 = GetItemName(item1);
+        string name2 = GetItemName(item2);
+        
+        return name1 == name2;
+    }
+
     public void PickupItem(GameObject item, int slot)
     {
         Debug.Log($"Picking up {item.name} into slot {slot}");
+        
+        // Check if item is stackable and if there's already a matching item in this slot
+        bool isStackable = IsItemStackable(item);
+        bool canStack = false;
+        
+        if (isStackable && heldItems[slot] != null && AreItemsSameType(heldItems[slot], item))
+        {
+            int currentStackCount = hotbarSlots[slot].GetStackCount();
+            if (currentStackCount < MAX_STACK_SIZE)
+            {
+                // Add to existing stack
+                hotbarSlots[slot].SetStackCount(currentStackCount + 1);
+                
+                // Destroy the picked up item since we're stacking
+                Destroy(item);
+                Debug.Log($"[HotbarManager] PickupItem: Stacked {item.name} in slot {slot}, new count: {currentStackCount + 1}");
+                return;
+            }
+        }
+        
+        // If not stackable or slot is empty or different item type, place item normally
         heldItems[slot] = item;
-        hotbarSlots[slot].SetItem(item); // Update the InventorySlot with the actual item
+        hotbarSlots[slot].SetItem(item, emptySlotSprite, 1); // Update the InventorySlot with the actual item
 
         // Mark item as DontDestroyOnLoad so it persists across scene loads
         if (item.scene.name != null && item.scene.name != "DontDestroyOnLoad")
@@ -723,13 +821,45 @@ public class HotbarManager : MonoBehaviour
         }
 
         GameObject itemToDrop = heldItems[selectedSlot];
-        Debug.Log($"Dropping {itemToDrop.name} from slot {selectedSlot}");
+        int currentStackCount = hotbarSlots[selectedSlot].GetStackCount();
+        
+        Debug.Log($"Dropping {itemToDrop.name} from slot {selectedSlot} (stack count: {currentStackCount})");
 
-        // Remove from hotbar array
-        heldItems[selectedSlot] = null;
-
-        // Update the hotbar UI to show the slot as empty
-        hotbarSlots[selectedSlot].SetItem(null, emptySlotSprite);
+        // Check if item is stacked
+        if (currentStackCount > 1)
+        {
+            // Create a new instance of the item to drop (one from the stack)
+            GameObject droppedItem = Instantiate(itemToDrop);
+            
+            // Clean up the name (remove "(Clone)" if it gets added)
+            string cleanName = droppedItem.name.Replace("(Clone)", "").Trim();
+            droppedItem.name = cleanName;
+            
+            // Position the dropped item at the player's position + forward
+            Camera cam = Camera.main;
+            if (cam != null)
+            {
+                droppedItem.transform.position = cam.transform.position + cam.transform.forward * 1.5f;
+                droppedItem.transform.rotation = Quaternion.identity;
+            }
+            
+            // Ensure the dropped item is active
+            droppedItem.SetActive(true);
+            
+            // Decrement stack count
+            hotbarSlots[selectedSlot].SetStackCount(currentStackCount - 1);
+            
+            // The original item stays in the slot, just with reduced stack count
+            itemToDrop = droppedItem; // Use the new instance for dropping
+            
+            Debug.Log($"Dropped one item from stack. Remaining stack count: {currentStackCount - 1}");
+        }
+        else
+        {
+            // Stack count is 1, so drop the entire item and clear the slot
+            heldItems[selectedSlot] = null;
+            hotbarSlots[selectedSlot].SetItem(null, emptySlotSprite, 1);
+        }
 
         // Ensure the item name display is updated after dropping
         UpdateSelectedItemNameDisplay();
@@ -792,7 +922,9 @@ public class HotbarManager : MonoBehaviour
     {
         for (int i = 0; i < hotbarSlots.Length; i++)
         {
-            hotbarSlots[i].SetItem(heldItems[i], emptySlotSprite); // Ensure currentItem and visual are in sync
+            // Preserve stack count when updating UI
+            int stackCount = hotbarSlots[i].GetStackCount();
+            hotbarSlots[i].SetItem(heldItems[i], emptySlotSprite, stackCount); // Ensure currentItem and visual are in sync
         }
     }
 
@@ -821,7 +953,18 @@ public class HotbarManager : MonoBehaviour
         {
             Debug.Log($"[HotbarManager] SetItem: Setting item {(item != null ? item.name : "null")} at index {index}");
             heldItems[index] = item;
-            hotbarSlots[index].SetItem(item, emptySlotSprite); // Update the slot's visual and currentItem
+            
+            // Preserve stack count if item is the same, otherwise reset to 1
+            int currentStackCount = hotbarSlots[index].GetStackCount();
+            if (item != null && hotbarSlots[index].GetItem() != null && 
+                AreItemsSameType(item, hotbarSlots[index].GetItem()))
+            {
+                hotbarSlots[index].SetItem(item, emptySlotSprite, currentStackCount);
+            }
+            else
+            {
+                hotbarSlots[index].SetItem(item, emptySlotSprite, 1);
+            }
             // Parenting and activation will be handled by SelectSlot for equipped items, or InventorySystem for transfers
         }
         else
@@ -857,7 +1000,7 @@ public class HotbarManager : MonoBehaviour
             itemToClear.transform.SetParent(null);
 
             heldItems[selectedSlot] = null; // Clear the item from the array
-            hotbarSlots[selectedSlot].SetItem(null, emptySlotSprite); // Update UI to empty
+            hotbarSlots[selectedSlot].SetItem(null, emptySlotSprite, 1); // Update UI to empty
             _currentHeldItemAnimator = null; // Clear animator reference
 
             // Ensure the item name display is updated after clearing the slot

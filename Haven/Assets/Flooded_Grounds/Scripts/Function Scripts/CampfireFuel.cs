@@ -188,12 +188,16 @@ public class CampfireFuel : MonoBehaviour
         audioObj.transform.SetParent(transform);
         audioObj.transform.localPosition = Vector3.zero;
         
+        // Ensure the audio object is active
+        audioObj.SetActive(true);
+        
         sfxSource = audioObj.AddComponent<AudioSource>();
         sfxSource.playOnAwake = false;
         sfxSource.spatialBlend = 1f; // 3D sound
         sfxSource.minDistance = 5f;
         sfxSource.maxDistance = 20f;
         sfxSource.rolloffMode = AudioRolloffMode.Logarithmic;
+        sfxSource.enabled = true;
         
         Debug.Log("CampfireFuel: Created audio source automatically.");
     }
@@ -205,6 +209,9 @@ public class CampfireFuel : MonoBehaviour
         audioObj.transform.SetParent(transform);
         audioObj.transform.localPosition = Vector3.zero;
         
+        // Ensure the audio object is active
+        audioObj.SetActive(true);
+        
         loopSource = audioObj.AddComponent<AudioSource>();
         loopSource.playOnAwake = false;
         loopSource.loop = true; // Enable looping
@@ -212,6 +219,7 @@ public class CampfireFuel : MonoBehaviour
         loopSource.minDistance = 5f;
         loopSource.maxDistance = 25f; // Slightly further range for ambient sound
         loopSource.rolloffMode = AudioRolloffMode.Logarithmic;
+        loopSource.enabled = true;
         
         Debug.Log("CampfireFuel: Created loop audio source automatically.");
     }
@@ -225,6 +233,8 @@ public class CampfireFuel : MonoBehaviour
             contactCheckTimer = 0f;
             CheckForWoodContact();
             CheckForCookableItems(); // Also check for cookable items
+            CheckForWoodFromInventory(); // Check for wood being used from inventory/hotbar
+            CheckForCookableItemsFromInventory(); // Check for cookable items being used from inventory/hotbar
         }
         
         // Also check on mouse release (for drag-and-drop)
@@ -562,9 +572,320 @@ public class CampfireFuel : MonoBehaviour
     
     void PlayAddWoodSfx()
     {
+        if (sfxSource == null)
+        {
+            Debug.LogWarning("CampfireFuel: PlayAddWoodSfx - sfxSource is null! Creating audio source...");
+            CreateAudioSource();
+        }
+        
         if (sfxSource != null && addWoodSfx != null)
         {
+            // Ensure audio source is active and enabled
+            if (!sfxSource.gameObject.activeInHierarchy)
+            {
+                sfxSource.gameObject.SetActive(true);
+            }
+            
+            if (!sfxSource.enabled)
+            {
+                sfxSource.enabled = true;
+            }
+            
             sfxSource.PlayOneShot(addWoodSfx, addWoodSfxVolume);
+            Debug.Log($"CampfireFuel: Playing add wood sound - sfxSource: {(sfxSource != null ? "exists" : "null")}, clip: {(addWoodSfx != null ? addWoodSfx.name : "null")}, volume: {addWoodSfxVolume}");
+        }
+        else
+        {
+            Debug.LogWarning($"CampfireFuel: Cannot play add wood sound - sfxSource: {(sfxSource != null ? "exists" : "null")}, addWoodSfx: {(addWoodSfx != null ? "exists" : "null")}");
+        }
+    }
+    
+    void CheckForWoodFromInventory()
+    {
+        // Check if player is near campfire and has wood selected in hotbar/inventory
+        if (playerCamera == null) return;
+        
+        // Check distance to player
+        float playerDistance = Vector3.Distance(transform.position, playerCamera.transform.position);
+        if (playerDistance > interactionRange) return;
+        
+        // Check if player is looking at the campfire (raycast check)
+        RaycastHit hit;
+        Vector3 rayOrigin = playerCamera.transform.position;
+        Vector3 rayDirection = playerCamera.transform.forward;
+        
+        bool lookingAtCampfire = false;
+        if (Physics.Raycast(rayOrigin, rayDirection, out hit, interactionRange))
+        {
+            if (hit.collider.gameObject == gameObject || hit.collider.transform.IsChildOf(transform))
+            {
+                lookingAtCampfire = true;
+            }
+        }
+        
+        // Check if player clicked while near campfire and looking at it
+        if (Input.GetMouseButtonDown(0) && lookingAtCampfire)
+        {
+            // Check hotbar first
+            HotbarManager hotbarManager = FindObjectOfType<HotbarManager>();
+            if (hotbarManager != null && hotbarManager.GetItem(hotbarManager.selectedSlot) != null)
+            {
+                GameObject heldItem = hotbarManager.GetItem(hotbarManager.selectedSlot);
+                if (IsWoodItem(heldItem))
+                {
+                    // Consume one wood from stack
+                    InventorySlot slot = hotbarManager.hotbarSlots[hotbarManager.selectedSlot];
+                    int stackCount = slot.GetStackCount();
+                    
+                    if (stackCount > 1)
+                    {
+                        // Decrement stack count
+                        slot.SetStackCount(stackCount - 1);
+                    }
+                    else
+                    {
+                        // Remove item if stack is 1
+                        hotbarManager.SetItem(hotbarManager.selectedSlot, null);
+                        Destroy(heldItem);
+                    }
+                    
+                    // Add fuel directly (this will play the sound)
+                    AddFuelDirectly();
+                    hotbarManager.UpdateHotbarUI();
+                    return;
+                }
+            }
+            
+            // Check inventory
+            InventoryManager inventoryManager = FindObjectOfType<InventoryManager>();
+            if (inventoryManager != null)
+            {
+                for (int i = 0; i < inventoryManager.inventorySlots.Length; i++)
+                {
+                    GameObject invItem = inventoryManager.GetItem(i);
+                    if (invItem != null && IsWoodItem(invItem))
+                    {
+                        // Consume one wood from stack
+                        InventorySlot slot = inventoryManager.inventorySlots[i];
+                        int stackCount = slot.GetStackCount();
+                        
+                        if (stackCount > 1)
+                        {
+                            // Decrement stack count
+                            slot.SetStackCount(stackCount - 1);
+                        }
+                        else
+                        {
+                            // Remove item if stack is 1
+                            inventoryManager.RemoveItem(i);
+                            Destroy(invItem);
+                        }
+                        
+                        // Add fuel directly (this will play the sound)
+                        AddFuelDirectly();
+                        inventoryManager.UpdateInventoryUI();
+                        return;
+                    }
+                }
+            }
+        }
+    }
+    
+    void AddFuelDirectly()
+    {
+        // Add fuel without a wood object (for inventory/hotbar usage)
+        currentFuel = Mathf.Min(currentFuel + fuelPerLog, maxFuel);
+        
+        // Play sound effect when wood is added
+        PlayAddWoodSfx();
+        
+        // Light the fire if it's the first log
+        if (!isLit && currentFuel > 0f)
+        {
+            SetLitState(true);
+        }
+        
+        // Update fuel bar
+        UpdateFuelBar();
+        
+        Debug.Log($"CampfireFuel: Added {fuelPerLog} fuel from inventory/hotbar. Current fuel: {currentFuel}%");
+    }
+    
+    void CheckForCookableItemsFromInventory()
+    {
+        // Check if player is near campfire and has a cookable item selected in hotbar/inventory
+        if (playerCamera == null) return;
+        
+        // Check distance to player
+        float playerDistance = Vector3.Distance(transform.position, playerCamera.transform.position);
+        if (playerDistance > interactionRange) return;
+        
+        // Check if player is looking at the campfire (raycast check)
+        RaycastHit hit;
+        Vector3 rayOrigin = playerCamera.transform.position;
+        Vector3 rayDirection = playerCamera.transform.forward;
+        
+        bool lookingAtCampfire = false;
+        if (Physics.Raycast(rayOrigin, rayDirection, out hit, interactionRange))
+        {
+            if (hit.collider.gameObject == gameObject || hit.collider.transform.IsChildOf(transform))
+            {
+                lookingAtCampfire = true;
+            }
+        }
+        
+        // Check if player clicked while near campfire and looking at it
+        if (Input.GetMouseButtonDown(0) && lookingAtCampfire && isLit)
+        {
+            // Check hotbar first
+            HotbarManager hotbarManager = FindObjectOfType<HotbarManager>();
+            if (hotbarManager != null && hotbarManager.GetItem(hotbarManager.selectedSlot) != null)
+            {
+                GameObject heldItem = hotbarManager.GetItem(hotbarManager.selectedSlot);
+                CookingRecipe recipe = GetCookingRecipe(heldItem);
+                
+                if (recipe != null)
+                {
+                    // Check if fire needs to be lit
+                    if (recipe.requiresFireLit && !isLit)
+                        return;
+                    
+                    // Create an instance of the item near the campfire to cook it
+                    GameObject itemToCook = Instantiate(heldItem);
+                    itemToCook.transform.position = transform.position + Vector3.up * 0.5f; // Slightly above campfire
+                    itemToCook.transform.rotation = Quaternion.identity;
+                    
+                    // Enable the item and make it visible
+                    itemToCook.SetActive(true);
+                    
+                    // Enable colliders so it can be detected
+                    Collider[] colliders = itemToCook.GetComponentsInChildren<Collider>();
+                    foreach (Collider col in colliders)
+                    {
+                        if (col != null)
+                            col.enabled = true;
+                    }
+                    
+                    // Add Rigidbody if it doesn't have one (might be needed for physics)
+                    Rigidbody rb = itemToCook.GetComponent<Rigidbody>();
+                    if (rb == null)
+                    {
+                        rb = itemToCook.AddComponent<Rigidbody>();
+                        rb.isKinematic = true; // Make it stationary while cooking
+                    }
+                    else
+                    {
+                        rb.isKinematic = true;
+                    }
+                    
+                    // Set layer to be detectable
+                    itemToCook.layer = LayerMask.NameToLayer("Default");
+                    foreach (Transform child in itemToCook.GetComponentsInChildren<Transform>())
+                    {
+                        child.gameObject.layer = LayerMask.NameToLayer("Default");
+                    }
+                    
+                    // Start cooking the item
+                    StartCookingItem(itemToCook, recipe);
+                    
+                    // Consume one item from stack
+                    InventorySlot slot = hotbarManager.hotbarSlots[hotbarManager.selectedSlot];
+                    int stackCount = slot.GetStackCount();
+                    
+                    if (stackCount > 1)
+                    {
+                        // Decrement stack count
+                        slot.SetStackCount(stackCount - 1);
+                    }
+                    else
+                    {
+                        // Remove item if stack is 1
+                        hotbarManager.SetItem(hotbarManager.selectedSlot, null);
+                        Destroy(heldItem);
+                    }
+                    
+                    hotbarManager.UpdateHotbarUI();
+                    return;
+                }
+            }
+            
+            // Check inventory
+            InventoryManager inventoryManager = FindObjectOfType<InventoryManager>();
+            if (inventoryManager != null)
+            {
+                for (int i = 0; i < inventoryManager.inventorySlots.Length; i++)
+                {
+                    GameObject invItem = inventoryManager.GetItem(i);
+                    if (invItem != null)
+                    {
+                        CookingRecipe recipe = GetCookingRecipe(invItem);
+                        
+                        if (recipe != null)
+                        {
+                            // Check if fire needs to be lit
+                            if (recipe.requiresFireLit && !isLit)
+                                continue;
+                            
+                            // Create an instance of the item near the campfire to cook it
+                            GameObject itemToCook = Instantiate(invItem);
+                            itemToCook.transform.position = transform.position + Vector3.up * 0.5f; // Slightly above campfire
+                            itemToCook.transform.rotation = Quaternion.identity;
+                            
+                            // Enable the item and make it visible
+                            itemToCook.SetActive(true);
+                            
+                            // Enable colliders so it can be detected
+                            Collider[] colliders = itemToCook.GetComponentsInChildren<Collider>();
+                            foreach (Collider col in colliders)
+                            {
+                                if (col != null)
+                                    col.enabled = true;
+                            }
+                            
+                            // Add Rigidbody if it doesn't have one (might be needed for physics)
+                            Rigidbody rb = itemToCook.GetComponent<Rigidbody>();
+                            if (rb == null)
+                            {
+                                rb = itemToCook.AddComponent<Rigidbody>();
+                                rb.isKinematic = true; // Make it stationary while cooking
+                            }
+                            else
+                            {
+                                rb.isKinematic = true;
+                            }
+                            
+                            // Set layer to be detectable
+                            itemToCook.layer = LayerMask.NameToLayer("Default");
+                            foreach (Transform child in itemToCook.GetComponentsInChildren<Transform>())
+                            {
+                                child.gameObject.layer = LayerMask.NameToLayer("Default");
+                            }
+                            
+                            // Start cooking the item
+                            StartCookingItem(itemToCook, recipe);
+                            
+                            // Consume one item from stack
+                            InventorySlot slot = inventoryManager.inventorySlots[i];
+                            int stackCount = slot.GetStackCount();
+                            
+                            if (stackCount > 1)
+                            {
+                                // Decrement stack count
+                                slot.SetStackCount(stackCount - 1);
+                            }
+                            else
+                            {
+                                // Remove item if stack is 1
+                                inventoryManager.RemoveItem(i);
+                                Destroy(invItem);
+                            }
+                            
+                            inventoryManager.UpdateInventoryUI();
+                            return;
+                        }
+                    }
+                }
+            }
         }
     }
     
@@ -743,9 +1064,31 @@ public class CampfireFuel : MonoBehaviour
         itemsBeingCooked.Add(cookingItem);
         
         // Play cooking start sound
+        if (sfxSource == null)
+        {
+            Debug.LogWarning("CampfireFuel: StartCookingItem - sfxSource is null! Creating audio source...");
+            CreateAudioSource();
+        }
+        
         if (sfxSource != null && cookingStartSfx != null)
         {
+            // Ensure audio source is active and enabled
+            if (!sfxSource.gameObject.activeInHierarchy)
+            {
+                sfxSource.gameObject.SetActive(true);
+            }
+            
+            if (!sfxSource.enabled)
+            {
+                sfxSource.enabled = true;
+            }
+            
             sfxSource.PlayOneShot(cookingStartSfx, cookingSfxVolume);
+            Debug.Log($"CampfireFuel: Playing cooking start sound");
+        }
+        else
+        {
+            Debug.LogWarning($"CampfireFuel: Cannot play cooking start sound - sfxSource: {(sfxSource != null ? "exists" : "null")}, cookingStartSfx: {(cookingStartSfx != null ? "exists" : "null")}");
         }
         
         Debug.Log($"<color=yellow>CampfireFuel: Started cooking '{item.name}' -> '{recipe.cookedItemPrefab.name}' (cooking time: {recipe.cookingTime}s)</color>");
@@ -857,9 +1200,31 @@ public class CampfireFuel : MonoBehaviour
         }
         
         // Play cooking complete sound
+        if (sfxSource == null)
+        {
+            Debug.LogWarning("CampfireFuel: CompleteCooking - sfxSource is null! Creating audio source...");
+            CreateAudioSource();
+        }
+        
         if (sfxSource != null && cookingCompleteSfx != null)
         {
+            // Ensure audio source is active and enabled
+            if (!sfxSource.gameObject.activeInHierarchy)
+            {
+                sfxSource.gameObject.SetActive(true);
+            }
+            
+            if (!sfxSource.enabled)
+            {
+                sfxSource.enabled = true;
+            }
+            
             sfxSource.PlayOneShot(cookingCompleteSfx, cookingSfxVolume);
+            Debug.Log($"CampfireFuel: Playing cooking complete sound");
+        }
+        else
+        {
+            Debug.LogWarning($"CampfireFuel: Cannot play cooking complete sound - sfxSource: {(sfxSource != null ? "exists" : "null")}, cookingCompleteSfx: {(cookingCompleteSfx != null ? "exists" : "null")}");
         }
         
         // Store reference to item for cleanup
@@ -949,22 +1314,66 @@ public class CampfireFuel : MonoBehaviour
     
     void PlayFireLitSfx()
     {
+        if (sfxSource == null)
+        {
+            Debug.LogWarning("CampfireFuel: PlayFireLitSfx - sfxSource is null! Creating audio source...");
+            CreateAudioSource();
+        }
+        
         if (sfxSource != null && fireLitSfx != null)
         {
+            // Ensure audio source is active and enabled
+            if (!sfxSource.gameObject.activeInHierarchy)
+            {
+                sfxSource.gameObject.SetActive(true);
+            }
+            
+            if (!sfxSource.enabled)
+            {
+                sfxSource.enabled = true;
+            }
+            
             sfxSource.PlayOneShot(fireLitSfx, fireLitSfxVolume);
+            Debug.Log($"CampfireFuel: Playing fire lit sound - sfxSource: {(sfxSource != null ? "exists" : "null")}, clip: {(fireLitSfx != null ? fireLitSfx.name : "null")}");
+        }
+        else
+        {
+            Debug.LogWarning($"CampfireFuel: Cannot play fire lit sound - sfxSource: {(sfxSource != null ? "exists" : "null")}, fireLitSfx: {(fireLitSfx != null ? "exists" : "null")}");
         }
     }
     
     void StartCampfireLoop()
     {
+        if (loopSource == null)
+        {
+            Debug.LogWarning("CampfireFuel: StartCampfireLoop - loopSource is null! Creating audio source...");
+            CreateLoopAudioSource();
+        }
+        
         if (loopSource != null && campfireLoopSfx != null)
         {
+            // Ensure audio source is active and enabled
+            if (!loopSource.gameObject.activeInHierarchy)
+            {
+                loopSource.gameObject.SetActive(true);
+            }
+            
+            if (!loopSource.enabled)
+            {
+                loopSource.enabled = true;
+            }
+            
             if (!loopSource.isPlaying)
             {
                 loopSource.clip = campfireLoopSfx;
                 loopSource.volume = campfireLoopVolume;
                 loopSource.Play();
+                Debug.Log($"CampfireFuel: Started campfire loop sound");
             }
+        }
+        else
+        {
+            Debug.LogWarning($"CampfireFuel: Cannot play campfire loop sound - loopSource: {(loopSource != null ? "exists" : "null")}, campfireLoopSfx: {(campfireLoopSfx != null ? "exists" : "null")}");
         }
     }
     
@@ -973,6 +1382,7 @@ public class CampfireFuel : MonoBehaviour
         if (loopSource != null && loopSource.isPlaying)
         {
             loopSource.Stop();
+            Debug.Log($"CampfireFuel: Stopped campfire loop sound");
         }
     }
     

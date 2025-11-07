@@ -1,14 +1,17 @@
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using TMPro;
 
 public class InventorySlot : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IDropHandler
 {
     public Image itemImage; // The Image component that displays the item's icon (should be a child of this slot)
     public Slider durabilitySlider; // Optional: Slider to show item durability (should be a child of this slot)
     public Image durabilityFillImage; // Optional: Fill image for durability slider color changes
+    public TextMeshProUGUI stackCountText; // Optional: Text to display stack count (should be a child of this slot)
     public static InventorySlot itemBeingDraggedSlot; 
     public GameObject currentItem; // The actual GameObject representing the item in this slot
+    public int stackCount = 1; // Number of items in this stack (1 means single item, >1 means stack)
 
     private RectTransform rectTransform;
     private Canvas canvas;
@@ -53,10 +56,22 @@ public class InventorySlot : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             }
         }
         
+        // Try to find stack count text if not assigned
+        if (stackCountText == null)
+        {
+            stackCountText = GetComponentInChildren<TextMeshProUGUI>();
+        }
+        
         // Initially hide durability slider
         if (durabilitySlider != null)
         {
             durabilitySlider.gameObject.SetActive(false);
+        }
+        
+        // Initially hide stack count text
+        if (stackCountText != null)
+        {
+            stackCountText.gameObject.SetActive(false);
         }
     }
     
@@ -64,6 +79,9 @@ public class InventorySlot : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     {
         // Update durability slider if item has durability
         UpdateDurabilitySlider();
+        
+        // Update stack count display
+        UpdateStackCountDisplay();
     }
     
     // Update the durability slider based on current item's durability
@@ -106,6 +124,30 @@ public class InventorySlot : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
             if (durabilitySlider.gameObject.activeSelf)
             {
                 durabilitySlider.gameObject.SetActive(false);
+            }
+        }
+    }
+    
+    // Update the stack count display
+    private void UpdateStackCountDisplay()
+    {
+        if (stackCountText == null) return;
+        
+        if (currentItem != null && stackCount > 1)
+        {
+            // Show stack count text if stack is greater than 1
+            if (!stackCountText.gameObject.activeSelf)
+            {
+                stackCountText.gameObject.SetActive(true);
+            }
+            stackCountText.text = stackCount.ToString();
+        }
+        else
+        {
+            // Hide stack count text if single item or no item
+            if (stackCountText.gameObject.activeSelf)
+            {
+                stackCountText.gameObject.SetActive(false);
             }
         }
     }
@@ -225,9 +267,10 @@ public class InventorySlot : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
     }
 
     // Public method to set the item for this slot
-    public void SetItem(GameObject item, Sprite emptySlotDefaultSprite = null)
+    public void SetItem(GameObject item, Sprite emptySlotDefaultSprite = null, int count = 1)
     {
         currentItem = item;
+        stackCount = count;
         
         // Check if item has durability component (check item and its children)
         if (item != null)
@@ -242,6 +285,7 @@ public class InventorySlot : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         else
         {
             currentItemDurability = null;
+            stackCount = 1; // Reset stack count when item is null
         }
         
         if (itemImage != null)
@@ -276,11 +320,27 @@ public class InventorySlot : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         
         // Update durability slider immediately
         UpdateDurabilitySlider();
+        
+        // Update stack count display immediately
+        UpdateStackCountDisplay();
     }
 
     // Public method to get the item from this slot
     public GameObject GetItem()
     {
         return currentItem;
+    }
+    
+    // Public method to get the stack count
+    public int GetStackCount()
+    {
+        return stackCount;
+    }
+    
+    // Public method to set the stack count
+    public void SetStackCount(int count)
+    {
+        stackCount = count;
+        UpdateStackCountDisplay();
     }
 } 

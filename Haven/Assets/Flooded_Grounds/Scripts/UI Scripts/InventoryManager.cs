@@ -10,6 +10,7 @@ public class InventoryManager : MonoBehaviour
     public Transform hiddenItemsParent; // Assign an empty GameObject as a parent for inactive items
 
     private GameObject[] inventoryItems; // Stores the actual item GameObjects
+    private const int MAX_STACK_SIZE = 12; // Maximum stack size for stackable items
 
     // Start is called before the first frame update
     void Start()
@@ -48,21 +49,96 @@ public class InventoryManager : MonoBehaviour
 
         for (int i = 0; i < inventorySlots.Length; i++)
         {
-            // Ensure currentItem and visual are in sync
-            inventorySlots[i].SetItem(inventoryItems[i], emptySlotSprite);
+            // Ensure currentItem and visual are in sync, preserve stack count
+            int stackCount = inventorySlots[i].GetStackCount();
+            inventorySlots[i].SetItem(inventoryItems[i], emptySlotSprite, stackCount);
         }
     }
 
-    // Public method to add an item to the inventory
+    // Helper method to check if an item is stackable (excludes axe, pickaxe, bed, campfire)
+    private bool IsItemStackable(GameObject item)
+    {
+        if (item == null) return false;
+        
+        string itemName = GetItemName(item).ToLower();
+        
+        // Items that are NOT stackable
+        if (itemName.Contains("axe") || itemName.Contains("pickaxe") || 
+            itemName.Contains("bed") || itemName.Contains("campfire"))
+        {
+            return false;
+        }
+        
+        return true;
+    }
+    
+    // Helper method to get item name (from ItemIconProvider or GameObject name)
+    private string GetItemName(GameObject item)
+    {
+        if (item == null) return "";
+        
+        ItemIconProvider iconProvider = item.GetComponent<ItemIconProvider>();
+        if (iconProvider != null && !string.IsNullOrEmpty(iconProvider.itemName))
+        {
+            return iconProvider.itemName;
+        }
+        
+        string itemName = item.name;
+        if (itemName.Contains("(Clone)"))
+        {
+            itemName = itemName.Replace("(Clone)", "").Trim();
+        }
+        return itemName;
+    }
+    
+    // Helper method to check if two items are the same type
+    private bool AreItemsSameType(GameObject item1, GameObject item2)
+    {
+        if (item1 == null || item2 == null) return false;
+        
+        string name1 = GetItemName(item1);
+        string name2 = GetItemName(item2);
+        
+        return name1 == name2;
+    }
+    
+    // Public method to add an item to the inventory (with stacking support)
     public bool AddItem(GameObject itemToAdd)
     {
         Debug.Log($"[InventoryManager] AddItem: Attempting to add item {itemToAdd.name}");
+        
+        // Check if item is stackable
+        bool isStackable = IsItemStackable(itemToAdd);
+        
+        if (isStackable)
+        {
+            // Try to add to existing stack first
+            for (int i = 0; i < inventoryItems.Length; i++)
+            {
+                if (inventoryItems[i] != null && AreItemsSameType(inventoryItems[i], itemToAdd))
+                {
+                    int currentStackCount = inventorySlots[i].GetStackCount();
+                    if (currentStackCount < MAX_STACK_SIZE)
+                    {
+                        // Add to existing stack
+                        inventorySlots[i].SetStackCount(currentStackCount + 1);
+                        
+                        // Destroy the picked up item since we're stacking
+                        Destroy(itemToAdd);
+                        Debug.Log($"[InventoryManager] AddItem: Stacked {itemToAdd.name} in slot {i}, new count: {currentStackCount + 1}");
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        // If not stackable or no existing stack found, add to empty slot
         for (int i = 0; i < inventoryItems.Length; i++)
         {
             if (inventoryItems[i] == null)
             {
                 inventoryItems[i] = itemToAdd;
-                inventorySlots[i].SetItem(itemToAdd); // Update the InventorySlot with the actual item
+                inventorySlots[i].SetItem(itemToAdd, emptySlotSprite, 1); // Set stack count to 1
                 
                 // Mark item as DontDestroyOnLoad so it persists across scene loads
                 if (itemToAdd.scene.name != null && itemToAdd.scene.name != "DontDestroyOnLoad")
@@ -71,14 +147,6 @@ public class InventoryManager : MonoBehaviour
                     Debug.Log($"[InventoryManager] AddItem: Marked {itemToAdd.name} as DontDestroyOnLoad");
                 }
                 
-                // Parenting and deactivation will be handled by InventorySystem for transfers
-                // if (itemToAdd != null)
-                // {
-                //     itemToAdd.transform.SetParent(hiddenItemsParent);
-                //     itemToAdd.transform.localPosition = Vector3.zero;
-                //     itemToAdd.transform.localRotation = Quaternion.identity;
-                //     itemToAdd.SetActive(false);
-                // }
                 Debug.Log($"[InventoryManager] AddItem: Successfully added {itemToAdd.name} to slot {i}");
                 return true; // Item added successfully
             }
@@ -126,7 +194,18 @@ public class InventoryManager : MonoBehaviour
         {
             Debug.Log($"[InventoryManager] SetItem: Setting item {(item != null ? item.name : "null")} at index {index}");
             inventoryItems[index] = item;
-            inventorySlots[index].SetItem(item, emptySlotSprite); // Update the slot's visual and currentItem
+            
+            // Preserve stack count if item is the same, otherwise reset to 1
+            int currentStackCount = inventorySlots[index].GetStackCount();
+            if (item != null && inventorySlots[index].GetItem() != null && 
+                AreItemsSameType(item, inventorySlots[index].GetItem()))
+            {
+                inventorySlots[index].SetItem(item, emptySlotSprite, currentStackCount);
+            }
+            else
+            {
+                inventorySlots[index].SetItem(item, emptySlotSprite, 1);
+            }
 
             // Parenting and deactivation will be handled by InventorySystem for transfers
             // if (item != null)

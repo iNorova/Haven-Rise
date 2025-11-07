@@ -94,17 +94,26 @@ namespace Haven.CraftingUI
 			if (string.IsNullOrEmpty(targetName)) return 0;
 			int count = 0;
 			// Inventory
-			for (int i = 0; ; i++)
+			for (int i = 0; i < GetInventoryLength(); i++)
 			{
 				var go = inventoryManager.GetItem(i);
-				if (go == null && i >= GetInventoryLength() - 1) break;
-				if (go != null && MatchesName(go, targetName)) count++;
+				if (go != null && MatchesName(go, targetName))
+				{
+					// Add stack count instead of just 1
+					int stackCount = inventoryManager.inventorySlots[i].GetStackCount();
+					count += stackCount;
+				}
 			}
 			// Hotbar
 			for (int i = 0; i < hotbarManager.hotbarSlots.Length; i++)
 			{
 				var go = hotbarManager.GetItem(i);
-				if (go != null && MatchesName(go, targetName)) count++;
+				if (go != null && MatchesName(go, targetName))
+				{
+					// Add stack count instead of just 1
+					int stackCount = hotbarManager.hotbarSlots[i].GetStackCount();
+					count += stackCount;
+				}
 			}
 			return count;
 		}
@@ -117,9 +126,23 @@ namespace Haven.CraftingUI
 				var go = inventoryManager.GetItem(i);
 				if (go != null && MatchesName(go, targetName))
 				{
-					var removed = inventoryManager.RemoveItem(i);
-					if (removed != null) Destroy(removed);
-					consumed++;
+					InventorySlot slot = inventoryManager.inventorySlots[i];
+					int stackCount = slot.GetStackCount();
+					int toConsumeFromStack = Mathf.Min(stackCount, quantity - consumed);
+					
+					if (toConsumeFromStack >= stackCount)
+					{
+						// Consume entire stack - remove item
+						var removed = inventoryManager.RemoveItem(i);
+						if (removed != null) Destroy(removed);
+						consumed += stackCount;
+					}
+					else
+					{
+						// Consume part of stack - decrement stack count
+						slot.SetStackCount(stackCount - toConsumeFromStack);
+						consumed += toConsumeFromStack;
+					}
 				}
 			}
 			return consumed;
@@ -133,10 +156,23 @@ namespace Haven.CraftingUI
 				var go = hotbarManager.GetItem(i);
 				if (go != null && MatchesName(go, targetName))
 				{
-					// Remove from hotbar and destroy instance
-					hotbarManager.SetItem(i, null);
-					Destroy(go);
-					consumed++;
+					InventorySlot slot = hotbarManager.hotbarSlots[i];
+					int stackCount = slot.GetStackCount();
+					int toConsumeFromStack = Mathf.Min(stackCount, quantity - consumed);
+					
+					if (toConsumeFromStack >= stackCount)
+					{
+						// Consume entire stack - remove item
+						hotbarManager.SetItem(i, null);
+						Destroy(go);
+						consumed += stackCount;
+					}
+					else
+					{
+						// Consume part of stack - decrement stack count
+						slot.SetStackCount(stackCount - toConsumeFromStack);
+						consumed += toConsumeFromStack;
+					}
 				}
 			}
 			return consumed;
