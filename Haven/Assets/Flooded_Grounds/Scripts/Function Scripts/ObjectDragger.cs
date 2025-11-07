@@ -248,12 +248,19 @@ public class ObjectDragger : MonoBehaviour
             return true;
         }
         
+        // Exclude chests from dragging (treat as placed/non-draggable)
+        if (obj.GetComponent<ChestInteraction>() != null)
+        {
+            return true;
+        }
+        
         // Also check parent objects (in case the pickup component is on a parent)
         Transform parent = obj.transform.parent;
         while (parent != null)
         {
             if (parent.GetComponent<CampfirePickup>() != null || 
-                parent.GetComponent<BedPickup>() != null)
+                parent.GetComponent<BedPickup>() != null ||
+                parent.GetComponent<ChestInteraction>() != null)
             {
                 return true;
             }
