@@ -23,6 +23,10 @@ public class ChestInteraction : MonoBehaviour
 	public AudioClip closeSfx;
 	[Range(0f,1f)] public float sfxVolume = 0.8f;
 
+	[Header("Skill Check (Optional)")]
+	public bool useSkillCheck = false;
+	public ChestSkillCheck skillCheck;
+
 	private bool isOpen = false;
 	private bool isInteractable = true;
 	private bool isAnimating = false;
@@ -35,6 +39,16 @@ public class ChestInteraction : MonoBehaviour
 		// Auto-find player
 		GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
 		player = playerObj != null ? playerObj.transform : null;
+
+		// Auto-wire skill check if enabled and not assigned
+		if (useSkillCheck && skillCheck == null)
+		{
+			skillCheck = GetComponent<ChestSkillCheck>();
+			if (skillCheck == null)
+			{
+				Debug.LogWarning("ChestInteraction: useSkillCheck is enabled but no ChestSkillCheck component found on this object.");
+			}
+		}
 
 		// Ensure AudioSource
 		if (sfxSource == null)
@@ -75,7 +89,17 @@ public class ChestInteraction : MonoBehaviour
 		bool canInteract = IsPlayerInRange();
 		if (canInteract && Input.GetKeyDown(interactKey))
 		{
-			Toggle();
+			Debug.Log("ChestInteraction: Interact key pressed.");
+			if (!isOpen && useSkillCheck && skillCheck != null)
+			{
+				Debug.Log("ChestInteraction: Starting skill check.");
+				skillCheck.Begin(this);
+			}
+			else
+			{
+				Debug.Log("ChestInteraction: Toggling chest (no skill check).");
+				Toggle();
+			}
 		}
 	}
 
@@ -84,7 +108,8 @@ public class ChestInteraction : MonoBehaviour
 		// Prefer trigger events, but also support distance check as fallback
 		if (player == null) return true; // allow interaction if player ref is missing
 		float dist = Vector3.Distance(player.position, transform.position);
-		return dist <= interactRange;
+		bool within = dist <= interactRange;
+		return within;
 	}
 
 	private void Toggle()
@@ -161,6 +186,17 @@ public class ChestInteraction : MonoBehaviour
 		isAnimating = false;
 	}
 
+	// Callback from ChestSkillCheck
+	public void OnSkillCheckComplete(bool success)
+	{
+		if (!success)
+		{
+			return; // exit without opening; player can try again
+		}
+		// Open once successful
+		Open();
+	}
+
 	private void DisableInteraction()
 	{
 		isInteractable = false;
@@ -172,6 +208,12 @@ public class ChestInteraction : MonoBehaviour
 		}
 		// Optionally disable this component if you want zero Update cost
 		// enabled = false; // uncomment if desired
+	}
+
+	void OnDrawGizmosSelected()
+	{
+		Gizmos.color = Color.cyan;
+		Gizmos.DrawWireSphere(transform.position, interactRange);
 	}
 }
 

@@ -133,6 +133,9 @@ namespace Controller
         public Vector3 Target => m_Target;
         public bool IsRun => m_IsRun;
 
+        [Header("Debug")]
+        [SerializeField, Tooltip("Enable verbose CreatureMover logs")] private bool m_EnableDebugLogs = false;
+
         private void OnValidate()
         {
             m_WalkSpeed = Mathf.Max(m_WalkSpeed, 0f);
@@ -194,7 +197,7 @@ namespace Controller
                 if (structureLayer != -1) m_StructureLayerMask |= (1 << structureLayer);
                 if (m_StructureLayerMask != 0)
                 {
-                    Debug.Log($"CreatureMover: Auto-configured Structure Layer Mask to include Tree and Structure layers");
+                    if (m_EnableDebugLogs) Debug.Log($"CreatureMover: Auto-configured Structure Layer Mask to include Tree and Structure layers");
                 }
             }
         }
@@ -279,7 +282,7 @@ namespace Controller
                         {
                             // We're back near where we started and player is still close - likely circling
                             isCircling = true;
-                            Debug.LogWarning($"CreatureMover: Detected circling behavior! Distance from start: {distanceFromStart:F1}m, Player distance: {distanceToPlayer:F1}m");
+                            if (m_EnableDebugLogs) Debug.LogWarning($"CreatureMover: Detected circling behavior! Distance from start: {distanceFromStart:F1}m, Player distance: {distanceToPlayer:F1}m");
                         }
                         m_CircleCheckTimer = 0f;
                     }
@@ -300,7 +303,7 @@ namespace Controller
                         requiredDistance = m_DetectionRadius * 1.2f; // Only need to be 20% beyond detection radius
                         playerIsFarEnough = distanceToPlayer > requiredDistance;
                         
-                        Debug.Log($"CreatureMover: Player stationary for {m_PlayerStationaryTime:F1}s. Distance: {distanceToPlayer:F1}m, Required: {requiredDistance:F1}m");
+                        if (m_EnableDebugLogs) Debug.Log($"CreatureMover: Player stationary for {m_PlayerStationaryTime:F1}s. Distance: {distanceToPlayer:F1}m, Required: {requiredDistance:F1}m");
                     }
                     else
                     {
@@ -325,7 +328,7 @@ namespace Controller
                         if (Time.time - m_LastStateChangeTime >= m_StateChangeCooldown)
                         {
                             string reason = isCircling ? "circling detected" : "player far enough";
-                            Debug.Log($"CreatureMover: Going back to idle. Distance: {distanceToPlayer:F1}m, Player stationary: {playerIsStationary}, Flee time: {m_TimeFleeing:F1}s, Reason: {reason}");
+                            if (m_EnableDebugLogs) Debug.Log($"CreatureMover: Going back to idle. Distance: {distanceToPlayer:F1}m, Player stationary: {playerIsStationary}, Flee time: {m_TimeFleeing:F1}s, Reason: {reason}");
                             m_IsFleeing = false;
                             m_LastStateChangeTime = Time.time;
                             m_DistanceWhenFleeStarted = float.MaxValue;
@@ -340,7 +343,7 @@ namespace Controller
                     // Safety: Force idle if fleeing too long (prevents infinite running)
                     if (m_TimeFleeing > MAX_FLEE_TIME)
                     {
-                        Debug.LogWarning($"CreatureMover: Forcing idle after {m_TimeFleeing:F1}s of fleeing (max time exceeded)");
+                        if (m_EnableDebugLogs) Debug.LogWarning($"CreatureMover: Forcing idle after {m_TimeFleeing:F1}s of fleeing (max time exceeded)");
                         m_IsFleeing = false;
                         m_LastStateChangeTime = Time.time;
                         m_DistanceWhenFleeStarted = float.MaxValue;
@@ -354,7 +357,7 @@ namespace Controller
                     // Force idle if circling and player has been stationary for a while
                     if (isCircling && m_PlayerStationaryTime > PLAYER_STATIONARY_TIME_FOR_IDLE * 1.5f)
                     {
-                        Debug.LogWarning($"CreatureMover: Forcing idle - circling detected and player stationary for {m_PlayerStationaryTime:F1}s");
+                        if (m_EnableDebugLogs) Debug.LogWarning($"CreatureMover: Forcing idle - circling detected and player stationary for {m_PlayerStationaryTime:F1}s");
                         m_IsFleeing = false;
                         m_LastStateChangeTime = Time.time;
                         m_DistanceWhenFleeStarted = float.MaxValue;
@@ -399,7 +402,7 @@ namespace Controller
                         m_PlayerStationaryTime = 0f; // Reset stationary timer
                         m_FleeStartPosition = m_Transform.position; // Record starting position
                         m_CircleCheckTimer = 0f; // Reset circle check timer
-                        Debug.Log($"CreatureMover: Starting to flee. Distance: {distanceToPlayer:F1}m");
+                        if (m_EnableDebugLogs) Debug.Log($"CreatureMover: Starting to flee. Distance: {distanceToPlayer:F1}m");
                     }
                 }
             }
@@ -466,7 +469,7 @@ namespace Controller
                 if (isStuck)
                 {
                     m_LastStuckTime = Time.time;
-                    Debug.Log($"CreatureMover: Deer is stuck! Distance moved: {distanceMoved:F2}m");
+                    if (m_EnableDebugLogs) Debug.Log($"CreatureMover: Deer is stuck! Distance moved: {distanceMoved:F2}m");
                 }
             }
 
@@ -502,7 +505,7 @@ namespace Controller
                     m_LastStuckAvoidDirection = fleeDirection;
                 }
                 
-                Debug.Log($"CreatureMover: Forcing new direction due to being stuck: {fleeDirection}");
+                if (m_EnableDebugLogs) Debug.Log($"CreatureMover: Forcing new direction due to being stuck: {fleeDirection}");
             }
             else if (distanceToPlayer < m_MinPlayerDistance)
             {
@@ -526,7 +529,7 @@ namespace Controller
             float dotTowardPlayer = Vector3.Dot(fleeDirection, toPlayer.normalized);
             if (dotTowardPlayer > 0.1f) // If more than 10% toward player, fix it
             {
-                Debug.LogWarning($"CreatureMover: Flee direction was toward player! Fixing... Dot: {dotTowardPlayer:F2}");
+                if (m_EnableDebugLogs) Debug.LogWarning($"CreatureMover: Flee direction was toward player! Fixing... Dot: {dotTowardPlayer:F2}");
                 fleeDirection = awayFromPlayerDir; // Force away from player
             }
 
@@ -544,7 +547,7 @@ namespace Controller
             dotTowardPlayer = Vector3.Dot(fleeDirection, toPlayer.normalized);
             if (dotTowardPlayer > 0.1f)
             {
-                Debug.LogWarning($"CreatureMover: After avoidance, direction still toward player! Forcing away. Dot: {dotTowardPlayer:F2}");
+                if (m_EnableDebugLogs) Debug.LogWarning($"CreatureMover: After avoidance, direction still toward player! Forcing away. Dot: {dotTowardPlayer:F2}");
                 fleeDirection = awayFromPlayerDir; // Force away from player as last resort
             }
 
@@ -810,7 +813,7 @@ namespace Controller
                     if (dotTowardPlayer > 0.1f)
                     {
                         // Blended direction is toward player - fall back to preferred direction
-                        Debug.LogWarning($"CreatureMover: AvoidNearbyStructures created direction toward player! Dot: {dotTowardPlayer:F2}. Using preferred direction.");
+                        if (m_EnableDebugLogs) Debug.LogWarning($"CreatureMover: AvoidNearbyStructures created direction toward player! Dot: {dotTowardPlayer:F2}. Using preferred direction.");
                         return preferredDirection;
                     }
                 }
@@ -888,7 +891,7 @@ namespace Controller
                 if (dotProduct > 0.1f) // If direction is even slightly towards player (10% or more)
                 {
                     score -= 10f; // HEAVY penalty - effectively makes this direction impossible
-                    Debug.LogWarning($"CreatureMover: Direction toward player detected! Dot: {dotProduct:F2}, Score: {score}");
+                    if (m_EnableDebugLogs) Debug.LogWarning($"CreatureMover: Direction toward player detected! Dot: {dotProduct:F2}, Score: {score}");
                 }
             }
 
