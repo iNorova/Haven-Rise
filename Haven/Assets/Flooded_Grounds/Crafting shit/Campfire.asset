@@ -15,6 +15,6 @@ MonoBehaviour:
   requirements:
   - itemName: Wood
     quantity: 7
-  outputPrefab: {fileID: 6540687526093916089, guid: 9622d618dd35a4bb0a1a84ed325bce60, type: 3}
+  outputPrefab: {fileID: 7419990666723935043, guid: 2f5f63a5c8504ca4bb2189334603417d, type: 3}
   outputQuantity: 1
   iconOverride: {fileID: 21300000, guid: 0b0d891b3d2b244febcf287afa056982, type: 3}
