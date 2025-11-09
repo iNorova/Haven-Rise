@@ -64,6 +64,8 @@ public class ChestSkillCheck : MonoBehaviour
 	private float angle;
 	private float timer;
 	private int successes;
+	private float inputCooldown = 0.15f; // Ignore input for this many seconds after Begin()
+	private float inputCooldownTimer;
 	private static Sprite s_DefaultSprite;
 	private AudioSource CreateAudioSource(string name, bool spatial)
 	{
@@ -106,6 +108,12 @@ public class ChestSkillCheck : MonoBehaviour
 			return;
 		}
 
+		// Update input cooldown (prevents the E key that triggered Begin from immediately failing)
+		if (inputCooldownTimer > 0f)
+		{
+			inputCooldownTimer -= Time.deltaTime;
+		}
+
 		// Rotate needle
 		angle += needleSpeed * Time.deltaTime;
 		if (angle >= 360f) angle -= 360f;
@@ -123,33 +131,37 @@ public class ChestSkillCheck : MonoBehaviour
 				worldCanvas.transform.rotation = Quaternion.LookRotation(toCam, Vector3.up);
 		}
 
-		bool hitPressed = Input.GetKeyDown(hitKey) || Input.GetKeyDown(altHitKey) || (allowMouseClick && Input.GetMouseButtonDown(0));
-		if (hitPressed)
+		// Only process input after cooldown has expired
+		if (inputCooldownTimer <= 0f)
 		{
-			Debug.Log("ChestSkillCheck: Hit input received.");
-			float adaptiveGrace = speedAdaptiveGrace ? (needleSpeed * Time.deltaTime * speedGraceFactor) : 0f;
-			float half = successWindowWidth * 0.5f + hitGraceDegrees + adaptiveGrace;
-			float diff = Mathf.DeltaAngle(angle, successWindowCenter);
-			bool ok = Mathf.Abs(diff) <= half;
-			if (ok)
+			bool hitPressed = Input.GetKeyDown(hitKey) || Input.GetKeyDown(altHitKey) || (allowMouseClick && Input.GetMouseButtonDown(0));
+			if (hitPressed)
 			{
-				Play(successSfx);
-				successes++;
-				UpdateProgress();
-				if (successes >= requiredSuccesses)
+				Debug.Log("ChestSkillCheck: Hit input received.");
+				float adaptiveGrace = speedAdaptiveGrace ? (needleSpeed * Time.deltaTime * speedGraceFactor) : 0f;
+				float half = successWindowWidth * 0.5f + hitGraceDegrees + adaptiveGrace;
+				float diff = Mathf.DeltaAngle(angle, successWindowCenter);
+				bool ok = Mathf.Abs(diff) <= half;
+				if (ok)
 				{
-					End(true);
-					return;
+					Play(successSfx);
+					successes++;
+					UpdateProgress();
+					if (successes >= requiredSuccesses)
+					{
+						End(true);
+						return;
+					}
+					// reset round
+					timer = 0f;
+					// randomize window center each round
+					successWindowCenter = Random.Range(0f, 360f);
+					UpdateSuccessArc();
 				}
-				// reset round
-				timer = 0f;
-				// randomize window center each round
-				successWindowCenter = Random.Range(0f, 360f);
-				UpdateSuccessArc();
-			}
-			else
-			{
-				Fail();
+				else
+				{
+					Fail();
+				}
 			}
 		}
 	}
@@ -161,6 +173,7 @@ public class ChestSkillCheck : MonoBehaviour
 		successes = 0;
 		timer = 0f;
 		angle = 0f;
+		inputCooldownTimer = inputCooldown; // Ignore input for a brief period after starting
 		successWindowCenter = Random.Range(0f, 360f);
 		ApplyDifficulty();
 		EnsureUI();
@@ -168,7 +181,7 @@ public class ChestSkillCheck : MonoBehaviour
 		UpdateProgress();
 		SetUIVisible(true);
 		active = true;
-		Debug.Log("ChestSkillCheck: UI shown and active.");
+		Debug.Log("ChestSkillCheck: UI shown and active. Input cooldown: " + inputCooldown + "s");
 		PlayBgm();
 	}
 
@@ -366,7 +379,20 @@ public class ChestSkillCheck : MonoBehaviour
 
 	private void SetUIVisible(bool v)
 	{
-		if (worldCanvas != null) worldCanvas.gameObject.SetActive(v);
+		if (worldCanvas != null)
+		{
+			worldCanvas.gameObject.SetActive(v);
+			// Also ensure all child UI elements are active
+			if (v)
+			{
+				if (dialCircle != null) dialCircle.gameObject.SetActive(true);
+				if (successArc != null) successArc.gameObject.SetActive(true);
+				if (needle != null) needle.gameObject.SetActive(true);
+				if (progressText != null) progressText.gameObject.SetActive(true);
+				if (instructionText != null) instructionText.gameObject.SetActive(true);
+			}
+		}
+		Debug.Log("ChestSkillCheck: SetUIVisible(" + v + "). Canvas active: " + (worldCanvas != null && worldCanvas.gameObject.activeSelf));
 	}
 
 	private void UpdateProgress()
