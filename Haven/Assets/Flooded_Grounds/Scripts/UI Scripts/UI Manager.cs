@@ -3,7 +3,7 @@ using UnityEngine.UI; // For UI elements
 using UnityEngine.Events;
 using System;
 
-public class UIManager : MonoBehaviour
+public class UIManager : MonoBehaviour, IDamageable
 {
     [Header("Pause Menu")]
     public Button pauseButton;        // Reference to pause button
@@ -563,7 +563,20 @@ public class UIManager : MonoBehaviour
 
     private void TakeHealthDamage()
     {
-        currentHealth -= healthDamageRate;
+        ApplyDamage(healthDamageRate);
+    }
+
+    /// <summary>
+    /// Implements IDamageable interface. Called by enemies (like Ghoul Zombie) to damage the player.
+    /// </summary>
+    public void ApplyDamage(float amount)
+    {
+        if (isPaused)
+        {
+            return; // Don't take damage while paused
+        }
+
+        currentHealth -= Mathf.Abs(amount);
         currentHealth = Mathf.Max(currentHealth, 0f);
         
         // Update health UI
@@ -589,7 +602,7 @@ public class UIManager : MonoBehaviour
             }
         }
 
-        Debug.Log($"Health damaged by heat. Current health: {currentHealth}");
+        Debug.Log($"Player took {amount} damage. Current health: {currentHealth}");
 
         // Check if player died
         if (currentHealth <= 0f)

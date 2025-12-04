@@ -54,6 +54,11 @@ public class GhoulZombieAI : MonoBehaviour
 	public float patrolRadius = 6f;
 	[Tooltip("Seconds spent waiting at each patrol point.")]
 	public float patrolWaitTime = 2f;
+	[Header("Day/Night Behavior")]
+	[Tooltip("Sunrise hour (default: 6 AM). Ghoul walks during day time.")]
+	public float sunriseHour = 6f;
+	[Tooltip("Sunset hour (default: 6 PM). Ghoul runs during night time.")]
+	public float sunsetHour = 18f;
 
 	[Header("Combat")]
 	public float attackDamage = 15f;
@@ -200,7 +205,8 @@ public class GhoulZombieAI : MonoBehaviour
 	private void RunPatrol()
 	{
 		agent.stoppingDistance = 0f;
-		agent.speed = walkSpeed;
+		// Use walk speed during day, run speed during night
+		agent.speed = IsNightTime() ? runSpeed : walkSpeed;
 		if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.2f)
 		{
 			patrolTimer += Time.deltaTime;
@@ -215,7 +221,16 @@ public class GhoulZombieAI : MonoBehaviour
 	private void RunChase(float playerDistance)
 	{
 		agent.stoppingDistance = attackRange - 0.1f;
-		agent.speed = playerDistance > runThreshold ? runSpeed : walkSpeed;
+		// During night: always use run speed when chasing
+		// During day: use walk speed unless player is far away
+		if (IsNightTime())
+		{
+			agent.speed = runSpeed;
+		}
+		else
+		{
+			agent.speed = playerDistance > runThreshold ? runSpeed : walkSpeed;
+		}
 		if (player != null)
 		{
 			agent.SetDestination(player.position);
@@ -410,15 +425,21 @@ public class GhoulZombieAI : MonoBehaviour
 			animator.SetFloat(speedParam, speed);
 		}
 
+		// Determine if ghoul is running based on current speed
+		bool isRunningSpeed = agent.speed > walkSpeed + 0.1f;
+		
 		if (SupportsAnimatorParam(walkBool))
 		{
-			bool walking = currentState == GhoulState.Patrol || (currentState == GhoulState.Chase && agent.speed <= walkSpeed + 0.1f);
+			// Walking: patrol state OR chase state with walk speed
+			bool walking = (currentState == GhoulState.Patrol && !isRunningSpeed) || 
+			               (currentState == GhoulState.Chase && !isRunningSpeed);
 			animator.SetBool(walkBool, walking);
 		}
 
 		if (SupportsAnimatorParam(runBool))
 		{
-			bool running = currentState == GhoulState.Chase && agent.speed > walkSpeed + 0.1f;
+			// Running: patrol or chase state with run speed
+			bool running = (currentState == GhoulState.Patrol || currentState == GhoulState.Chase) && isRunningSpeed;
 			animator.SetBool(runBool, running);
 		}
 	}
@@ -434,6 +455,19 @@ public class GhoulZombieAI : MonoBehaviour
 	}
 
 	private bool SupportsAnimatorParam(string paramName) => !string.IsNullOrEmpty(paramName) && animatorParameters.Contains(paramName);
+
+	/// <summary>
+	/// Checks if it's currently night time based on DayNightCycle.
+	/// </summary>
+	private bool IsNightTime()
+	{
+		if (DayNightCycle.Instance == null)
+		{
+			// If no day/night cycle found, default to day (walk speed)
+			return false;
+		}
+		return DayNightCycle.Instance.IsNightTime(sunriseHour, sunsetHour);
+	}
 
 	private void OnDrawGizmosSelected()
 	{

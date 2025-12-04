@@ -84,6 +84,7 @@ public class RespawnManager : MonoBehaviour
         }
         Vector3 targetPosition = GetRespawnPositionNear(lastDeathPosition);
         TeleportPlayer(player, targetPosition);
+        ResetPlayerDeathState(player);
         if (UIManager.Instance != null)
         {
             UIManager.Instance.ResetAllStats();
@@ -100,9 +101,20 @@ public class RespawnManager : MonoBehaviour
         }
         Vector3 targetPosition = GetRespawnPositionNear(startPosition);
         TeleportPlayer(player, targetPosition);
+        ResetPlayerDeathState(player);
         if (UIManager.Instance != null)
         {
             UIManager.Instance.ResetAllStats();
+        }
+    }
+
+    private void ResetPlayerDeathState(GameObject player)
+    {
+        // Reset death animation state
+        PlayerDeathAnimation deathAnim = player.GetComponent<PlayerDeathAnimation>();
+        if (deathAnim != null)
+        {
+            deathAnim.OnPlayerRespawn();
         }
     }
 

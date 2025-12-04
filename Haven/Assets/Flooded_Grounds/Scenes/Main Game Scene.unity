@@ -20795,7 +20795,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &146946519
 RectTransform:
   m_ObjectHideFlags: 0
@@ -32656,9 +32656,11 @@ MonoBehaviour:
   loseInterestRadius: 22
   attackRange: 2.25
   walkSpeed: 1.4
-  runSpeed: 3.8
+  runSpeed: 7.04
   patrolRadius: 6
   patrolWaitTime: 2
+  sunriseHour: 6
+  sunsetHour: 18
   attackDamage: 15
   attackCooldown: 1.4
   attackImpactDelay: 0.35
@@ -137574,9 +137576,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4abe787fd3ac54562a131ed1e8626530, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  deerPrefab: {fileID: 320317058}
-  deerCount: 100
+  spawnPrefabs: []
+  spawnCount: 10
   spawnRadius: 100
+  minDistanceBetweenSpawns: 5
+  raycastStartHeight: 100
+  maxRaycastDistance: 200
+  requiredTags: []
+  spawnSurfaceLayers:
+    serializedVersion: 2
+    m_Bits: 4091
+  requireTagMatch: 1
+  randomRotationRange: 360
+  parentToSpawner: 0
 --- !u!4 &956478279
 Transform:
   m_ObjectHideFlags: 0
@@ -262214,6 +262226,7 @@ GameObject:
   - component: {fileID: 1780305043}
   - component: {fileID: 1780305053}
   - component: {fileID: 1780305050}
+  - component: {fileID: 1780305054}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -262472,6 +262485,18 @@ MonoBehaviour:
   excludedTags:
   - Untagged
   showDebugMessages: 1
+--- !u!114 &1780305054
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1780305042}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 854c2a75f28020e41880d3e152fff1db, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1001 &1780574239
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -284973,9 +284998,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4abe787fd3ac54562a131ed1e8626530, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  deerPrefab: {fileID: 1461527838}
-  deerCount: 150
-  spawnRadius: 250
+  spawnPrefabs:
+  - {fileID: 1461527838}
+  - {fileID: 320317058}
+  - {fileID: 223880539}
+  spawnCount: 100
+  spawnRadius: 213.1
+  minDistanceBetweenSpawns: 3.05
+  raycastStartHeight: 100
+  maxRaycastDistance: 200
+  requiredTags: []
+  spawnSurfaceLayers:
+    serializedVersion: 2
+    m_Bits: 4003
+  requireTagMatch: 1
+  randomRotationRange: 360
+  parentToSpawner: 0
 --- !u!4 &1906084644
 Transform:
   m_ObjectHideFlags: 0

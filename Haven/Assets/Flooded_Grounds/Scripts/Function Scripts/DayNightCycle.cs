@@ -57,6 +57,22 @@ public class DayNightCycle : MonoBehaviour
     private float transitionStartTime = 0f;
     private float transitionStartValue = 0f;
 
+    // Static instance for global access
+    public static DayNightCycle Instance { get; private set; }
+
+    void Awake()
+    {
+        // Singleton pattern
+        if (Instance == null)
+        {
+            Instance = this;
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
+    }
+
     void Start()
     {
         // Calculate time scale: (24 hours / dayDurationInMinutes) * minutes_in_hour (60) for a full day
@@ -248,5 +264,31 @@ public class DayNightCycle : MonoBehaviour
         transitionStartValue = timeOfDay;
         
         Debug.Log($"[DayNightCycle] Transitioning from {transitionStartValue:F2} to {targetTransitionTime:F2} over {duration} seconds");
+    }
+
+    /// <summary>
+    /// Returns true if it's currently daytime (between sunrise and sunset).
+    /// Default: Day is 6:00 AM to 6:00 PM (6-18 hours).
+    /// </summary>
+    public bool IsDayTime(float sunriseHour = 6f, float sunsetHour = 18f)
+    {
+        return timeOfDay >= sunriseHour && timeOfDay < sunsetHour;
+    }
+
+    /// <summary>
+    /// Returns true if it's currently nighttime (between sunset and sunrise).
+    /// Default: Night is 6:00 PM to 6:00 AM (18-6 hours).
+    /// </summary>
+    public bool IsNightTime(float sunriseHour = 6f, float sunsetHour = 18f)
+    {
+        return !IsDayTime(sunriseHour, sunsetHour);
+    }
+
+    /// <summary>
+    /// Gets the current time of day (0-24 hours).
+    /// </summary>
+    public float GetTimeOfDay()
+    {
+        return timeOfDay;
     }
 } 
