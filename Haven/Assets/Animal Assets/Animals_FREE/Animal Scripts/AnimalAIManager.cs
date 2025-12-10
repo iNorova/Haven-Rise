@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.AI;
 using System.Collections;
 
-public class AnimalAIManager : MonoBehaviour
+public class AnimalAIManager : MonoBehaviour, IDamageable
 {
     [Header("Detection Settings")]
     [SerializeField] private float detectionRadius = 10f;
@@ -308,6 +308,14 @@ public class AnimalAIManager : MonoBehaviour
         // Wait a short moment before destroying
         yield return new WaitForSeconds(0.5f);
         Destroy(gameObject);
+    }
+
+    /// <summary>
+    /// Allow generic damage sources (axe/rock hits) to affect animals via IDamageable.
+    /// </summary>
+    public void ApplyDamage(float amount)
+    {
+        TakeDamage(Mathf.CeilToInt(Mathf.Abs(amount)));
     }
 
     // Optional: Visualize detection ranges in the editor

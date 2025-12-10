@@ -7,6 +7,8 @@ public class ObjectInteractionController : MonoBehaviour
     public float hitRange = 3f;
     public float hitCooldown = 0.5f;
     [SerializeField] private LayerMask interactableLayer = (1 << 8);  // Layer 8 is the Destroyable layer
+    [SerializeField] private LayerMask enemyLayerMask = ~0;           // Assign enemy/ghoul layers in inspector
+    [SerializeField] private string groundLayerName = "Ground";       // Fallback layer name for enemies tagged destroyable
 
     [Header("Item Damage Settings")]
     public float axeDamage = 25f;      // 100 health / 4 hits = 25 damage per hit
@@ -29,7 +31,7 @@ public class ObjectInteractionController : MonoBehaviour
     {
         playerCamera = GetComponentInChildren<Camera>();
         motorController = GetComponent<CharController_Motor>();
-        hotbarManager = FindObjectOfType<HotbarManager>();
+        hotbarManager = FindFirstObjectByType<HotbarManager>();
         
         // Setup audio source for break sound
         audioSource = GetComponent<AudioSource>();
@@ -50,6 +52,7 @@ public class ObjectInteractionController : MonoBehaviour
 
         // Debug log to verify layer mask
         Debug.Log($"Interaction Layer Mask: {interactableLayer.value}");
+        Debug.Log($"Enemy Layer Mask: {enemyLayerMask.value}");
     }
 
     void Update()
@@ -70,38 +73,82 @@ public class ObjectInteractionController : MonoBehaviour
             return;
         }
         
-        RaycastHit hit;
         Ray ray = playerCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0)); // Center of screen
 
         Debug.DrawRay(ray.origin, ray.direction * hitRange, Color.red, 1f); // Visualize the ray
 
-        if (Physics.Raycast(ray, out hit, hitRange, interactableLayer))
+        // Use an unmasked RaycastAll (except we will ignore the player) so layer setup can't block hits.
+        // Include triggers because some enemy colliders may be triggers.
+        RaycastHit[] hits = Physics.RaycastAll(ray, hitRange, ~0, QueryTriggerInteraction.Collide);
+        if (hits.Length > 0)
         {
-            Debug.Log($"Hit object: {hit.collider.gameObject.name} on layer: {LayerMask.LayerToName(hit.collider.gameObject.layer)}");
-            
-            DestroyableObject destroyableObject = hit.collider.GetComponent<DestroyableObject>();
-            if (destroyableObject != null)
+            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+            RaycastHit? firstDamageableHit = null;
+            RaycastHit? firstDestroyableHit = null;
+
+            foreach (var h in hits)
             {
-                // Calculate damage based on currently equipped item
+                if (h.collider.CompareTag("Player"))
+                {
+                    continue; // skip self-hit
+                }
+
+                var damageable = h.collider.GetComponentInParent<IDamageable>();
+                if (damageable != null)
+                {
+                    firstDamageableHit = h;
+                    break;
+                }
+
+                if (!firstDestroyableHit.HasValue)
+                {
+                    var destroyable = h.collider.GetComponent<DestroyableObject>();
+                    if (destroyable != null)
+                    {
+                        firstDestroyableHit = h;
+                    }
+                }
+            }
+
+            if (firstDamageableHit.HasValue)
+            {
+                var h = firstDamageableHit.Value;
                 float damageToApply = GetDamageForCurrentItem();
-                Debug.Log($"Found DestroyableObject component, applying damage: {damageToApply} (Item: {GetCurrentItemName()})");
-                // Apply damage to the object
-                destroyableObject.TakeDamage(damageToApply);
-
-                // Reduce durability if current item has durability component (e.g., axe)
+                IDamageable damageableTarget = h.collider.GetComponentInParent<IDamageable>();
+                Debug.Log($"Hit damageable: {h.collider.gameObject.name} on layer {LayerMask.LayerToName(h.collider.gameObject.layer)}, dist {h.distance:F2}m. Applying {damageToApply} (Item: {GetCurrentItemName()})");
+                damageableTarget.ApplyDamage(damageToApply);
                 ReduceItemDurability();
+                ShowHitEffect(h.point, h.normal);
+                return;
+            }
 
-                // Show hit effect at point of impact
-                ShowHitEffect(hit.point, hit.normal);
-            }
-            else
+            if (firstDestroyableHit.HasValue)
             {
-                Debug.LogWarning($"Hit object does not have DestroyableObject component: {hit.collider.gameObject.name}");
+                var h = firstDestroyableHit.Value;
+                DestroyableObject destroyableObject = h.collider.GetComponent<DestroyableObject>();
+                float damageToApply = GetDamageForCurrentItem();
+                Debug.Log($"Hit DestroyableObject: {h.collider.gameObject.name} on layer {LayerMask.LayerToName(h.collider.gameObject.layer)}, dist {h.distance:F2}m. Applying {damageToApply} (Item: {GetCurrentItemName()})");
+                destroyableObject.TakeDamage(damageToApply);
+                ReduceItemDurability();
+                ShowHitEffect(h.point, h.normal);
+                return;
             }
+
+            // No damageable/destroyable in hits, log closest for debugging
+            var closest = hits[0];
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            sb.Append("[Debug] Ray hits (closest first): ");
+            for (int i = 0; i < hits.Length; i++)
+            {
+                sb.Append($"[{i}] {hits[i].collider.gameObject.name} layer={LayerMask.LayerToName(hits[i].collider.gameObject.layer)} dist={hits[i].distance:F2}m; ");
+            }
+            Debug.Log(sb.ToString());
+            Debug.Log($"[Debug] Closest '{closest.collider.gameObject.name}' is not damageable/destroyable.");
         }
         else
         {
-            Debug.Log("No destroyable object in range");
+            Debug.Log("No valid target in range");
         }
     }
     
@@ -180,7 +227,8 @@ public class ObjectInteractionController : MonoBehaviour
         ItemDurability durability = currentItem.GetComponent<ItemDurability>();
         if (durability == null)
         {
-            durability = currentItem.GetComponentInChildren<ItemDurability>();
+            // include inactive children so holstered/hidden meshes are found
+            durability = currentItem.GetComponentInChildren<ItemDurability>(true);
         }
         
         if (durability != null)

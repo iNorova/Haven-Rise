@@ -18,7 +18,7 @@ public interface IDamageable
 /// </summary>
 [RequireComponent(typeof(NavMeshAgent))]
 [RequireComponent(typeof(Animator))]
-public class GhoulZombieAI : MonoBehaviour
+public class GhoulZombieAI : MonoBehaviour, IDamageable
 {
 	private enum GhoulState
 	{
@@ -204,6 +204,11 @@ public class GhoulZombieAI : MonoBehaviour
 
 	private void RunPatrol()
 	{
+		if (agent == null || !agent.isOnNavMesh)
+		{
+			return;
+		}
+
 		agent.stoppingDistance = 0f;
 		// Use walk speed during day, run speed during night
 		agent.speed = IsNightTime() ? runSpeed : walkSpeed;
@@ -220,6 +225,11 @@ public class GhoulZombieAI : MonoBehaviour
 
 	private void RunChase(float playerDistance)
 	{
+		if (agent == null || !agent.isOnNavMesh)
+		{
+			return;
+		}
+
 		agent.stoppingDistance = attackRange - 0.1f;
 		// During night: always use run speed when chasing
 		// During day: use walk speed unless player is far away
@@ -242,6 +252,11 @@ public class GhoulZombieAI : MonoBehaviour
 		if (player == null)
 		{
 			SetState(GhoulState.Patrol);
+			return;
+		}
+
+		if (agent == null || !agent.isOnNavMesh)
+		{
 			return;
 		}
 
@@ -398,6 +413,11 @@ public class GhoulZombieAI : MonoBehaviour
 
 	private void Die()
 	{
+		if (currentState == GhoulState.Dead)
+		{
+			return;
+		}
+
 		currentState = GhoulState.Dead;
 		damagePendingFromAutoDelay = false;
 		isAttacking = false;
@@ -405,9 +425,27 @@ public class GhoulZombieAI : MonoBehaviour
 		TriggerAnimator(deathTrigger);
 		onDeath?.Invoke();
 
+		if (agent != null)
+		{
+			agent.isStopped = true;
+			agent.enabled = false;
+		}
+
 		foreach (var collider in GetComponentsInChildren<Collider>())
 		{
 			collider.enabled = false;
+		}
+
+		// Snap to ground so death pose isn't floating
+		if (Physics.Raycast(transform.position + Vector3.up * 0.5f, Vector3.down, out var hit, 5f, Physics.AllLayers, QueryTriggerInteraction.Ignore))
+		{
+			transform.position = hit.point;
+			var forwardFlat = new Vector3(transform.forward.x, 0f, transform.forward.z);
+			if (forwardFlat.sqrMagnitude < 0.001f)
+			{
+				forwardFlat = Vector3.forward;
+			}
+			transform.rotation = Quaternion.LookRotation(forwardFlat.normalized, hit.normal);
 		}
 
 		Destroy(gameObject, despawnDelay);

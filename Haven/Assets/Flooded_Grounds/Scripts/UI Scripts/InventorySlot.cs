@@ -343,4 +343,17 @@ public class InventorySlot : MonoBehaviour, IBeginDragHandler, IDragHandler, IEn
         stackCount = count;
         UpdateStackCountDisplay();
     }
+
+    // Public method to clean up dragged icon (for use by external drop targets)
+    public void CleanupDraggedIcon()
+    {
+        if (draggedIconGameObject != null)
+        {
+            draggedIconGameObject.SetActive(false);
+            Destroy(draggedIconGameObject);
+            draggedIconGameObject = null;
+            draggedIconImage = null;
+        }
+        if (itemImage != null) itemImage.enabled = true;
+    }
 } 

@@ -20,6 +20,100 @@ public class InventorySystem : MonoBehaviour
         }
     }
 
+	/// <summary>
+	/// Consume a single unit from the given slot (hotbar or inventory). Handles stack decrement or clearing.
+	/// Returns the consumed item's display name for logging, or null if nothing was consumed.
+	/// </summary>
+	public string ConsumeOneFromSlot(InventorySlot sourceSlot)
+	{
+		if (sourceSlot == null)
+		{
+			return null;
+		}
+
+		// Determine source slot index and whether it's hotbar
+		int sourceIndex = -1;
+		bool sourceIsHotbar = false;
+		for (int i = 0; i < hotbarManager.hotbarSlots.Length; i++)
+		{
+			if (hotbarManager.hotbarSlots[i] == sourceSlot)
+			{
+				sourceIndex = i;
+				sourceIsHotbar = true;
+				break;
+			}
+		}
+
+		if (sourceIndex == -1)
+		{
+			for (int i = 0; i < inventoryManager.inventorySlots.Length; i++)
+			{
+				if (inventoryManager.inventorySlots[i] == sourceSlot)
+				{
+					sourceIndex = i;
+					sourceIsHotbar = false;
+					break;
+				}
+			}
+		}
+
+		if (sourceIndex == -1)
+		{
+			Debug.LogWarning("[InventorySystem] ConsumeOneFromSlot: Source slot not found in hotbar or inventory.");
+			return null;
+		}
+
+		GameObject sourceItem = sourceSlot.GetItem();
+		if (sourceItem == null)
+		{
+			return null;
+		}
+
+		// Resolve item display name
+		string itemName = sourceItem.name;
+		var iconProvider = sourceItem.GetComponent<ItemIconProvider>();
+		if (iconProvider != null && !string.IsNullOrEmpty(iconProvider.itemName))
+		{
+			itemName = iconProvider.itemName;
+		}
+		itemName = itemName?.Replace("(Clone)", "").Trim();
+
+		int stackCount = sourceSlot.GetStackCount();
+
+		if (sourceIsHotbar)
+		{
+			if (stackCount > 1)
+			{
+				hotbarManager.hotbarSlots[sourceIndex].SetStackCount(stackCount - 1);
+			}
+			else
+			{
+				hotbarManager.SetItem(sourceIndex, null);
+				if (sourceItem != null)
+				{
+					Destroy(sourceItem);
+				}
+			}
+		}
+		else
+		{
+			if (stackCount > 1)
+			{
+				inventoryManager.inventorySlots[sourceIndex].SetStackCount(stackCount - 1);
+			}
+			else
+			{
+				inventoryManager.SetItem(sourceIndex, null);
+				if (sourceItem != null)
+				{
+					Destroy(sourceItem);
+				}
+			}
+		}
+
+		return itemName;
+	}
+
     // This method will be called by InventorySlot.OnDrop
     public void RequestItemTransfer(InventorySlot sourceSlot, InventorySlot targetSlot)
     {
