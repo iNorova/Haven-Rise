@@ -54,6 +54,11 @@ namespace Haven.CraftingUI
 				{
 					instance.AddComponent<BedPlacement>();
 				}
+				// If this is a workbench, add WorkbenchPlacement script so it can be placed
+				if (instance.name.ToLower().Contains("workbench") && instance.GetComponent<WorkbenchPlacement>() == null)
+				{
+					instance.AddComponent<WorkbenchPlacement>();
+				}
 				if (!inventoryManager.AddItem(instance))
 				{
 					// If inventory full, try add to an empty hotbar slot

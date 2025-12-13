@@ -683,10 +683,14 @@ public class HotbarManager : MonoBehaviour
             // Special handling for campfires - ensure CampfirePlacement initializes properly
             CampfirePlacement campfirePlacement = heldItems[selectedSlot].GetComponent<CampfirePlacement>();
             
-            // Check if this is a bed or campfire (by name, even if component is missing)
+            // Special handling for workbenches - ensure WorkbenchPlacement initializes properly
+            WorkbenchPlacement workbenchPlacement = heldItems[selectedSlot].GetComponent<WorkbenchPlacement>();
+            
+            // Check if this is a bed, campfire, or workbench (by name, even if component is missing)
             string itemName = heldItems[selectedSlot].name.ToLower();
             bool isBed = itemName.Contains("bed");
             bool isCampfire = itemName.Contains("campfire");
+            bool isWorkbench = itemName.Contains("workbench");
             
             // If no BedPlacement found but this is a bed, try to add it
             // (This handles cases where the bed was restored but BedPlacement wasn't added properly)
@@ -713,6 +717,23 @@ public class HotbarManager : MonoBehaviour
                     campfirePlacement.InitializeReferences();
                     campfirePlacement.enabled = true;
                     Debug.Log($"[HotbarManager] SelectSlot: Added and initialized CampfirePlacement for '{heldItems[selectedSlot].name}'");
+                }
+            }
+            
+            // If WorkbenchPlacement exists, initialize it and clean up the name
+            if (workbenchPlacement != null)
+            {
+                workbenchPlacement.InitializeReferences();
+                workbenchPlacement.enabled = true; // Ensure it's enabled
+                Debug.Log($"[HotbarManager] SelectSlot: Initialized WorkbenchPlacement for '{heldItems[selectedSlot].name}'");
+                
+                // Also clean up the name if it still has "_Placed" suffix (happens if name cleanup failed during pickup)
+                string currentName = heldItems[selectedSlot].name;
+                if (currentName.Contains("_Placed") || currentName.Contains("_placed"))
+                {
+                    string cleanedName = currentName.Replace("_Placed", "").Replace("_placed", "").Trim();
+                    heldItems[selectedSlot].name = cleanedName;
+                    Debug.Log($"[HotbarManager] SelectSlot: Cleaned workbench name from '{currentName}' to '{cleanedName}'");
                 }
             }
             
