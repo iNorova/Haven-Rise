@@ -5,6 +5,12 @@ public class TreePlantingSystem : MonoBehaviour
     [Header("Tree Assets")]
     public GameObject soilPrefab;           // The soil asset that appears when tree is cut
     public GameObject plantedTreePrefab;    // The combined soil + sprout prefab
+    [Tooltip("Array of full-grown tree prefabs. One will be randomly selected when a sprout finishes growing.")]
+    public GameObject[] fullGrownTreePrefabs;  // Array of full-grown tree prefabs for random selection
+
+    [Header("Growth Settings")]
+    [Tooltip("Time in seconds for planted sprouts to grow into full trees")]
+    public float treeGrowthTime = 60f; // Default: 60 seconds (1 minute)
 
     [Header("Spawn Adjustments")]
     public Vector3 soilSpawnOffset = Vector3.zero; // Offset for the soil's position
@@ -78,18 +84,78 @@ public class TreePlantingSystem : MonoBehaviour
             Debug.LogWarning("TreePlantingSystem: No ground detected for planting. Using original Y position.");
         }
 
-        // Spawn the planted tree prefab at the adjusted position
+        // Spawn the planted tree prefab (sprout) at the adjusted position
         GameObject newPlantedTree = Instantiate(plantedTreePrefab, new Vector3(spawnPosition.x, targetY, spawnPosition.z), Quaternion.identity);
         newPlantedTree.transform.localScale = plantedTreeScale;
         newPlantedTree.transform.localRotation = Quaternion.Euler(plantedTreeRotation);
 
-        // Play growth sound effect when tree spawns
-        PlaySeedGrowSfx(newPlantedTree.transform.position);
+        // Add PlantedTreeGrower component to handle growth over time
+        PlantedTreeGrower grower = newPlantedTree.GetComponent<PlantedTreeGrower>();
+        if (grower == null)
+        {
+            grower = newPlantedTree.AddComponent<PlantedTreeGrower>();
+        }
+        
+        // Configure the grower component
+        grower.fullGrownTreePrefabs = fullGrownTreePrefabs;
+        grower.growthTime = treeGrowthTime;
+        grower.treePlantingSystem = this;
+        grower.growthSound = seedGrowSfx;
+        grower.growthSoundVolume = seedGrowSfxVolume;
+        
+        // Validate that tree prefabs are assigned and warn about non-tree prefabs
+        if (fullGrownTreePrefabs == null || fullGrownTreePrefabs.Length == 0)
+        {
+            Debug.LogError("TreePlantingSystem: fullGrownTreePrefabs array is empty or null! Trees will not grow properly. Please assign tree prefabs in the Inspector.");
+        }
+        else
+        {
+            int validCount = 0;
+            int rockCount = 0;
+            foreach (GameObject prefab in fullGrownTreePrefabs)
+            {
+                if (prefab != null)
+                {
+                    validCount++;
+                    // Check if prefab name suggests it's a rock/boulder instead of a tree
+                    string prefabName = prefab.name.ToLower();
+                    if (prefabName.Contains("rock") || prefabName.Contains("boulder") || prefabName.Contains("stone") || prefabName.Contains("cobble"))
+                    {
+                        rockCount++;
+                        Debug.LogWarning($"TreePlantingSystem: WARNING! Prefab '{prefab.name}' appears to be a ROCK/Boulder, not a TREE! Please assign only TREE prefabs to fullGrownTreePrefabs array!");
+                    }
+                }
+            }
+            if (validCount == 0)
+            {
+                Debug.LogError("TreePlantingSystem: All tree prefabs in fullGrownTreePrefabs array are null! Trees will not grow properly. Please assign valid prefabs in the Inspector.");
+            }
+            else
+            {
+                Debug.Log($"TreePlantingSystem: Configured grower with {validCount} valid prefab(s) out of {fullGrownTreePrefabs.Length} total.");
+                if (rockCount > 0)
+                {
+                    Debug.LogError($"TreePlantingSystem: ERROR! Found {rockCount} ROCK/Boulder prefab(s) assigned to tree prefabs array! This will cause rocks to spawn instead of trees. Please fix this in the Inspector!");
+                }
+            }
+        }
+        
+        // If the sprout prefab has an audio source, assign it
+        if (sfxSource != null)
+        {
+            grower.audioSource = sfxSource;
+        }
+        
+        // Start the growth process (this ensures values are set before growth starts)
+        grower.StartGrowth();
+
+        // Do NOT play growth sound here - it will play when the tree actually grows
+        // The growth sound is now handled by PlantedTreeGrower when growth completes
 
         // Optionally, destroy the original soil object after a short delay or immediately
         // You might want to keep it if you plan to re-use it later, but for simple hide/replace, destroy is fine.
         Destroy(soilGameObject); // Destroy the soil GameObject after planting
-        Debug.Log("TreePlantingSystem: Soil replaced with PlantedTree.");
+        Debug.Log($"TreePlantingSystem: Soil replaced with PlantedTree (sprout). Growth time: {treeGrowthTime} seconds.");
 
         // Notify UIManager that a sprout seed has been planted
         if (UIManager.Instance != null)
