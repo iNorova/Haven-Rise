@@ -157,7 +157,55 @@ public class PlantedTreeGrower : MonoBehaviour
                 fullTree.SetActive(true);
                 
                 // Ensure the full tree has proper components (like DestroyableObject for cutting)
-                // You might need to adjust this based on your tree prefab structure
+                // Check if DestroyableObject component exists and configure it as a tree
+                DestroyableObject destroyableObj = fullTree.GetComponent<DestroyableObject>();
+                if (destroyableObj == null)
+                {
+                    // Try to find it in children
+                    destroyableObj = fullTree.GetComponentInChildren<DestroyableObject>();
+                }
+                
+                if (destroyableObj != null)
+                {
+                    Debug.Log($"PlantedTreeGrower: Found DestroyableObject component on spawned tree '{fullTree.name}'.");
+                    
+                    // Ensure the tree is configured as a tree (sets isTree = true)
+                    destroyableObj.ConfigureAsTree(true);
+                    
+                    // Try to find a reference tree in the scene to copy drop settings from
+                    // This ensures the spawned tree has the same drop settings as other trees
+                    GameObject[] allTrees = GameObject.FindGameObjectsWithTag("Destroyable");
+                    DestroyableObject referenceTree = null;
+                    
+                    foreach (GameObject obj in allTrees)
+                    {
+                        if (obj != fullTree) // Don't use the tree we just spawned
+                        {
+                            DestroyableObject dobj = obj.GetComponent<DestroyableObject>();
+                            if (dobj != null && dobj.IsTree)
+                            {
+                                // Found a tree - use it as reference
+                                referenceTree = dobj;
+                                Debug.Log($"PlantedTreeGrower: Found reference tree '{obj.name}' to copy DestroyableObject settings from.");
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Copy settings from reference tree if found
+                    if (referenceTree != null)
+                    {
+                        destroyableObj.CopyDropSettings(referenceTree);
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"PlantedTreeGrower: No reference tree found in scene. Spawned tree should still work, but make sure the prefab has dropPrefabs configured in the Inspector.");
+                    }
+                }
+                else
+                {
+                    Debug.LogError($"PlantedTreeGrower: ERROR! Spawned tree '{fullTree.name}' does not have a DestroyableObject component! Trees won't be cuttable or drop items. The tree prefab needs a DestroyableObject component!");
+                }
                 
                 Debug.Log($"PlantedTreeGrower: Successfully spawned full-grown tree '{fullTree.name}' at {spawnPosition}.");
                 Debug.Log($"PlantedTreeGrower: Tree scale: {fullTree.transform.localScale}, Active: {fullTree.activeSelf}, Tag: {fullTree.tag}");

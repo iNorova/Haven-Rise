@@ -14,6 +14,8 @@ public class TreePlantingSystem : MonoBehaviour
 
     [Header("Spawn Adjustments")]
     public Vector3 soilSpawnOffset = Vector3.zero; // Offset for the soil's position
+    [Tooltip("Height offset above ground for soil when tree is cut. Increase this if soil spawns underground.")]
+    public float soilHeightOffset = 0.2f; // Height above ground for soil spawn
     public Vector3 soilScale = Vector3.one;     // Scale for the soil
     public Vector3 soilRotation = Vector3.zero; // Rotation for the soil (Euler angles)
     public Vector3 plantedTreeSpawnOffset = Vector3.zero; // Offset for the planted tree's position
@@ -35,8 +37,56 @@ public class TreePlantingSystem : MonoBehaviour
     // Method called by DestroyableObject when a tree is cut
     public void OnTreeCut(Vector3 treePosition)
     {
-        // Spawn soil at the tree's position with specified adjustments
-        GameObject newSoil = Instantiate(soilPrefab, treePosition + soilSpawnOffset, Quaternion.identity);
+        // Calculate soil spawn position with X and Z offsets
+        Vector3 soilSpawnPos = new Vector3(
+            treePosition.x + soilSpawnOffset.x,
+            treePosition.y,
+            treePosition.z + soilSpawnOffset.z
+        );
+        
+        // Perform a raycast downwards to find the actual ground height
+        // This ensures the soil spawns above ground, not underground
+        float targetY = soilSpawnPos.y;
+        RaycastHit hit;
+        Vector3 rayOrigin = new Vector3(soilSpawnPos.x, soilSpawnPos.y + raycastHeight, soilSpawnPos.z);
+        
+        if (Physics.Raycast(rayOrigin, Vector3.down, out hit, raycastHeight * 2, groundLayer))
+        {
+            float groundY = hit.point.y;
+            float treeToGroundDistance = Mathf.Abs(treePosition.y - groundY);
+            
+            // Check if the tree is already positioned at or near ground level
+            // If the tree is very close to ground (within 1.0 unit), it's likely an initially spawned tree
+            // that's already positioned at ground level - use the tree's position as base
+            // Otherwise, use the ground height + offset (for grown trees that might be positioned differently)
+            if (treeToGroundDistance < 1.0f)
+            {
+                // Tree is already at/near ground level (initially spawned tree)
+                // Use the tree's Y position directly (it's already at ground level), plus a small offset
+                targetY = treePosition.y + soilHeightOffset;
+                Debug.Log($"TreePlantingSystem: Tree is near ground level (distance: {treeToGroundDistance}). Using tree Y={treePosition.y} as base. Placing soil at Y={targetY} (offset: {soilHeightOffset}).");
+            }
+            else
+            {
+                // Tree is positioned above ground (might be a grown tree or have trunk height)
+                // Use ground height + offset to ensure proper placement
+                targetY = groundY + soilHeightOffset;
+                Debug.Log($"TreePlantingSystem: Tree is above ground (distance: {treeToGroundDistance}). Ground at Y={groundY}, Tree at Y={treePosition.y}. Placing soil at Y={targetY} (offset: {soilHeightOffset}).");
+            }
+        }
+        else
+        {
+            // If no ground detected, check if tree position seems reasonable
+            // Use a small offset from tree position, but not too much
+            targetY = treePosition.y + Mathf.Min(soilHeightOffset, 0.3f);
+            Debug.LogWarning($"TreePlantingSystem: No ground detected for soil spawn at {treePosition}. Using tree Y position + limited offset: {targetY}");
+        }
+        
+        // Set final spawn position with corrected Y height
+        soilSpawnPos.y = targetY;
+        
+        // Spawn soil at the calculated position
+        GameObject newSoil = Instantiate(soilPrefab, soilSpawnPos, Quaternion.identity);
         newSoil.transform.localScale = soilScale;
         newSoil.transform.localRotation = Quaternion.Euler(soilRotation);
 
@@ -52,7 +102,7 @@ public class TreePlantingSystem : MonoBehaviour
             newSoil.layer = soilLayerInt;
         }
         
-        Debug.Log($"TreePlantingSystem: Spawned soil at {treePosition}. Tag: {newSoil.tag}, Layer: {LayerMask.LayerToName(newSoil.layer)}.");
+        Debug.Log($"TreePlantingSystem: Spawned soil at {soilSpawnPos} (original tree position: {treePosition}). Tag: {newSoil.tag}, Layer: {LayerMask.LayerToName(newSoil.layer)}.");
     }
 
     // Method called by SeedInteraction when player tries to plant on soil

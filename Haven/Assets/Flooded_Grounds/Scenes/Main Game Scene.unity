@@ -151593,7 +151593,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   soilPrefab: {fileID: 2606101765789596433, guid: 3367547403ce84d36ac4c4719ec7cf72, type: 3}
   plantedTreePrefab: {fileID: 842558052791071584, guid: 6ba01dc4066c34c05b6f075ab81eaf04, type: 3}
+  fullGrownTreePrefabs:
+  - {fileID: 1142462325}
+  - {fileID: 1881214065}
+  - {fileID: 1088291053}
+  - {fileID: 2122180814}
+  treeGrowthTime: 1
   soilSpawnOffset: {x: 0, y: 0, z: 0}
+  soilHeightOffset: 0.2
   soilScale: {x: 2, y: 2, z: 2}
   soilRotation: {x: -90, y: 0, z: 0}
   plantedTreeSpawnOffset: {x: 0, y: -1.3, z: 0}

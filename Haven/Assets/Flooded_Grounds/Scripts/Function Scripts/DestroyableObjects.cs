@@ -16,6 +16,7 @@ public class DestroyableObject : MonoBehaviour
     [SerializeField] private float dropScatterRadius = 2f;  // How far the drops scatter
     [SerializeField] private float dropForce = 5f;          // Force applied to dropped items
     [SerializeField] private bool isTree = false;           // Flag to identify if this is a tree
+    public bool IsTree { get { return isTree; } } // Public getter for isTree
 
     [Header("Sprout Seed Drops")]
     [SerializeField] private bool canDropSproutSeed = false;
@@ -299,5 +300,32 @@ public class DestroyableObject : MonoBehaviour
                 Debug.Log("Applied force to sprout seed drop");
             }
         }
+    }
+    
+    // Public method to configure this object as a tree with drop settings
+    // This can be called when spawning trees to ensure they're properly configured
+    public void ConfigureAsTree(bool enableSproutSeedDrops = true)
+    {
+        isTree = true;
+        canDropSproutSeed = enableSproutSeedDrops;
+        Debug.Log($"DestroyableObject: Configured '{gameObject.name}' as a tree (isTree=true, canDropSproutSeed={enableSproutSeedDrops}).");
+    }
+    
+    // Public method to copy drop settings from another DestroyableObject
+    public void CopyDropSettings(DestroyableObject source)
+    {
+        if (source == null)
+        {
+            Debug.LogWarning("DestroyableObject: Cannot copy drop settings from null source.");
+            return;
+        }
+        
+        // Ensure isTree is set if source is a tree
+        if (source.IsTree)
+        {
+            isTree = true;
+        }
+        
+        Debug.Log($"DestroyableObject: Copied tree configuration from '{source.gameObject.name}' to '{gameObject.name}' (isTree={isTree}).");
     }
 } 
