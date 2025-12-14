@@ -305255,9 +305255,9 @@ MonoBehaviour:
     requiredItemName: Engine
     requiredQuantity: 1
     minigameType: 0
-    numberOfKnots: 6
-    numberOfKnotPairs: 3
-    timeLimit: 60
+    numberOfKnots: 12
+    numberOfKnotPairs: 6
+    timeLimit: 15
     targetPoints: 80
     pointsPerClick: 10
     decayRate: 15
@@ -305311,7 +305311,7 @@ MonoBehaviour:
   instructionsText: {fileID: 0}
   clickCountText: {fileID: 0}
   timeLimit: 15
-  pointsPerClick: 10
+  pointsPerClick: 3
   decayRate: 15
   targetPoints: 80
   failureThreshold: 20

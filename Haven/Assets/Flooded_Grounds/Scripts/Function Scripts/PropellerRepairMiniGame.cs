@@ -66,6 +66,8 @@ public class PropellerRepairMiniGame : MonoBehaviour
     private float clickCountResetTimer = 0f;
     private float lastClickTime = 0f;
     private float clicksPerSecond = 0f;
+    private float timeAtZeroPoints = 0f; // Track how long points have been at 0
+    private const float ZERO_POINTS_FAILURE_DELAY = 3f; // Fail after 3 seconds at 0 points
     
     // Player input and cursor management
     private CharController_Motor playerMotor;
@@ -175,10 +177,20 @@ public class PropellerRepairMiniGame : MonoBehaviour
             Debug.LogWarning($"PropellerRepairMiniGame: Part '{part.partName}' has timeLimit = 0. Using default {timeLimit} seconds.");
         }
         
+        // Use part settings if set (> 0), otherwise use component Inspector values
+        // This allows setting values either in the ShipRepairPart OR in the component Inspector
+        float previousTargetPoints = targetPoints;
+        float previousPointsPerClick = pointsPerClick;
+        float previousDecayRate = decayRate;
+        float previousFailureThreshold = failureThreshold;
+        
         if (part.targetPoints > 0) targetPoints = part.targetPoints;
         if (part.pointsPerClick > 0) pointsPerClick = part.pointsPerClick;
         if (part.decayRate > 0) decayRate = part.decayRate;
         if (part.failureThreshold > 0) failureThreshold = part.failureThreshold;
+        
+        Debug.Log($"PropellerRepairMiniGame: Settings loaded - Part values: TargetPoints={part.targetPoints}, PointsPerClick={part.pointsPerClick}, DecayRate={part.decayRate}, FailureThreshold={part.failureThreshold}");
+        Debug.Log($"PropellerRepairMiniGame: Final values being used - TargetPoints: {targetPoints} (was {previousTargetPoints}), PointsPerClick: {pointsPerClick} (was {previousPointsPerClick}), DecayRate: {decayRate} (was {previousDecayRate}), FailureThreshold: {failureThreshold} (was {previousFailureThreshold})");
         
         // Start with points slightly above failure threshold, so player has time to react
         // This prevents instant failure when the minigame starts
@@ -187,6 +199,7 @@ public class PropellerRepairMiniGame : MonoBehaviour
         clickCount = 0;
         clicksPerSecond = 0f;
         hasFailed = false;
+        timeAtZeroPoints = 0f; // Reset timer for zero points
         isActive = true;
         isPaused = false;
         
@@ -262,17 +275,28 @@ public class PropellerRepairMiniGame : MonoBehaviour
                 // Update time
                 timeRemaining -= Time.deltaTime;
                 
+                // Track time spent at 0 points
+                if (currentPoints <= 0f)
+                {
+                    timeAtZeroPoints += Time.deltaTime;
+                    
+                    // Fail if we've been at 0 points for 3 seconds
+                    if (timeAtZeroPoints >= ZERO_POINTS_FAILURE_DELAY)
+                    {
+                        FailMinigame();
+                        yield break;
+                    }
+                }
+                else
+                {
+                    // Reset timer if points are above 0
+                    timeAtZeroPoints = 0f;
+                }
+                
                 // Update UI
                 UpdateProgressBar();
                 UpdateTimer();
                 UpdateClickCountDisplay();
-                
-                // Check for failure (points dropped below threshold)
-                if (currentPoints < failureThreshold)
-                {
-                    FailMinigame();
-                    yield break;
-                }
                 
                 // Check for success (points reached target and time still remaining)
                 if (currentPoints >= targetPoints)
