@@ -67,16 +67,32 @@ public class SeedInteraction : MonoBehaviour
                 Debug.Log("SeedInteraction: Hit object is tagged as Soil. Requesting TreePlantingSystem to plant.");
                 treePlantingSystem.PlantSeedOnSoil(hitObject);
 
-                // Notify HotbarManager to clear the current slot
+                // Consume one seed from the stack (similar to CampfireFuel)
                 if (hotbarManager != null)
                 {
-                    hotbarManager.ClearCurrentHotbarSlot();
+                    InventorySlot slot = hotbarManager.hotbarSlots[hotbarManager.selectedSlot];
+                    int stackCount = slot.GetStackCount();
+                    
+                    if (stackCount > 1)
+                    {
+                        // Decrement stack count - only consume one seed
+                        slot.SetStackCount(stackCount - 1);
+                        hotbarManager.UpdateHotbarUI();
+                        Debug.Log($"SeedInteraction: Consumed 1 seed from stack. Remaining: {stackCount - 1}");
+                    }
+                    else
+                    {
+                        // Stack count is 1, so remove the item entirely
+                        hotbarManager.ClearCurrentHotbarSlot();
+                        Destroy(this.gameObject);
+                        Debug.Log("SeedInteraction: Last seed consumed, slot cleared.");
+                    }
                 }
-
-                // After successful planting, destroy this seed instance (the one in player's hand)
-                // Or, if using an inventory system, remove it from inventory.
-                // For now, destroy the GameObject if it's not managed by inventory.
-                Destroy(this.gameObject);
+                else
+                {
+                    // Fallback if hotbarManager is null
+                    Destroy(this.gameObject);
+                }
             }
             else
             {
