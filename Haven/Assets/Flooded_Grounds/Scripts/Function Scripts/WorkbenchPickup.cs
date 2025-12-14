@@ -189,6 +189,15 @@ public class WorkbenchPickup : MonoBehaviour
         
         Debug.Log($"WorkbenchPickup: Restoring workbench '{originalName}' -> '{workbench.name}' (verified)");
         
+        // Reset rotation to identity (fixes sideways issue when picking up)
+        workbench.transform.rotation = Quaternion.identity;
+        
+        // Reset position to zero (prevents janky placement)
+        workbench.transform.position = Vector3.zero;
+        
+        // Reset scale to ensure it's normal
+        workbench.transform.localScale = Vector3.one;
+        
         // Reset physics state (workbench might have been placed with kinematic)
         Rigidbody rb = workbench.GetComponent<Rigidbody>();
         if (rb != null)

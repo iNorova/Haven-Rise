@@ -97,6 +97,14 @@ public class GhoulZombieAI : MonoBehaviour, IDamageable
 
 	private IDamageable cachedDamageable;
 
+	// Stuck detection
+	private Vector3 lastPosition;
+	private float stuckTimer;
+	private const float STUCK_THRESHOLD = 0.1f; // Distance considered "stuck"
+	private const float STUCK_TIME = 3f; // Seconds before considered stuck
+	private float navMeshCheckTimer;
+	private const float NAVMESH_CHECK_INTERVAL = 2f; // Check NavMesh every 2 seconds
+
 	private void Awake()
 	{
 		animator = GetComponent<Animator>();
@@ -114,6 +122,14 @@ public class GhoulZombieAI : MonoBehaviour, IDamageable
 
 	private void Start()
 	{
+		// Ensure NavMeshAgent is properly placed on NavMesh
+		EnsureOnNavMesh();
+
+		// Initialize stuck detection
+		lastPosition = transform.position;
+		stuckTimer = 0f;
+		navMeshCheckTimer = 0f;
+
 		if (player == null)
 		{
 			var motor = FindFirstObjectByType<CharController_Motor>();
@@ -139,12 +155,69 @@ public class GhoulZombieAI : MonoBehaviour, IDamageable
 		PickNewPatrolPoint();
 	}
 
+	/// <summary>
+	/// Ensures the ghoul is placed on a valid NavMesh position. If not, tries to find the nearest valid position.
+	/// </summary>
+	private void EnsureOnNavMesh()
+	{
+		if (agent == null) return;
+
+		// Check if agent is on NavMesh
+		if (!agent.isOnNavMesh)
+		{
+			// Try progressively larger radii to find valid NavMesh position
+			float[] searchRadii = { 5f, 10f, 20f, 50f };
+			
+			foreach (float radius in searchRadii)
+			{
+				UnityEngine.AI.NavMeshHit hit;
+				if (UnityEngine.AI.NavMesh.SamplePosition(transform.position, out hit, radius, UnityEngine.AI.NavMesh.AllAreas))
+				{
+					transform.position = hit.position;
+					agent.Warp(hit.position);
+					
+					if (radius > 10f)
+					{
+						Debug.LogWarning($"GhoulZombieAI: Repositioned ghoul {gameObject.name} to valid NavMesh position ({radius}m radius).");
+					}
+					return; // Successfully repositioned
+				}
+			}
+			
+			// If all radii failed, log error but don't destroy the ghoul
+			Debug.LogError($"GhoulZombieAI: Could not find valid NavMesh position for ghoul {gameObject.name} within 50m. Ghoul may be stuck! Position: {transform.position}");
+		}
+		else
+		{
+			// Even if on NavMesh, occasionally warp to current position to ensure agent is properly initialized
+			// This helps with edge cases where the agent thinks it's on NavMesh but isn't actually working
+			if (Random.value < 0.1f) // 10% chance per check to avoid doing it every frame
+			{
+				agent.Warp(transform.position);
+			}
+		}
+	}
+
 	private void Update()
 	{
 		if (currentState == GhoulState.Dead)
 		{
 			return;
 		}
+
+		// Periodic NavMesh validation
+		navMeshCheckTimer += Time.deltaTime;
+		if (navMeshCheckTimer >= NAVMESH_CHECK_INTERVAL)
+		{
+			navMeshCheckTimer = 0f;
+			if (agent != null && !agent.isOnNavMesh)
+			{
+				EnsureOnNavMesh();
+			}
+		}
+
+		// Stuck detection
+		CheckIfStuck();
 
 		attackTimer -= Time.deltaTime;
 		if (damagePendingFromAutoDelay)
@@ -321,17 +394,92 @@ public class GhoulZombieAI : MonoBehaviour, IDamageable
 
 	private void PickNewPatrolPoint()
 	{
-		Vector3 randomDirection = Random.insideUnitSphere * patrolRadius;
-		randomDirection += transform.position;
-
-		if (NavMesh.SamplePosition(randomDirection, out var hit, patrolRadius, NavMesh.AllAreas))
+		if (agent == null || !agent.isOnNavMesh)
 		{
-			currentPatrolTarget = hit.position;
+			EnsureOnNavMesh();
+			if (agent == null || !agent.isOnNavMesh)
+			{
+				return; // Can't pick patrol point if not on NavMesh
+			}
+		}
+
+		// Try multiple random directions to find a valid NavMesh position
+		for (int attempts = 0; attempts < 10; attempts++)
+		{
+			Vector3 randomDirection = Random.insideUnitSphere * patrolRadius;
+			randomDirection.y = 0; // Keep it on the same Y level
+			Vector3 targetPosition = transform.position + randomDirection;
+
+			if (NavMesh.SamplePosition(targetPosition, out var hit, patrolRadius * 1.5f, NavMesh.AllAreas))
+			{
+				currentPatrolTarget = hit.position;
+				agent.SetDestination(currentPatrolTarget);
+				return; // Successfully found a valid patrol point
+			}
+		}
+
+		// If all attempts failed, try to find any valid NavMesh position nearby
+		if (NavMesh.SamplePosition(transform.position, out var fallbackHit, patrolRadius * 2f, NavMesh.AllAreas))
+		{
+			currentPatrolTarget = fallbackHit.position;
 			agent.SetDestination(currentPatrolTarget);
 		}
 		else
 		{
+			// Last resort: stay in place but try to ensure we're on NavMesh
 			currentPatrolTarget = transform.position;
+			EnsureOnNavMesh();
+		}
+	}
+
+	/// <summary>
+	/// Checks if the ghoul is stuck and attempts to unstick it.
+	/// </summary>
+	private void CheckIfStuck()
+	{
+		if (agent == null || currentState == GhoulState.Attack || currentState == GhoulState.Dead)
+		{
+			return;
+		}
+
+		// Check if ghoul has moved significantly
+		float distanceMoved = Vector3.Distance(transform.position, lastPosition);
+		
+		if (distanceMoved < STUCK_THRESHOLD)
+		{
+			stuckTimer += Time.deltaTime;
+			
+			// If stuck for too long and agent has a destination, try to recover
+			if (stuckTimer >= STUCK_TIME && agent.hasPath)
+			{
+				Debug.LogWarning($"GhoulZombieAI: {gameObject.name} appears to be stuck. Attempting recovery...");
+				
+				// Try to ensure we're on NavMesh
+				EnsureOnNavMesh();
+				
+				// Reset the current destination and pick a new one
+				agent.ResetPath();
+				
+				// If in patrol, pick a new point
+				if (currentState == GhoulState.Patrol)
+				{
+					PickNewPatrolPoint();
+				}
+				// If chasing, try to set destination again
+				else if (currentState == GhoulState.Chase && player != null)
+				{
+					agent.SetDestination(player.position);
+				}
+				
+				// Reset stuck timer
+				stuckTimer = 0f;
+			}
+		}
+		else
+		{
+			// Ghoul is moving, reset stuck timer
+			stuckTimer = 0f;
+			lastPosition = transform.position;
 		}
 	}
 

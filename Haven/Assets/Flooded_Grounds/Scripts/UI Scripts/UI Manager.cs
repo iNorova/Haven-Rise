@@ -60,6 +60,53 @@ public class UIManager : MonoBehaviour, IDamageable
     private float staminaRegenTimer;          // Timer for stamina regeneration delay
     private bool isUsingStamina;              // Whether player is currently using stamina
 
+    [Header("Hunger System")]
+    public Slider hungerSlider;               // Reference to hunger UI slider
+    public Image hungerFillImage;             // Reference to the hunger slider's fill image
+    public Color hungerColor = new Color(1f, 0.65f, 0f);          // Orange (#FFA500)
+    public float maxHunger = 100f;            // Maximum hunger value
+    public float cookedSteakHungerRestore = 50f; // How much hunger is restored when eating cooked steak
+    [Tooltip("Drag the cooked steak prefab/asset here. If not assigned, will use item name matching.")]
+    public GameObject cookedSteakPrefab;      // Reference to the cooked steak prefab (drag from project)
+    [Tooltip("Name of the cooked steak item (used as fallback if prefab is not assigned).")]
+    public string cookedSteakItemName = "Cooked Steak"; // Name of the cooked steak item (fallback)
+    private float currentHunger;              // Current hunger value
+    private float hungerActionTimer = 0f;      // Timer for action-based hunger decrease
+    private float thirstActionTimer = 0f;      // Timer for action-based thirst decrease
+
+    [Header("Thirst System")]
+    public Slider thirstSlider;               // Reference to thirst UI slider
+    public Image thirstFillImage;             // Reference to the thirst slider's fill image
+    public Color thirstColor = new Color(0f, 0.5f, 1f);          // Blue (#0080FF)
+    public float maxThirst = 100f;            // Maximum thirst value
+    public float waterDrinkRestore = 50f;     // How much thirst is restored when drinking water
+    [Tooltip("Drag the water plane GameObject here. Player can drink by pressing G when near it.")]
+    public GameObject waterPlane;              // Reference to the water plane (drag from scene)
+    [Tooltip("How close player needs to be to water to drink.")]
+    public float waterDrinkRange = 3f;        // Distance from water to allow drinking
+    [Tooltip("Cooldown time in seconds before player can drink water again (5 minutes = 300 seconds).")]
+    public float waterDrinkCooldown = 300f;   // 5 minutes cooldown
+    private float currentThirst;              // Current thirst value
+    private float lastWaterDrinkTime = -999f;  // Time when player last drank water
+
+    [Header("Action-Based Hunger/Thirst Costs")]
+    [Tooltip("Hunger lost per axe swing.")]
+    public float hungerCostAxeSwing = 2f;
+    [Tooltip("Thirst lost per axe swing.")]
+    public float thirstCostAxeSwing = 3f;
+    [Tooltip("Hunger lost per rock swing.")]
+    public float hungerCostRockSwing = 1.5f;
+    [Tooltip("Thirst lost per rock swing.")]
+    public float thirstCostRockSwing = 2f;
+    [Tooltip("Hunger lost per second while sprinting.")]
+    public float hungerCostSprinting = 1f;
+    [Tooltip("Thirst lost per second while sprinting.")]
+    public float thirstCostSprinting = 2f;
+    [Tooltip("Hunger lost per second while walking.")]
+    public float hungerCostWalking = 0.3f;
+    [Tooltip("Thirst lost per second while walking.")]
+    public float thirstCostWalking = 0.5f;
+
     private float currentTemperature;
     private float permanentTemperatureIncrease = 0f;  // Tracks permanent temperature increase from deforestation
     private bool isTemperatureIncreasing = false; // Flag to control temperature increase
@@ -68,6 +115,14 @@ public class UIManager : MonoBehaviour, IDamageable
     // Static instance for global access
     public static UIManager Instance { get; private set; }
     public static event Action OnPlayerDeath;
+
+    // Cached references for optimization
+    private CharController_Motor cachedPlayerMotor;
+    private HotbarManager cachedHotbarManager;
+    private InventoryManager cachedInventoryManager;
+    private GameObject cachedPlayer;
+    private float playerMotorCheckTimer = 0f;
+    private const float PLAYER_MOTOR_CHECK_INTERVAL = 1f; // Check every second instead of every frame
 
     void Awake()
     {
@@ -143,6 +198,44 @@ public class UIManager : MonoBehaviour, IDamageable
         else
         {
             Debug.LogError("Stamina Slider is not assigned in the inspector!");
+        }
+
+        // Initialize hunger system
+        currentHunger = maxHunger;
+        if (hungerSlider != null)
+        {
+            hungerSlider.maxValue = maxHunger;
+            hungerSlider.minValue = 0f;
+            hungerSlider.value = currentHunger;
+            if (hungerFillImage != null)
+            {
+                hungerFillImage.fillAmount = 1f;
+                hungerFillImage.color = hungerColor;
+            }
+            Debug.Log($"Hunger slider initialized - Max: {maxHunger}, Current: {currentHunger}");
+        }
+        else
+        {
+            Debug.LogError("Hunger Slider is not assigned in the inspector!");
+        }
+
+        // Initialize thirst system
+        currentThirst = maxThirst;
+        if (thirstSlider != null)
+        {
+            thirstSlider.maxValue = maxThirst;
+            thirstSlider.minValue = 0f;
+            thirstSlider.value = currentThirst;
+            if (thirstFillImage != null)
+            {
+                thirstFillImage.fillAmount = 1f;
+                thirstFillImage.color = thirstColor;
+            }
+            Debug.Log($"Thirst slider initialized - Max: {maxThirst}, Current: {currentThirst}");
+        }
+        else
+        {
+            Debug.LogError("Thirst Slider is not assigned in the inspector!");
         }
 
         // Check if components are assigned
@@ -230,6 +323,32 @@ public class UIManager : MonoBehaviour, IDamageable
 
             // Update stamina system
             UpdateStaminaSystem();
+
+            // Update action-based hunger/thirst (from movement)
+            UpdateActionBasedHungerThirst();
+
+            // Periodically refresh cached references (every second)
+            playerMotorCheckTimer += Time.deltaTime;
+            if (playerMotorCheckTimer >= PLAYER_MOTOR_CHECK_INTERVAL)
+            {
+                RefreshCachedReferences();
+                playerMotorCheckTimer = 0f;
+            }
+
+            // Check for food consumption (G key)
+            if (Input.GetKeyDown(KeyCode.G))
+            {
+                // Try to drink water first (if near water)
+                if (TryDrinkWater())
+                {
+                    // Water drinking takes priority
+                }
+                else
+                {
+                    // If not near water, try to consume food
+                    TryConsumeFood();
+                }
+            }
         }
     }
 
@@ -430,8 +549,13 @@ public class UIManager : MonoBehaviour, IDamageable
 
     private void DisablePlayerControls()
     {
-        // Find the player GameObject
-        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        // Use cached player reference
+        if (cachedPlayer == null)
+        {
+            cachedPlayer = GameObject.FindGameObjectWithTag("Player");
+        }
+
+        GameObject player = cachedPlayer;
         if (player != null)
         {
             // Disable all Rigidbody movement
@@ -465,8 +589,13 @@ public class UIManager : MonoBehaviour, IDamageable
 
     private void EnablePlayerControls()
     {
-        // Find the player GameObject
-        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        // Use cached player reference
+        if (cachedPlayer == null)
+        {
+            cachedPlayer = GameObject.FindGameObjectWithTag("Player");
+        }
+
+        GameObject player = cachedPlayer;
         if (player != null)
         {
             // Re-enable Rigidbody movement
@@ -483,15 +612,19 @@ public class UIManager : MonoBehaviour, IDamageable
                 cc.enabled = true;
             }
 
-            // Re-enable any movement scripts
+            // Re-enable any movement scripts (cache GetComponents result)
             MonoBehaviour[] scripts = player.GetComponents<MonoBehaviour>();
-            foreach (MonoBehaviour script in scripts)
+            int scriptCount = scripts.Length;
+            for (int i = 0; i < scriptCount; i++)
             {
-                if (script != null && script.GetType().Name.ToLower().Contains("movement") 
-                    || script.GetType().Name.ToLower().Contains("controller")
-                    || script.GetType().Name.ToLower().Contains("input"))
+                MonoBehaviour script = scripts[i];
+                if (script != null)
                 {
-                    script.enabled = true;
+                    string typeName = script.GetType().Name.ToLower();
+                    if (typeName.Contains("movement") || typeName.Contains("controller") || typeName.Contains("input"))
+                    {
+                        script.enabled = true;
+                    }
                 }
             }
         }
@@ -510,10 +643,9 @@ public class UIManager : MonoBehaviour, IDamageable
         {
             float regenRate = GetStaminaRegenRate();
             currentStamina = Mathf.Min(currentStamina + regenRate * Time.deltaTime, maxStamina);
-            // Removed debug log - was looping every frame
         }
 
-        // Update stamina UI
+        // Update stamina UI only if slider exists
         if (staminaSlider != null)
         {
             staminaSlider.value = currentStamina;
@@ -672,11 +804,590 @@ public class UIManager : MonoBehaviour, IDamageable
         NotifyTemperatureChanged(GetCurrentTemperature());
     }
 
+    private void RefreshCachedReferences()
+    {
+        // Refresh cached references periodically
+        if (cachedPlayerMotor == null)
+        {
+            cachedPlayerMotor = FindObjectOfType<CharController_Motor>();
+        }
+        if (cachedHotbarManager == null)
+        {
+            cachedHotbarManager = FindFirstObjectByType<HotbarManager>();
+        }
+        if (cachedInventoryManager == null)
+        {
+            cachedInventoryManager = FindFirstObjectByType<InventoryManager>();
+        }
+        if (cachedPlayer == null)
+        {
+            cachedPlayer = GameObject.FindGameObjectWithTag("Player");
+        }
+    }
+
+    private void UpdateActionBasedHungerThirst()
+    {
+        if (isPaused) return;
+
+        // Use cached reference
+        if (cachedPlayerMotor == null)
+        {
+            cachedPlayerMotor = FindObjectOfType<CharController_Motor>();
+            if (cachedPlayerMotor == null) return;
+        }
+
+        CharController_Motor playerMotor = cachedPlayerMotor;
+        if (playerMotor != null)
+        {
+            // Check if player is sprinting
+            if (playerMotor.IsSprinting())
+            {
+                // Decrease hunger and thirst while sprinting
+                hungerActionTimer += Time.deltaTime;
+                thirstActionTimer += Time.deltaTime;
+                
+                if (hungerActionTimer >= 1f) // Every second
+                {
+                    DecreaseHunger(hungerCostSprinting);
+                    hungerActionTimer = 0f;
+                }
+                
+                if (thirstActionTimer >= 1f) // Every second
+                {
+                    DecreaseThirst(thirstCostSprinting);
+                    thirstActionTimer = 0f;
+                }
+            }
+            // Check if player is walking
+            else if (playerMotor.IsWalking())
+            {
+                hungerActionTimer += Time.deltaTime;
+                thirstActionTimer += Time.deltaTime;
+                
+                if (hungerActionTimer >= 1f) // Every second
+                {
+                    DecreaseHunger(hungerCostWalking);
+                    hungerActionTimer = 0f;
+                }
+                
+                if (thirstActionTimer >= 1f) // Every second
+                {
+                    DecreaseThirst(thirstCostWalking);
+                    thirstActionTimer = 0f;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Called when player swings an axe. Decreases hunger and thirst.
+    /// </summary>
+    public void OnAxeSwing()
+    {
+        DecreaseHunger(hungerCostAxeSwing);
+        DecreaseThirst(thirstCostAxeSwing);
+        Debug.Log($"Axe swing! Hunger: -{hungerCostAxeSwing}, Thirst: -{thirstCostAxeSwing}");
+    }
+
+    /// <summary>
+    /// Called when player swings a rock. Decreases hunger and thirst.
+    /// </summary>
+    public void OnRockSwing()
+    {
+        DecreaseHunger(hungerCostRockSwing);
+        DecreaseThirst(thirstCostRockSwing);
+        Debug.Log($"Rock swing! Hunger: -{hungerCostRockSwing}, Thirst: -{thirstCostRockSwing}");
+    }
+
+    private void DecreaseHunger(float amount)
+    {
+        currentHunger = Mathf.Max(currentHunger - amount, 0f);
+        UpdateHungerUI();
+    }
+
+    private void DecreaseThirst(float amount)
+    {
+        currentThirst = Mathf.Max(currentThirst - amount, 0f);
+        UpdateThirstUI();
+    }
+
+    private void UpdateHungerUI()
+    {
+        if (hungerSlider != null)
+        {
+            hungerSlider.value = currentHunger;
+            if (hungerFillImage != null)
+            {
+                hungerFillImage.fillAmount = currentHunger / maxHunger;
+                hungerFillImage.color = hungerColor;
+            }
+        }
+    }
+
+    private void UpdateThirstUI()
+    {
+        if (thirstSlider != null)
+        {
+            thirstSlider.value = currentThirst;
+            if (thirstFillImage != null)
+            {
+                thirstFillImage.fillAmount = currentThirst / maxThirst;
+                thirstFillImage.color = thirstColor;
+            }
+        }
+    }
+
+    private void TryConsumeFood()
+    {
+        // Check if player has cooked steak in inventory/hotbar
+        if (HasCookedSteak())
+        {
+            ConsumeCookedSteak();
+        }
+    }
+
+    private bool HasCookedSteak()
+    {
+        // Use cached reference
+        if (cachedHotbarManager == null)
+        {
+            cachedHotbarManager = FindFirstObjectByType<HotbarManager>();
+        }
+
+        HotbarManager hotbarManager = cachedHotbarManager;
+        if (hotbarManager != null)
+        {
+            // Check selected slot first (what player is holding)
+            GameObject selectedItem = hotbarManager.GetItem(hotbarManager.selectedSlot);
+            if (IsCookedSteak(selectedItem))
+            {
+                return true;
+            }
+            
+            // Check all hotbar slots
+            for (int i = 0; i < hotbarManager.hotbarSlots.Length; i++)
+            {
+                GameObject item = hotbarManager.GetItem(i);
+                if (IsCookedSteak(item))
+                {
+                    return true;
+                }
+            }
+        }
+
+        // Use cached reference
+        if (cachedInventoryManager == null)
+        {
+            cachedInventoryManager = FindFirstObjectByType<InventoryManager>();
+        }
+
+        InventoryManager inventoryManager = cachedInventoryManager;
+        if (inventoryManager != null)
+        {
+            for (int i = 0; i < inventoryManager.inventorySlots.Length; i++)
+            {
+                GameObject item = inventoryManager.GetItem(i);
+                if (IsCookedSteak(item))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private bool IsCookedSteak(GameObject item)
+    {
+        if (item == null) return false;
+        
+        // First check: Compare with prefab reference (most reliable)
+        if (cookedSteakPrefab != null)
+        {
+            // Check if item is the same prefab (by comparing names without Clone)
+            string itemName = item.name.Replace("(Clone)", "").Trim();
+            string prefabName = cookedSteakPrefab.name.Replace("(Clone)", "").Trim();
+            
+            if (itemName.Equals(prefabName, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            
+            // Also check ItemIconProvider if both have it
+            ItemIconProvider itemProvider = item.GetComponent<ItemIconProvider>();
+            ItemIconProvider prefabProvider = cookedSteakPrefab.GetComponent<ItemIconProvider>();
+            
+            if (itemProvider != null && prefabProvider != null)
+            {
+                if (!string.IsNullOrEmpty(itemProvider.itemName) && 
+                    !string.IsNullOrEmpty(prefabProvider.itemName))
+                {
+                    if (itemProvider.itemName.Equals(prefabProvider.itemName, System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        // Fallback: Check by name (if prefab not assigned)
+        if (cookedSteakPrefab == null)
+        {
+            ItemIconProvider iconProvider = item.GetComponent<ItemIconProvider>();
+            if (iconProvider != null && !string.IsNullOrEmpty(iconProvider.itemName))
+            {
+                return iconProvider.itemName.Equals(cookedSteakItemName, System.StringComparison.OrdinalIgnoreCase);
+            }
+            
+            string itemName = item.name.Replace("(Clone)", "").Trim();
+            return itemName.Equals(cookedSteakItemName, System.StringComparison.OrdinalIgnoreCase) || 
+                   itemName.Contains(cookedSteakItemName);
+        }
+        
+        return false;
+    }
+
+    private void ConsumeCookedSteak()
+    {
+        // Restore hunger
+        currentHunger = Mathf.Min(currentHunger + cookedSteakHungerRestore, maxHunger);
+        
+        // Update hunger UI immediately
+        if (hungerSlider != null)
+        {
+            hungerSlider.value = currentHunger;
+            if (hungerFillImage != null)
+            {
+                hungerFillImage.fillAmount = currentHunger / maxHunger;
+                hungerFillImage.color = hungerColor;
+            }
+        }
+
+        Debug.Log($"Consumed cooked steak! Hunger restored by {cookedSteakHungerRestore}. Current hunger: {currentHunger}");
+
+        // Remove cooked steak from inventory/hotbar
+        RemoveCookedSteakFromInventory();
+    }
+
+    private void RemoveCookedSteakFromInventory()
+    {
+        // Use cached reference
+        if (cachedHotbarManager == null)
+        {
+            cachedHotbarManager = FindFirstObjectByType<HotbarManager>();
+        }
+
+        HotbarManager hotbarManager = cachedHotbarManager;
+        if (hotbarManager != null)
+        {
+            // Check selected slot first
+            int selectedSlot = hotbarManager.selectedSlot;
+            GameObject selectedItem = hotbarManager.GetItem(selectedSlot);
+            if (IsCookedSteak(selectedItem))
+            {
+                InventorySlot slot = hotbarManager.hotbarSlots[selectedSlot];
+                int stackCount = slot.GetStackCount();
+                
+                if (stackCount > 1)
+                {
+                    // Decrement stack
+                    slot.SetStackCount(stackCount - 1);
+                }
+                else
+                {
+                    // Remove item completely
+                    hotbarManager.SetItem(selectedSlot, null);
+                    if (selectedItem != null)
+                    {
+                        Destroy(selectedItem);
+                    }
+                }
+                hotbarManager.UpdateHotbarUI();
+                Debug.Log("Consumed cooked steak from hotbar selected slot.");
+                return;
+            }
+            
+            // Check all other hotbar slots
+            for (int i = 0; i < hotbarManager.hotbarSlots.Length; i++)
+            {
+                if (i == selectedSlot) continue; // Already checked
+                
+                GameObject item = hotbarManager.GetItem(i);
+                if (IsCookedSteak(item))
+                {
+                    InventorySlot slot = hotbarManager.hotbarSlots[i];
+                    int stackCount = slot.GetStackCount();
+                    
+                    if (stackCount > 1)
+                    {
+                        slot.SetStackCount(stackCount - 1);
+                    }
+                    else
+                    {
+                        hotbarManager.SetItem(i, null);
+                        if (item != null)
+                        {
+                            Destroy(item);
+                        }
+                    }
+                    hotbarManager.UpdateHotbarUI();
+                    Debug.Log($"Consumed cooked steak from hotbar slot {i}.");
+                    return;
+                }
+            }
+        }
+
+        // Use cached reference
+        if (cachedInventoryManager == null)
+        {
+            cachedInventoryManager = FindFirstObjectByType<InventoryManager>();
+        }
+
+        InventoryManager inventoryManager = cachedInventoryManager;
+        if (inventoryManager != null)
+        {
+            for (int i = 0; i < inventoryManager.inventorySlots.Length; i++)
+            {
+                GameObject item = inventoryManager.GetItem(i);
+                if (IsCookedSteak(item))
+                {
+                    InventorySlot slot = inventoryManager.inventorySlots[i];
+                    int stackCount = slot.GetStackCount();
+                    
+                    if (stackCount > 1)
+                    {
+                        slot.SetStackCount(stackCount - 1);
+                    }
+                    else
+                    {
+                        inventoryManager.SetItem(i, null);
+                        if (item != null)
+                        {
+                            Destroy(item);
+                        }
+                    }
+                    inventoryManager.UpdateInventoryUI();
+                    Debug.Log($"Consumed cooked steak from inventory slot {i}.");
+                    return;
+                }
+            }
+        }
+        
+        Debug.LogWarning("Could not find cooked steak to consume!");
+    }
+
+    /// <summary>
+    /// Manually restore hunger (for testing or other systems).
+    /// </summary>
+    public void RestoreHunger(float amount)
+    {
+        currentHunger = Mathf.Min(currentHunger + amount, maxHunger);
+        if (hungerSlider != null)
+        {
+            hungerSlider.value = currentHunger;
+            if (hungerFillImage != null)
+            {
+                hungerFillImage.fillAmount = currentHunger / maxHunger;
+                hungerFillImage.color = hungerColor;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Restore hunger to full.
+    /// </summary>
+    public void RestoreFullHunger()
+    {
+        currentHunger = maxHunger;
+        if (hungerSlider != null)
+        {
+            hungerSlider.value = currentHunger;
+            if (hungerFillImage != null)
+            {
+                hungerFillImage.fillAmount = 1f;
+                hungerFillImage.color = hungerColor;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Get current hunger value.
+    /// </summary>
+    public float GetCurrentHunger()
+    {
+        return currentHunger;
+    }
+
+
+    private bool TryDrinkWater()
+    {
+        if (waterPlane == null)
+        {
+            Debug.LogWarning("UIManager: Water plane is not assigned! Cannot drink water.");
+            return false;
+        }
+
+        // Use cached player reference
+        if (cachedPlayer == null)
+        {
+            cachedPlayer = GameObject.FindGameObjectWithTag("Player");
+            if (cachedPlayer == null)
+            {
+                if (cachedPlayerMotor != null)
+                {
+                    cachedPlayer = cachedPlayerMotor.gameObject;
+                }
+                else
+                {
+                    CharController_Motor motor = FindObjectOfType<CharController_Motor>();
+                    if (motor != null)
+                    {
+                        cachedPlayer = motor.gameObject;
+                        cachedPlayerMotor = motor;
+                    }
+                }
+            }
+        }
+
+        GameObject player = cachedPlayer;
+        if (player == null)
+        {
+            Debug.LogWarning("UIManager: Player not found! Cannot drink water.");
+            return false;
+        }
+
+        // Calculate distance to water plane
+        float distanceToWater = GetDistanceToWaterPlane(player.transform.position);
+        
+        Debug.Log($"UIManager: Distance to water: {distanceToWater:F2}, Drink range: {waterDrinkRange}, Water plane: {(waterPlane != null ? waterPlane.name : "NULL")}");
+        
+        if (distanceToWater <= waterDrinkRange)
+        {
+            Debug.Log("UIManager: Player is near water! Drinking...");
+            DrinkWater();
+            return true;
+        }
+        else
+        {
+            Debug.Log($"UIManager: Player is too far from water. Distance: {distanceToWater:F2}, Required: {waterDrinkRange}");
+        }
+
+        return false;
+    }
+
+    private float GetDistanceToWaterPlane(Vector3 position)
+    {
+        if (waterPlane == null)
+        {
+            return float.MaxValue;
+        }
+
+        // Get water plane's position
+        Vector3 waterPosition = waterPlane.transform.position;
+        
+        // For a flat water plane, we primarily check vertical distance (Y position)
+        // This works well for large flat water planes
+        float verticalDistance = Mathf.Abs(position.y - waterPosition.y);
+        
+        // Optional: Check horizontal bounds if water plane has a collider
+        Collider waterCollider = waterPlane.GetComponent<Collider>();
+        if (waterCollider != null)
+        {
+            Bounds waterBounds = waterCollider.bounds;
+            
+            // Check if player is within horizontal bounds (X and Z)
+            bool withinHorizontalBounds = position.x >= waterBounds.min.x && position.x <= waterBounds.max.x &&
+                                         position.z >= waterBounds.min.z && position.z <= waterBounds.max.z;
+            
+            if (!withinHorizontalBounds)
+            {
+                // Player is outside water bounds - calculate distance to nearest edge
+                Vector3 closestPoint = waterBounds.ClosestPoint(position);
+                closestPoint.y = waterPosition.y; // Use water's Y level
+                float horizontalDistance = Vector3.Distance(new Vector3(position.x, 0, position.z), 
+                                                           new Vector3(closestPoint.x, 0, closestPoint.z));
+                // Return combined distance (prioritize vertical, but include horizontal)
+                return Mathf.Max(verticalDistance, horizontalDistance);
+            }
+        }
+        
+        // If within bounds or no collider, just return vertical distance
+        return verticalDistance;
+    }
+
+    private void DrinkWater()
+    {
+        // Check cooldown
+        float timeSinceLastDrink = Time.time - lastWaterDrinkTime;
+        if (lastWaterDrinkTime > 0 && timeSinceLastDrink < waterDrinkCooldown)
+        {
+            float remainingCooldown = waterDrinkCooldown - timeSinceLastDrink;
+            float remainingMinutes = remainingCooldown / 60f;
+            Debug.Log($"Cannot drink water yet! Cooldown remaining: {remainingMinutes:F1} minutes ({remainingCooldown:F0} seconds)");
+            return;
+        }
+
+        // Restore thirst
+        currentThirst = Mathf.Min(currentThirst + waterDrinkRestore, maxThirst);
+        
+        // Update cooldown timer
+        lastWaterDrinkTime = Time.time;
+        
+        // Update thirst UI immediately
+        UpdateThirstUI();
+
+        Debug.Log($"Drank water! Thirst restored by {waterDrinkRestore}. Current thirst: {currentThirst}. Cooldown: {waterDrinkCooldown} seconds.");
+    }
+
+    /// <summary>
+    /// Manually restore thirst (for testing or other systems).
+    /// </summary>
+    public void RestoreThirst(float amount)
+    {
+        currentThirst = Mathf.Min(currentThirst + amount, maxThirst);
+        if (thirstSlider != null)
+        {
+            thirstSlider.value = currentThirst;
+            if (thirstFillImage != null)
+            {
+                thirstFillImage.fillAmount = currentThirst / maxThirst;
+                thirstFillImage.color = thirstColor;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Restore thirst to full.
+    /// </summary>
+    public void RestoreFullThirst()
+    {
+        currentThirst = maxThirst;
+        if (thirstSlider != null)
+        {
+            thirstSlider.value = currentThirst;
+            if (thirstFillImage != null)
+            {
+                thirstFillImage.fillAmount = 1f;
+                thirstFillImage.color = thirstColor;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Get current thirst value.
+    /// </summary>
+    public float GetCurrentThirst()
+    {
+        return currentThirst;
+    }
+
     // Convenience method to reset all gameplay stats on respawn
     public void ResetAllStats()
     {
         RestoreFullHealth();
         RestoreFullStamina();
+        RestoreFullHunger();
+        RestoreFullThirst();
         ResetTemperature();
     }
 }

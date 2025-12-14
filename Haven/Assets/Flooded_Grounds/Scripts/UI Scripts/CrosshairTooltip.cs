@@ -517,8 +517,9 @@ public class CrosshairTooltip : MonoBehaviour
         }
         
         // Check if it's an interactable object (skip these)
+        // Removed NPC tag check to avoid "Tag: NPC is not defined" console spam - using component check instead
         if (obj.CompareTag("Pickupable") || obj.CompareTag("Destroyable") || 
-            obj.CompareTag("NPC") || obj.GetComponent<BedInteraction>() != null ||
+            obj.GetComponent("NPCController") != null || obj.GetComponent<BedInteraction>() != null ||
             obj.GetComponent<ItemIconProvider>() != null || obj.GetComponent<BedPickup>() != null)
         {
             return false;
@@ -615,8 +616,9 @@ public class CrosshairTooltip : MonoBehaviour
             return destroyableText;
         }
         
-        // Check if it's an NPC (you might need to add an NPC tag or component)
-        if (obj.CompareTag("NPC") || obj.GetComponent("NPCController") != null)
+        // Check if it's an NPC (check component first, avoid tag check to prevent console spam)
+        // Only check for NPC component - tag check removed to avoid "Tag: NPC is not defined" errors
+        if (obj.GetComponent("NPCController") != null)
         {
             return npcText;
         }

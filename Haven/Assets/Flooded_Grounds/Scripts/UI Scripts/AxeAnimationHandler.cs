@@ -24,6 +24,12 @@ public class AxeAnimationHandler : MonoBehaviour
         {
             Debug.Log("Playing Axe Swing Animation!");
             animator.SetTrigger(swingTrigger);
+            
+            // Decrease hunger and thirst when swinging axe
+            if (UIManager.Instance != null)
+            {
+                UIManager.Instance.OnAxeSwing();
+            }
         }
     }
 } 

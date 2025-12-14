@@ -231,12 +231,21 @@ public class WorkbenchPlacement : MonoBehaviour
                 // Force an immediate update after creating preview
                 if (previewWorkbench != null)
                 {
+                    // Make sure preview is active and visible
+                    previewWorkbench.SetActive(true);
                     UpdatePreview();
+                    Debug.Log($"[WorkbenchPlacement] Preview created and activated. Preview active: {previewWorkbench.activeSelf}, Renderers: {(cachedRenderers != null ? cachedRenderers.Length : 0)}");
                 }
                 else
                 {
                     Debug.LogError($"[WorkbenchPlacement] Failed to create preview for '{this.gameObject.name}'!");
                 }
+            }
+            
+            // Make sure preview is active if it exists
+            if (previewWorkbench != null && !previewWorkbench.activeSelf && showPreview)
+            {
+                previewWorkbench.SetActive(true);
             }
             
             // Always update placement check (needed for left-click placement)
@@ -257,18 +266,19 @@ public class WorkbenchPlacement : MonoBehaviour
             // Update preview visual (throttled for performance)
             if (showPreview && previewWorkbench != null)
             {
+                // Always update position/rotation smoothly (every frame)
+                if (previewWorkbench.activeSelf)
+                {
+                    previewWorkbench.transform.position = previewPosition;
+                    previewWorkbench.transform.rotation = previewRotation;
+                }
+                
                 // Update expensive operations (material changes) at intervals
                 previewUpdateTimer += Time.deltaTime;
                 if (previewUpdateTimer >= previewUpdateInterval)
                 {
                     previewUpdateTimer = 0f;
                     UpdatePreview(); // Updates visual based on current placement state
-                }
-                else if (previewWorkbench.activeSelf)
-                {
-                    // Keep position smooth between updates (already calculated by CheckPlacement)
-                    previewWorkbench.transform.position = previewPosition;
-                    previewWorkbench.transform.rotation = previewRotation;
                 }
             }
             
@@ -426,44 +436,23 @@ public class WorkbenchPlacement : MonoBehaviour
     
     void SetupPreviewMaterialsSimple()
     {
-        // Create visible outline effect for preview
+        // Minimal material setup - just tint existing materials slightly (same as bed)
+        // Avoids expensive material creation/modification
         if (cachedRenderers == null || cachedRenderers.Length == 0) return;
         
-        // Set materials to be semi-transparent with emission for better visibility
+        // Just set initial semi-transparent color - minimal changes (same as bed)
         for (int i = 0; i < cachedRenderers.Length; i++)
         {
-            if (cachedRenderers[i] != null)
+            if (cachedRenderers[i] != null && cachedRenderers[i].material != null)
             {
-                // Get material - create instance to avoid modifying original
                 Material mat = cachedRenderers[i].material;
-                if (mat == null) continue;
                 
-                // Make material semi-transparent
+                // Only modify if shader supports _Color (fastest path - same as bed)
                 if (mat.HasProperty("_Color"))
                 {
                     Color col = mat.color;
-                    col.a = 0.6f; // Semi-transparent
+                    col.a = 0.5f; // Semi-transparent (same as bed)
                     mat.color = col;
-                }
-                
-                // Enable emission for outline/glow effect (makes it more visible)
-                if (mat.HasProperty("_EmissionColor"))
-                {
-                    mat.SetColor("_EmissionColor", new Color(0.2f, 0.8f, 0.2f, 1f) * 0.5f); // Green glow
-                    mat.EnableKeyword("_EMISSION");
-                }
-                
-                // Try to enable transparency if shader supports it
-                if (mat.HasProperty("_Mode"))
-                {
-                    mat.SetFloat("_Mode", 3); // Set to transparent mode if supported
-                    mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                    mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                    mat.SetInt("_ZWrite", 0);
-                    mat.DisableKeyword("_ALPHATEST_ON");
-                    mat.EnableKeyword("_ALPHABLEND_ON");
-                    mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-                    mat.renderQueue = 3000; // Transparent queue
                 }
             }
         }
@@ -517,7 +506,7 @@ public class WorkbenchPlacement : MonoBehaviour
             // Check if placement is valid
             isValidPlacement = IsValidPlacement(hit);
             
-            // Calculate placement position with proper offset
+            // Calculate placement position (optimized - same as bed)
             float finalOffset = placementOffset;
             
             // If using bounds-based offset, calculate based on workbench size
@@ -528,12 +517,26 @@ public class WorkbenchPlacement : MonoBehaviour
                 finalOffset = bounds.extents.y;
             }
             
-            // Calculate placement position
-            previewPosition = hit.point + Vector3.up * finalOffset;
+            // Calculate placement position (optimized - same as bed)
+            previewPosition = hit.collider is TerrainCollider 
+                ? hit.point 
+                : hit.point + hit.normal * finalOffset;
             
-            // Calculate placement rotation - workbench should always face upward (upright)
-            // Apply rotation offset from Inspector if set
-            previewRotation = Quaternion.Euler(rotationOffset);
+            // Calculate placement rotation - auto-align to terrain like bed
+            float angle = Vector3.Angle(hit.normal, Vector3.up);
+            // For terrain or flat surfaces, use identity rotation with optional offset
+            // For sloped surfaces, align to surface normal
+            if (hit.collider is TerrainCollider || angle < 5f)
+            {
+                // Flat surface or terrain - use identity rotation (upright) with optional offset
+                previewRotation = Quaternion.Euler(rotationOffset);
+            }
+            else
+            {
+                // Sloped surface - align to surface normal, then apply offset
+                Quaternion surfaceRotation = Quaternion.FromToRotation(Vector3.up, hit.normal);
+                previewRotation = surfaceRotation * Quaternion.Euler(rotationOffset);
+            }
             
             // Debug placement status (only log when state changes to avoid spam)
             if (isValidPlacement != lastValidityState)
@@ -575,21 +578,28 @@ public class WorkbenchPlacement : MonoBehaviour
         // Update preview visual
         if (previewWorkbench != null)
         {
+            // Always ensure preview is active
+            if (!previewWorkbench.activeSelf)
+            {
+                previewWorkbench.SetActive(true);
+            }
+            
             previewWorkbench.transform.position = previewPosition;
             previewWorkbench.transform.rotation = previewRotation;
-            previewWorkbench.SetActive(true);
             
             // Update preview color based on validity (when state changes)
             if (isValidPlacement != lastValidityState)
             {
                 UpdatePreviewColor(isValidPlacement);
                 lastValidityState = isValidPlacement;
+                Debug.Log($"[WorkbenchPlacement] Preview color updated: {(isValidPlacement ? "GREEN" : "RED")}");
             }
             // Also update on first show if preview was just created
             else if (!lastValidityState && isValidPlacement)
             {
                 UpdatePreviewColor(true);
                 lastValidityState = true;
+                Debug.Log($"[WorkbenchPlacement] Preview color updated to GREEN on first show");
             }
         }
     }
@@ -610,36 +620,29 @@ public class WorkbenchPlacement : MonoBehaviour
     
     void UpdatePreviewColor(bool valid)
     {
-        // Optimized color update using cached renderers
+        // Optimized color update using cached renderers (same as bed)
         if (cachedRenderers == null || cachedRenderers.Length == 0) return;
         
         Color targetColor = valid ? new Color(0f, 1f, 0f, 0.6f) : new Color(1f, 0f, 0f, 0.6f); // Green or Red with better visibility
         
-        // Update all renderers
+        // Only update materials that support _Color property (fastest path - same as bed)
         for (int i = 0; i < cachedRenderers.Length; i++)
         {
-            if (cachedRenderers[i] != null)
+            if (cachedRenderers[i] != null && cachedRenderers[i].material != null)
             {
                 Material mat = cachedRenderers[i].material;
-                if (mat == null) continue;
                 
-                // Update color if material supports _Color property
+                // Only update if material has _Color property (most common)
                 if (mat.HasProperty("_Color"))
                 {
                     mat.color = targetColor;
-                }
-                
-                // Update emission for better visibility
-                if (mat.HasProperty("_EmissionColor"))
-                {
-                    mat.SetColor("_EmissionColor", targetColor * 0.8f); // Brighter emission
-                    mat.EnableKeyword("_EMISSION");
-                }
-                
-                // Also try _BaseColor for URP materials
-                if (mat.HasProperty("_BaseColor"))
-                {
-                    mat.SetColor("_BaseColor", targetColor);
+                    
+                    // Enable emission for better outline visibility (optional, can disable if causes issues)
+                    if (mat.HasProperty("_EmissionColor"))
+                    {
+                        mat.SetColor("_EmissionColor", targetColor * 0.5f);
+                        mat.EnableKeyword("_EMISSION");
+                    }
                 }
             }
         }
@@ -698,6 +701,11 @@ public class WorkbenchPlacement : MonoBehaviour
         // Create the actual placed workbench
         GameObject placedWorkbench = Instantiate(gameObject, previewPosition, previewRotation);
         placedWorkbench.name = gameObject.name + "_Placed";
+        
+        // Ensure placed workbench has correct rotation (no janky rotation)
+        placedWorkbench.transform.rotation = previewRotation;
+        placedWorkbench.transform.position = previewPosition;
+        placedWorkbench.transform.localScale = Vector3.one; // Ensure scale is normal
         
         // Enable physics and collider for the placed workbench
         Rigidbody rb = placedWorkbench.GetComponent<Rigidbody>();

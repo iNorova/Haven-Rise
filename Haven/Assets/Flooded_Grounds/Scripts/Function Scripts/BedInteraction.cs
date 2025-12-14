@@ -665,6 +665,12 @@ public class BedInteraction : MonoBehaviour
                     Debug.LogWarning("BedInteraction: nightSkybox is not assigned! Please assign it in the inspector on the bed prefab.");
                 }
                 
+                // Sync with DayNightCycle
+                if (DayNightCycle.Instance != null)
+                {
+                    DayNightCycle.Instance.SetToNight();
+                }
+                
                 Debug.Log($"BedInteraction: Switching to NIGHT - Sun disabled, NIGHT enabled");
         }
         else
@@ -701,6 +707,12 @@ public class BedInteraction : MonoBehaviour
                 else
                 {
                     Debug.LogWarning("BedInteraction: daySkybox is not assigned! Please assign it in the inspector on the bed prefab.");
+                }
+                
+                // Sync with DayNightCycle - reset timer when bed is used to go to day
+                if (DayNightCycle.Instance != null)
+                {
+                    DayNightCycle.Instance.ResetDayTimer();
                 }
                 
                 Debug.Log($"BedInteraction: Switching to DAY - Sun enabled, NIGHT disabled");
@@ -741,6 +753,12 @@ public class BedInteraction : MonoBehaviour
                 {
                     Debug.LogWarning("BedInteraction: nightSkybox is not assigned! Please assign it in the inspector on the bed prefab.");
                 }
+                
+                // Sync with DayNightCycle
+                if (DayNightCycle.Instance != null)
+                {
+                    DayNightCycle.Instance.SetToNight();
+                }
             }
             else
             {
@@ -756,6 +774,12 @@ public class BedInteraction : MonoBehaviour
                 else
                 {
                     Debug.LogWarning("BedInteraction: daySkybox is not assigned! Please assign it in the inspector on the bed prefab.");
+                }
+                
+                // Sync with DayNightCycle - reset timer when bed is used to go to day
+                if (DayNightCycle.Instance != null)
+                {
+                    DayNightCycle.Instance.ResetDayTimer();
                 }
             }
             yield return new WaitForSeconds(fadeDuration);

@@ -25,6 +25,12 @@ public class RockAnimationHandler : MonoBehaviour
         {
             Debug.Log("Playing Rock Swing Animation!");
             animator.SetTrigger(swingTrigger);
+            
+            // Decrease hunger and thirst when swinging rock
+            if (UIManager.Instance != null)
+            {
+                UIManager.Instance.OnRockSwing();
+            }
         }
     }
 } 
