@@ -44,10 +44,21 @@ public class ShipRepairPart
     [Tooltip("Difficulty level (affects various settings)")]
     public int difficultyLevel = 1;
     
+    [Header("Plywood Minigame Settings")]
+    [Tooltip("Number of screws to tighten (for Plywood minigame)")]
+    public int numberOfScrews = 4;
+    
+    [Tooltip("Time limit in seconds (for Plywood minigame)")]
+    public float plywoodTimeLimit = 60f;
+    
+    [Tooltip("Number of clicks needed to fully tighten each screw (for Plywood minigame)")]
+    public int clicksPerScrew = 10;
+    
     public enum MinigameType
     {
         Engine,        // Knot-tying minigame
-        Propeller,     // Future: Different minigame
+        Propeller,     // Spam-click minigame
+        Plywood,       // Drag-and-drop screws, then click to tighten
         MetalScraps,   // Future: Different minigame
         Wood,          // Future: Different minigame
         // Add more types as needed

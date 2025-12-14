@@ -250,6 +250,16 @@ public class ShipInteraction : MonoBehaviour
             
             propellerMiniGame.Begin(part, OnRepairMinigameComplete);
         }
+        else if (part.minigameType == ShipRepairPart.MinigameType.Plywood)
+        {
+            PlywoodRepairMiniGame plywoodMiniGame = GetComponent<PlywoodRepairMiniGame>();
+            if (plywoodMiniGame == null)
+            {
+                plywoodMiniGame = gameObject.AddComponent<PlywoodRepairMiniGame>();
+            }
+            
+            plywoodMiniGame.Begin(part, OnRepairMinigameComplete);
+        }
         else
         {
             // Add more minigame types here later (metal scraps, wood, etc.)
