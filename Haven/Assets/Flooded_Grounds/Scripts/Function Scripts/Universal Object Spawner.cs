@@ -25,10 +25,21 @@ public class UniversalObjectSpawner : MonoBehaviour
     private List<Vector3> spawnedPositions = new List<Vector3>();
     private List<Vector2> gridPositions = new List<Vector2>();
     private GameObject waterPlane;                // Reference to the water plane
+    private bool hasSpawned = false; // Track if spawner has already spawned
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
+        // Check if spawner has already spawned (from saved game)
+        CheckSavedSpawnState();
+
+        // If already spawned, don't spawn again
+        if (hasSpawned)
+        {
+            Debug.Log($"[UniversalObjectSpawner] {gameObject.name} has already spawned. Skipping spawn.");
+            return;
+        }
+
         Debug.Log("UniversalObjectSpawner: Starting initialization...");
         
         // Find water plane
@@ -77,6 +88,117 @@ public class UniversalObjectSpawner : MonoBehaviour
         Debug.Log($"UniversalObjectSpawner: Initialization complete. Ready to spawn {numberOfObjects} objects.");
         InitializeGrid();
         SpawnObjects();
+    }
+
+    /// <summary>
+    /// Check if spawner has already spawned based on saved state
+    /// </summary>
+    private void CheckSavedSpawnState()
+    {
+        // Check if there's a saved spawn state for this spawner
+        string spawnerKey = PauseMenuManager.SavedSpawnerPrefix + GetSpawnerIndex() + PauseMenuManager.SavedSpawnerHasSpawnedSuffix;
+        if (PlayerPrefs.HasKey(spawnerKey))
+        {
+            hasSpawned = PlayerPrefs.GetInt(spawnerKey, 0) == 1;
+        }
+        else
+        {
+            // Check if spawner has children or spawned positions
+            hasSpawned = CheckIfObjectsAlreadySpawned();
+        }
+    }
+
+    /// <summary>
+    /// Check if objects have already been spawned by this spawner
+    /// </summary>
+    private bool CheckIfObjectsAlreadySpawned()
+    {
+        // Check if spawner has children
+        if (transform.childCount > 0)
+        {
+            return true;
+        }
+
+        // Check if spawned positions list has items
+        if (spawnedPositions != null && spawnedPositions.Count > 0)
+        {
+            return true;
+        }
+
+        return false;
+    }
+    
+    /// <summary>
+    /// Check if spawned objects still exist in the scene
+    /// </summary>
+    private bool CheckIfObjectsStillExist()
+    {
+        // Check if spawner has children
+        if (transform.childCount > 0)
+        {
+            return true;
+        }
+
+        // Check spawned positions and verify objects exist at those positions
+        if (spawnedPositions != null && spawnedPositions.Count > 0)
+        {
+            // Check a few random positions to see if objects still exist
+            int checksToDo = Mathf.Min(3, spawnedPositions.Count);
+            for (int i = 0; i < checksToDo; i++)
+            {
+                Vector3 checkPos = spawnedPositions[Random.Range(0, spawnedPositions.Count)];
+                Collider[] colliders = Physics.OverlapSphere(checkPos, 2f);
+                foreach (Collider col in colliders)
+                {
+                    // Check if any of the colliders match our spawn prefabs
+                    foreach (GameObject prefab in objectPrefabs)
+                    {
+                        if (prefab != null && col.gameObject.name.Contains(prefab.name))
+                        {
+                            return true; // Found at least one spawned object
+                        }
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Get spawner index for save/load system
+    /// </summary>
+    private int GetSpawnerIndex()
+    {
+        // Get all spawners of this type and find our index
+        UniversalObjectSpawner[] allSpawners = FindObjectsOfType<UniversalObjectSpawner>();
+        UniversalAnimalSpawner[] animalSpawners = FindObjectsOfType<UniversalAnimalSpawner>();
+        int index = animalSpawners.Length; // Start after animal spawners
+        
+        for (int i = 0; i < allSpawners.Length; i++)
+        {
+            if (allSpawners[i] == this)
+            {
+                return index + i;
+            }
+        }
+        return index;
+    }
+
+    /// <summary>
+    /// Set if spawner has spawned (for loading saved games)
+    /// </summary>
+    public void SetHasSpawned(bool spawned)
+    {
+        hasSpawned = spawned;
+    }
+
+    /// <summary>
+    /// Check if spawner has spawned
+    /// </summary>
+    public bool GetHasSpawned()
+    {
+        return hasSpawned;
     }
 
     void InitializeGrid()
@@ -146,6 +268,12 @@ public class UniversalObjectSpawner : MonoBehaviour
                 spawnedObject.transform.parent = transform;
                 spawnedPositions.Add(spawnPosition);
                 successfulSpawns++;
+                
+                // Mark spawner as having spawned (only once when first object spawns)
+                if (!hasSpawned)
+                {
+                    hasSpawned = true;
+                }
                 
                 if (successfulSpawns % 10 == 0)
                 {

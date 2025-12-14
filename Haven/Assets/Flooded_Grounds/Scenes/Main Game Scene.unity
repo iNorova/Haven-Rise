@@ -33555,25 +33555,34 @@ MonoBehaviour:
   attackCooldown: 1.4
   attackImpactDelay: 0.35
   maxHealth: 100
-  despawnDelay: 2
+  despawnDelay: 5
   speedParam: Speed
   walkBool: IsWalking
   runBool: IsRunning
   attackTrigger: Attack
   deathTrigger: Die
+  roamingAudioClips:
+  - {fileID: 8300000, guid: e8d975af5a24fec4bb42250cdc79d0de, type: 3}
+  - {fileID: 8300000, guid: b21ae19630c95b84382fbe71d344d645, type: 3}
+  walkAttackAudioClip: {fileID: 8300000, guid: f92d86a92f76a8f43a805cc89052b91c, type: 3}
+  sprintAttackAudioClip: {fileID: 8300000, guid: f92d86a92f76a8f43a805cc89052b91c, type: 3}
+  dyingAudioClip: {fileID: 8300000, guid: 90505e86b2588a74c9ee16a88db36655, type: 3}
+  audioMinDistance: 1
+  audioMaxDistance: 25
+  roamingAudioSwitchInterval: 10
   onAttackStarted:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 8300000, guid: f92d86a92f76a8f43a805cc89052b91c, type: 3}
-        m_TargetAssemblyTypeName: 
-        m_MethodName: 
-        m_Mode: 0
+        m_TargetAssemblyTypeName: UnityEngine.Object, UnityEngine
+        m_MethodName: set_name
+        m_Mode: 5
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: 
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
           m_IntArgument: 0
           m_FloatArgument: 0
-          m_StringArgument: 
+          m_StringArgument: zombie-bite-96528
           m_BoolArgument: 0
         m_CallState: 2
   onAttackHit:
@@ -33583,15 +33592,15 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 8300000, guid: 90505e86b2588a74c9ee16a88db36655, type: 3}
-        m_TargetAssemblyTypeName: 
-        m_MethodName: 
-        m_Mode: 0
+        m_TargetAssemblyTypeName: UnityEngine.Object, UnityEngine
+        m_MethodName: set_name
+        m_Mode: 5
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: 
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
           m_IntArgument: 0
           m_FloatArgument: 0
-          m_StringArgument: 
+          m_StringArgument: zombie-dying-sound-357974
           m_BoolArgument: 0
         m_CallState: 2
 --- !u!195 &223880541
@@ -36674,8 +36683,10 @@ MonoBehaviour:
   maxThirst: 100
   waterDrinkRestore: 50
   waterPlane: {fileID: 959061177}
-  waterDrinkRange: 10
+  waterDrinkRange: 5
   waterDrinkCooldown: 300
+  hungerAudioClip: {fileID: 8300000, guid: 196b42a2e2b239b45a0ac01be54f86b1, type: 3}
+  thirstAudioClip: {fileID: 8300000, guid: ab3ab6db52c093a4dbd906a440b69fc3, type: 3}
   hungerCostAxeSwing: 2
   thirstCostAxeSwing: 3
   hungerCostRockSwing: 1.5
@@ -104178,12 +104189,32 @@ MonoBehaviour:
   nightSkybox: {fileID: 2100000, guid: 992a308c87edd6d429cdf8048835d8b3, type: 2}
   fadeOverlay: {fileID: 0}
   fadeToBlackFirst: 1
+  fadeInDuration: 1
+  fadeOutDuration: 3
   showTimer: 1
   timerText: {fileID: 0}
   timerFontSize: 24
   timerTextColor: {r: 1, g: 1, b: 1, a: 1}
   timerWarningColor: {r: 1, g: 0, b: 0, a: 1}
   warningThresholdMinutes: 5
+  nightTransitionScreechClip: {fileID: 8300000, guid: cbe0c05995321bd45878ea19ecbd12c5, type: 3}
+  nightWarningPanel: {fileID: 0}
+  nightWarningText: {fileID: 0}
+  nightWarningMessage: 'IT''S NIGHT TIME!
+
+
+    The Ghouls are faster now.
+
+
+    Build
+    a CAMPFIRE to stay warm.
+
+
+    Build a BED to sleep through the night.
+
+
+    Press
+    F key to continue...'
 --- !u!4 &684233255
 Transform:
   m_ObjectHideFlags: 0

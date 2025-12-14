@@ -40,6 +40,15 @@ public class PauseMenuManager : MonoBehaviour
 	public const string SavedTemperatureKey = "SavedTemperature";
 	public const string SavedPermanentTemperatureIncreaseKey = "SavedPermanentTemperatureIncrease";
 
+	// Day/Night Cycle save keys
+	public const string SavedDayTimerKey = "SavedDayTimer";
+	public const string SavedIsDayTimeKey = "SavedIsDayTime";
+	public const string SavedNightWarningShownKey = "SavedNightWarningShown";
+
+	// Spawner save keys
+	public const string SavedSpawnerPrefix = "SavedSpawner_";
+	public const string SavedSpawnerHasSpawnedSuffix = "_HasSpawned";
+
 	// Durability save keys
 	public const string SavedHotbarDurabilityPrefix = "SavedHotbarDurability_";
 	public const string SavedInventoryDurabilityPrefix = "SavedInventoryDurability_";
@@ -176,7 +185,30 @@ public class PauseMenuManager : MonoBehaviour
 		// Save temperature state
 		SaveTemperatureData();
 
+		// Stop any active day/night transitions before saving
+		DayNightCycle dayNightCycle = DayNightCycle.Instance;
+		if (dayNightCycle != null)
+		{
+			dayNightCycle.StopAllTransitions();
+			Debug.Log("[PauseMenuManager] SAVE AND QUIT: Stopped all day/night transitions before saving.");
+		}
+
+		// Save day/night cycle state BEFORE disabling the script
+		SaveDayNightCycleData();
+
+		// Save spawner states
+		SaveSpawnerStates();
+
 		PlayerPrefs.Save();
+		
+		// Disable the DayNightCycle script to prevent any transitions during scene change
+		if (dayNightCycle != null)
+		{
+			dayNightCycle.enabled = false;
+			Debug.Log("[PauseMenuManager] SAVE AND QUIT: DayNightCycle script disabled to prevent transitions during scene change.");
+		}
+		
+		Debug.Log("[PauseMenuManager] SAVE AND QUIT: All game data saved. Loading main menu scene...");
 
         Time.timeScale = 1f;
         SceneManager.LoadScene("MAIN MENU FINAL");
@@ -307,6 +339,203 @@ public class PauseMenuManager : MonoBehaviour
 		{
 			Debug.LogWarning("[PauseMenuManager] UIManager not found. Cannot save temperature data.");
 		}
+	}
+
+	// Save day/night cycle data before quitting
+	private void SaveDayNightCycleData()
+	{
+		DayNightCycle dayNightCycle = DayNightCycle.Instance;
+		if (dayNightCycle != null)
+		{
+			// Use public method to check if transitioning
+			bool isTransitioning = dayNightCycle.IsTransitioning();
+			
+			// Use public methods to get values
+			float dayTimer = dayNightCycle.GetDayTimer();
+			bool isDayTime = dayNightCycle.GetIsDayTime();
+			
+			// Always check actual light states to determine real state (more reliable than _isDayTime flag)
+			// This ensures we save the correct state even if there's a timing issue or transition
+			var sunLightField = typeof(DayNightCycle).GetField("sunLight", 
+				System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+			var nightLightField = typeof(DayNightCycle).GetField("nightLight", 
+				System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+			
+			if (sunLightField != null && nightLightField != null)
+			{
+				Light sunLight = sunLightField.GetValue(dayNightCycle) as Light;
+				Light nightLight = nightLightField.GetValue(dayNightCycle) as Light;
+				
+				if (sunLight != null && nightLight != null)
+				{
+					// Determine state based on which light is active
+					// If sun is active and night is inactive, it's day
+					// If night is active and sun is inactive, it's night
+					bool sunActive = sunLight.gameObject.activeSelf;
+					bool nightActive = nightLight.gameObject.activeSelf;
+					
+					if (sunActive && !nightActive)
+					{
+						isDayTime = true;
+					}
+					else if (nightActive && !sunActive)
+					{
+						isDayTime = false;
+					}
+					// If both are active or both inactive, use the _isDayTime flag as fallback
+				}
+			}
+			
+			PlayerPrefs.SetFloat(SavedDayTimerKey, dayTimer);
+			PlayerPrefs.SetInt(SavedIsDayTimeKey, isDayTime ? 1 : 0);
+			
+			// Save night warning state
+			PlayerPrefs.SetInt(SavedNightWarningShownKey, DayNightCycle.HasShownNightWarning() ? 1 : 0);
+			
+			Debug.Log($"[PauseMenuManager] Day/Night cycle data saved: DayTimer={dayTimer}, IsDayTime={isDayTime}, IsTransitioning={isTransitioning}");
+		}
+		else
+		{
+			Debug.LogWarning("[PauseMenuManager] DayNightCycle not found. Cannot save day/night cycle data.");
+		}
+	}
+
+	// Save spawner states before quitting
+	private void SaveSpawnerStates()
+	{
+		// Find all spawners in the scene
+		UniversalAnimalSpawner[] animalSpawners = FindObjectsOfType<UniversalAnimalSpawner>();
+		UniversalObjectSpawner[] objectSpawners = FindObjectsOfType<UniversalObjectSpawner>();
+		
+		int spawnerIndex = 0;
+		
+		// Save animal spawner states
+		foreach (var spawner in animalSpawners)
+		{
+			if (spawner != null)
+			{
+				string spawnerKey = SavedSpawnerPrefix + spawnerIndex + SavedSpawnerHasSpawnedSuffix;
+				// Check if spawner has spawned using its own method
+				bool hasSpawned = spawner.GetHasSpawned();
+				// Also check if spawner has children (backup check)
+				if (!hasSpawned && spawner.transform.childCount > 0)
+				{
+					hasSpawned = true;
+				}
+				PlayerPrefs.SetInt(spawnerKey, hasSpawned ? 1 : 0);
+				spawnerIndex++;
+			}
+		}
+		
+		// Save object spawner states
+		foreach (var spawner in objectSpawners)
+		{
+			if (spawner != null)
+			{
+				string spawnerKey = SavedSpawnerPrefix + spawnerIndex + SavedSpawnerHasSpawnedSuffix;
+				// Check if spawner has spawned using its own method
+				bool hasSpawned = spawner.GetHasSpawned();
+				// Also check if spawner has children (backup check)
+				if (!hasSpawned && spawner.transform.childCount > 0)
+				{
+					hasSpawned = true;
+				}
+				PlayerPrefs.SetInt(spawnerKey, hasSpawned ? 1 : 0);
+				spawnerIndex++;
+			}
+		}
+		
+		PlayerPrefs.SetInt(SavedSpawnerPrefix + "Count", spawnerIndex);
+		Debug.Log($"[PauseMenuManager] Saved {spawnerIndex} spawner states.");
+	}
+
+	// Load day/night cycle data when game loads
+	public static void LoadDayNightCycleData()
+	{
+		if (!PlayerPrefs.HasKey(SavedDayTimerKey))
+		{
+			Debug.Log("[PauseMenuManager] No saved day/night cycle data found. Using default values.");
+			return;
+		}
+		
+		DayNightCycle dayNightCycle = DayNightCycle.Instance;
+		if (dayNightCycle != null)
+		{
+			float savedDayTimer = PlayerPrefs.GetFloat(SavedDayTimerKey, 0f);
+			bool savedIsDayTime = PlayerPrefs.GetInt(SavedIsDayTimeKey, 1) == 1;
+			bool savedNightWarningShown = PlayerPrefs.GetInt(SavedNightWarningShownKey, 0) == 1;
+			
+			// Use public methods to set values
+			dayNightCycle.SetDayTimer(savedDayTimer);
+			dayNightCycle.SetIsDayTime(savedIsDayTime);
+			
+			// Restore night warning state
+			if (savedNightWarningShown)
+			{
+				DayNightCycle.SetNightWarningShown(true);
+			}
+			
+			Debug.Log($"[PauseMenuManager] Day/Night cycle data loaded: DayTimer={savedDayTimer}, IsDayTime={savedIsDayTime}");
+		}
+		else
+		{
+			Debug.LogWarning("[PauseMenuManager] DayNightCycle.Instance is null. Cannot load day/night cycle data.");
+		}
+	}
+
+	// Load spawner states when game loads
+	public static void LoadSpawnerStates()
+	{
+		int spawnerCount = PlayerPrefs.GetInt(SavedSpawnerPrefix + "Count", 0);
+		if (spawnerCount == 0)
+		{
+			Debug.Log("[PauseMenuManager] No saved spawner states found. Spawners will spawn normally.");
+			return;
+		}
+		
+		// Find all spawners
+		UniversalAnimalSpawner[] animalSpawners = FindObjectsOfType<UniversalAnimalSpawner>();
+		UniversalObjectSpawner[] objectSpawners = FindObjectsOfType<UniversalObjectSpawner>();
+		
+		int spawnerIndex = 0;
+		
+		// Load animal spawner states
+		foreach (var spawner in animalSpawners)
+		{
+			if (spawner != null && spawnerIndex < spawnerCount)
+			{
+				string spawnerKey = SavedSpawnerPrefix + spawnerIndex + SavedSpawnerHasSpawnedSuffix;
+				bool hasSpawned = PlayerPrefs.GetInt(spawnerKey, 0) == 1;
+				
+				if (hasSpawned)
+				{
+					// Mark spawner as already spawned
+					spawner.SetHasSpawned(true);
+				}
+				
+				spawnerIndex++;
+			}
+		}
+		
+		// Load object spawner states
+		foreach (var spawner in objectSpawners)
+		{
+			if (spawner != null && spawnerIndex < spawnerCount)
+			{
+				string spawnerKey = SavedSpawnerPrefix + spawnerIndex + SavedSpawnerHasSpawnedSuffix;
+				bool hasSpawned = PlayerPrefs.GetInt(spawnerKey, 0) == 1;
+				
+				if (hasSpawned)
+				{
+					// Mark spawner as already spawned
+					spawner.SetHasSpawned(true);
+				}
+				
+				spawnerIndex++;
+			}
+		}
+		
+		Debug.Log($"[PauseMenuManager] Loaded {spawnerIndex} spawner states.");
 	}
 
 	// Public method to load temperature data (called when scene loads)

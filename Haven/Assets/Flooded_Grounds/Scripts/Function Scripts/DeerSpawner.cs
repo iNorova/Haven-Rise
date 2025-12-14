@@ -138,9 +138,33 @@ public class UniversalAnimalSpawner : MonoBehaviour
     private List<Vector3> spawnedPositions = new List<Vector3>();
     private List<Vector2> gridPositions = new List<Vector2>();
     private GameObject waterPlane;
+    private bool hasSpawned = false; // Track if spawner has already spawned
 
     void Start()
     {
+        // Check if spawner has already spawned (from saved game)
+        CheckSavedSpawnState();
+
+        // If marked as spawned, verify that spawned objects still exist
+        if (hasSpawned)
+        {
+            // Check if spawned objects actually still exist in the scene
+            bool objectsStillExist = CheckIfObjectsStillExist();
+            
+            if (!objectsStillExist)
+            {
+                // Objects were destroyed (e.g., scene reload), reset spawner
+                Debug.Log($"UniversalAnimalSpawner on {gameObject.name}: Marked as spawned but objects don't exist. Resetting and respawning.");
+                hasSpawned = false;
+                // Continue to spawn below
+            }
+            else
+            {
+                Debug.Log($"[UniversalAnimalSpawner] {gameObject.name} has already spawned and objects exist. Skipping spawn.");
+                return;
+            }
+        }
+
         // Find water plane if not manually set
         if (avoidWater && waterPlane == null)
         {
@@ -159,6 +183,124 @@ public class UniversalAnimalSpawner : MonoBehaviour
         }
 
         SpawnAnimals();
+    }
+
+    /// <summary>
+    /// Check if spawner has already spawned based on saved state
+    /// </summary>
+    private void CheckSavedSpawnState()
+    {
+        // Check if there's a saved spawn state for this spawner
+        // We'll use the spawner's instance ID or name as a key
+        string spawnerKey = PauseMenuManager.SavedSpawnerPrefix + GetSpawnerIndex() + PauseMenuManager.SavedSpawnerHasSpawnedSuffix;
+        if (PlayerPrefs.HasKey(spawnerKey))
+        {
+            hasSpawned = PlayerPrefs.GetInt(spawnerKey, 0) == 1;
+        }
+        else
+        {
+            // Check if spawner has children (spawned objects might be parented)
+            // Or check if there are spawned objects in the scene
+            hasSpawned = CheckIfObjectsAlreadySpawned();
+        }
+    }
+
+    /// <summary>
+    /// Check if objects have already been spawned by this spawner
+    /// </summary>
+    private bool CheckIfObjectsAlreadySpawned()
+    {
+        // Check if spawner has children (if parentToSpawner is true)
+        if (parentToSpawner && transform.childCount > 0)
+        {
+            return true;
+        }
+
+        // Check if spawned positions list has items (if it was saved somehow)
+        if (spawnedPositions != null && spawnedPositions.Count > 0)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Check if spawned objects still exist in the scene
+    /// </summary>
+    private bool CheckIfObjectsStillExist()
+    {
+        // Check if spawner has children (if parentToSpawner is true)
+        if (parentToSpawner && transform.childCount > 0)
+        {
+            return true;
+        }
+
+        // Check spawned positions and verify objects exist at those positions
+        if (spawnedPositions != null && spawnedPositions.Count > 0)
+        {
+            // Check a few random positions to see if objects still exist
+            int checksToDo = Mathf.Min(3, spawnedPositions.Count);
+            for (int i = 0; i < checksToDo; i++)
+            {
+                Vector3 checkPos = spawnedPositions[Random.Range(0, spawnedPositions.Count)];
+                Collider[] colliders = Physics.OverlapSphere(checkPos, 2f);
+                foreach (Collider col in colliders)
+                {
+                    // Check if any of the colliders match our spawn prefabs
+                    foreach (GameObject prefab in spawnPrefabsList)
+                    {
+                        if (prefab != null && col.gameObject.name.Contains(prefab.name))
+                        {
+                            return true; // Found at least one spawned object
+                        }
+                    }
+                    // Also check legacy prefabs list
+                    foreach (GameObject prefab in spawnPrefabs)
+                    {
+                        if (prefab != null && col.gameObject.name.Contains(prefab.name))
+                        {
+                            return true; // Found at least one spawned object
+                        }
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Get spawner index for save/load system
+    /// </summary>
+    private int GetSpawnerIndex()
+    {
+        // Get all spawners of this type and find our index
+        UniversalAnimalSpawner[] allSpawners = FindObjectsOfType<UniversalAnimalSpawner>();
+        for (int i = 0; i < allSpawners.Length; i++)
+        {
+            if (allSpawners[i] == this)
+            {
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    /// <summary>
+    /// Set if spawner has spawned (for loading saved games)
+    /// </summary>
+    public void SetHasSpawned(bool spawned)
+    {
+        hasSpawned = spawned;
+    }
+
+    /// <summary>
+    /// Check if spawner has spawned
+    /// </summary>
+    public bool GetHasSpawned()
+    {
+        return hasSpawned;
     }
 
     /// <summary>
@@ -357,6 +499,12 @@ public class UniversalAnimalSpawner : MonoBehaviour
                 spawnedPositions.Add(spawnPosition);
                 spawnedPerPrefab[prefabIndex]++;
                 spawned++;
+                
+                // Mark spawner as having spawned (only once when first object spawns)
+                if (!hasSpawned)
+                {
+                    hasSpawned = true;
+                }
                 
                 if (spawned % 5 == 0)
                 {

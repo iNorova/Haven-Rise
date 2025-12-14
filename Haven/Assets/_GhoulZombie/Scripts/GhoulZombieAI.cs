@@ -77,6 +77,26 @@ public class GhoulZombieAI : MonoBehaviour, IDamageable
 	public string attackTrigger = "Attack";
 	public string deathTrigger = "Die";
 
+	[Header("Audio")]
+	[Tooltip("Roaming audio clips that loop continuously while patrolling, chasing, sprinting, or attacking. Volume adjusts based on distance from player. Multiple clips will be randomly selected for variation. Drag your MP3 audio files here.")]
+	public AudioClip[] roamingAudioClips;
+	[Tooltip("Audio clip that plays when attacking while walking. Drag your MP3 audio file here.")]
+	public AudioClip walkAttackAudioClip;
+	[Tooltip("Audio clip that plays when attacking while sprinting. Drag your MP3 audio file here.")]
+	public AudioClip sprintAttackAudioClip;
+	[Tooltip("Audio clip that plays when the ghoul dies. Drag your MP3 audio file here.")]
+	public AudioClip dyingAudioClip;
+	[Tooltip("Minimum distance for 3D audio (volume starts decreasing beyond this).")]
+	public float audioMinDistance = 1f;
+	[Tooltip("Maximum distance for 3D audio (volume reaches zero at this distance).")]
+	public float audioMaxDistance = 25f;
+	[Tooltip("Time in seconds before switching to a different roaming audio clip (for variation). Set to 0 to play one clip until state changes.")]
+	public float roamingAudioSwitchInterval = 10f;
+	private AudioSource audioSource; // Internal AudioSource component for playing clips
+	private AudioSource roamingAudioSource; // Separate AudioSource for looping roaming audio
+	private float roamingAudioSwitchTimer = 0f;
+	private int currentRoamingClipIndex = -1;
+
 	[Header("Unity Events")]
 	public UnityEvent onAttackStarted;
 	public UnityEvent onAttackHit;
@@ -110,6 +130,22 @@ public class GhoulZombieAI : MonoBehaviour, IDamageable
 		animator = GetComponent<Animator>();
 		agent = GetComponent<NavMeshAgent>();
 		currentHealth = Mathf.Clamp(maxHealth, 1f, float.MaxValue);
+
+		// Get or create AudioSource component for playing one-shot audio clips
+		audioSource = GetComponent<AudioSource>();
+		if (audioSource == null)
+		{
+			audioSource = gameObject.AddComponent<AudioSource>();
+		}
+
+		// Create separate AudioSource for looping roaming audio with 3D spatial settings
+		roamingAudioSource = gameObject.AddComponent<AudioSource>();
+		roamingAudioSource.spatialBlend = 1f; // Full 3D audio
+		roamingAudioSource.rolloffMode = AudioRolloffMode.Linear;
+		roamingAudioSource.minDistance = audioMinDistance;
+		roamingAudioSource.maxDistance = audioMaxDistance;
+		roamingAudioSource.loop = true; // Loop the roaming audio
+		roamingAudioSource.playOnAwake = false;
 
 		if (animator != null)
 		{
@@ -153,6 +189,12 @@ public class GhoulZombieAI : MonoBehaviour, IDamageable
 		}
 
 		PickNewPatrolPoint();
+		
+		// Start roaming audio if starting in patrol state
+		if (currentState == GhoulState.Patrol)
+		{
+			StartRoamingAudio();
+		}
 	}
 
 	/// <summary>
@@ -218,6 +260,17 @@ public class GhoulZombieAI : MonoBehaviour, IDamageable
 
 		// Stuck detection
 		CheckIfStuck();
+
+		// Handle roaming audio clip switching for variation
+		if (roamingAudioSwitchInterval > 0f && roamingAudioSource != null && roamingAudioSource.isPlaying && roamingAudioClips != null && roamingAudioClips.Length > 1)
+		{
+			roamingAudioSwitchTimer += Time.deltaTime;
+			if (roamingAudioSwitchTimer >= roamingAudioSwitchInterval)
+			{
+				roamingAudioSwitchTimer = 0f;
+				SwitchRoamingAudioClip();
+			}
+		}
 
 		attackTimer -= Time.deltaTime;
 		if (damagePendingFromAutoDelay)
@@ -350,6 +403,20 @@ public class GhoulZombieAI : MonoBehaviour, IDamageable
 			attackTimer = attackCooldown;
 			TriggerAnimator(attackTrigger);
 			onAttackStarted?.Invoke();
+
+			// Play attack audio based on movement speed
+			if (audioSource != null)
+			{
+				bool isRunningSpeed = agent.speed > walkSpeed + 0.1f;
+				if (isRunningSpeed && sprintAttackAudioClip != null)
+				{
+					audioSource.PlayOneShot(sprintAttackAudioClip);
+				}
+				else if (!isRunningSpeed && walkAttackAudioClip != null)
+				{
+					audioSource.PlayOneShot(walkAttackAudioClip);
+				}
+			}
 
 			if (attackImpactDelay > 0f)
 			{
@@ -499,19 +566,107 @@ public class GhoulZombieAI : MonoBehaviour, IDamageable
 				damagePendingFromAutoDelay = false;
 				agent.isStopped = false;
 				PickNewPatrolPoint();
+				StartRoamingAudio();
 				break;
 			case GhoulState.Chase:
 				isAttacking = false;
 				damagePendingFromAutoDelay = false;
 				agent.isStopped = false;
+				StartRoamingAudio();
 				break;
 			case GhoulState.Attack:
 				agent.isStopped = true;
+				StartRoamingAudio();
 				break;
 			case GhoulState.Dead:
 				agent.isStopped = true;
 				agent.enabled = false;
+				StopRoamingAudio();
 				break;
+		}
+	}
+
+	private void StartRoamingAudio()
+	{
+		if (roamingAudioSource != null && roamingAudioClips != null && roamingAudioClips.Length > 0)
+		{
+			if (!roamingAudioSource.isPlaying)
+			{
+				SelectRandomRoamingClip();
+				if (currentRoamingClipIndex >= 0 && currentRoamingClipIndex < roamingAudioClips.Length && roamingAudioClips[currentRoamingClipIndex] != null)
+				{
+					roamingAudioSource.clip = roamingAudioClips[currentRoamingClipIndex];
+					roamingAudioSource.Play();
+					roamingAudioSwitchTimer = 0f; // Reset timer when starting new audio
+				}
+			}
+		}
+	}
+
+	private void SelectRandomRoamingClip()
+	{
+		if (roamingAudioClips == null || roamingAudioClips.Length == 0)
+		{
+			currentRoamingClipIndex = -1;
+			return;
+		}
+
+		// Filter out null clips
+		var validClips = new System.Collections.Generic.List<int>();
+		for (int i = 0; i < roamingAudioClips.Length; i++)
+		{
+			if (roamingAudioClips[i] != null)
+			{
+				validClips.Add(i);
+			}
+		}
+
+		if (validClips.Count == 0)
+		{
+			currentRoamingClipIndex = -1;
+			return;
+		}
+
+		// If only one valid clip, use it
+		if (validClips.Count == 1)
+		{
+			currentRoamingClipIndex = validClips[0];
+			return;
+		}
+
+		// Select a random clip different from the current one
+		int newIndex;
+		do
+		{
+			newIndex = validClips[Random.Range(0, validClips.Count)];
+		}
+		while (newIndex == currentRoamingClipIndex && validClips.Count > 1);
+
+		currentRoamingClipIndex = newIndex;
+	}
+
+	private void SwitchRoamingAudioClip()
+	{
+		if (roamingAudioSource == null || roamingAudioClips == null || roamingAudioClips.Length == 0)
+		{
+			return;
+		}
+
+		// Select a new random clip
+		SelectRandomRoamingClip();
+		
+		if (currentRoamingClipIndex >= 0 && currentRoamingClipIndex < roamingAudioClips.Length && roamingAudioClips[currentRoamingClipIndex] != null)
+		{
+			roamingAudioSource.clip = roamingAudioClips[currentRoamingClipIndex];
+			roamingAudioSource.Play(); // Restart with new clip
+		}
+	}
+
+	private void StopRoamingAudio()
+	{
+		if (roamingAudioSource != null && roamingAudioSource.isPlaying)
+		{
+			roamingAudioSource.Stop();
 		}
 	}
 
@@ -569,6 +724,15 @@ public class GhoulZombieAI : MonoBehaviour, IDamageable
 		currentState = GhoulState.Dead;
 		damagePendingFromAutoDelay = false;
 		isAttacking = false;
+
+		// Stop roaming audio when dying
+		StopRoamingAudio();
+
+		// Play dying audio sound
+		if (audioSource != null && dyingAudioClip != null)
+		{
+			audioSource.PlayOneShot(dyingAudioClip);
+		}
 
 		TriggerAnimator(deathTrigger);
 		onDeath?.Invoke();

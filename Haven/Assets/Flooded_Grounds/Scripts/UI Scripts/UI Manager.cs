@@ -89,6 +89,13 @@ public class UIManager : MonoBehaviour, IDamageable
     private float currentThirst;              // Current thirst value
     private float lastWaterDrinkTime = -999f;  // Time when player last drank water
 
+    [Header("Hunger/Thirst Audio")]
+    [Tooltip("Audio clip that plays when pressing G to eat food. Drag your MP3 audio file here.")]
+    public AudioClip hungerAudioClip; // Audio clip for hunger actions (eating)
+    [Tooltip("Audio clip that plays when pressing G to drink water. Drag your MP3 audio file here.")]
+    public AudioClip thirstAudioClip; // Audio clip for thirst actions (drinking)
+    private AudioSource audioSource; // Internal AudioSource component for playing clips
+
     [Header("Action-Based Hunger/Thirst Costs")]
     [Tooltip("Hunger lost per axe swing.")]
     public float hungerCostAxeSwing = 2f;
@@ -142,6 +149,13 @@ public class UIManager : MonoBehaviour, IDamageable
     void Start()
     {
         Debug.Log("UI Manager Started");
+        
+        // Get or create AudioSource component for playing audio clips
+        audioSource = GetComponent<AudioSource>();
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+        }
         
         // Initialize temperature system
         currentTemperature = minTemperatureValue;
@@ -339,14 +353,22 @@ public class UIManager : MonoBehaviour, IDamageable
             if (Input.GetKeyDown(KeyCode.G))
             {
                 // Try to drink water first (if near water)
+                // Audio will be played inside TryDrinkWater/DrinkWater if cooldown allows
                 if (TryDrinkWater())
                 {
-                    // Water drinking takes priority
+                    // Audio is handled inside DrinkWater() after cooldown check
                 }
                 else
                 {
                     // If not near water, try to consume food
-                    TryConsumeFood();
+                    if (TryConsumeFood())
+                    {
+                        // Play hunger audio sound when eating food
+                        if (hungerAudioClip != null && audioSource != null)
+                        {
+                            audioSource.PlayOneShot(hungerAudioClip);
+                        }
+                    }
                 }
             }
         }
@@ -937,13 +959,15 @@ public class UIManager : MonoBehaviour, IDamageable
         }
     }
 
-    private void TryConsumeFood()
+    private bool TryConsumeFood()
     {
         // Check if player has cooked steak in inventory/hotbar
         if (HasCookedSteak())
         {
             ConsumeCookedSteak();
+            return true;
         }
+        return false;
     }
 
     private bool HasCookedSteak()
@@ -957,43 +981,15 @@ public class UIManager : MonoBehaviour, IDamageable
         HotbarManager hotbarManager = cachedHotbarManager;
         if (hotbarManager != null)
         {
-            // Check selected slot first (what player is holding)
+            // Only check selected slot (what player is holding) - steak must be held to consume
             GameObject selectedItem = hotbarManager.GetItem(hotbarManager.selectedSlot);
             if (IsCookedSteak(selectedItem))
             {
                 return true;
             }
-            
-            // Check all hotbar slots
-            for (int i = 0; i < hotbarManager.hotbarSlots.Length; i++)
-            {
-                GameObject item = hotbarManager.GetItem(i);
-                if (IsCookedSteak(item))
-                {
-                    return true;
-                }
-            }
         }
 
-        // Use cached reference
-        if (cachedInventoryManager == null)
-        {
-            cachedInventoryManager = FindFirstObjectByType<InventoryManager>();
-        }
-
-        InventoryManager inventoryManager = cachedInventoryManager;
-        if (inventoryManager != null)
-        {
-            for (int i = 0; i < inventoryManager.inventorySlots.Length; i++)
-            {
-                GameObject item = inventoryManager.GetItem(i);
-                if (IsCookedSteak(item))
-                {
-                    return true;
-                }
-            }
-        }
-
+        // Player must be holding the steak to consume it, so we don't check other slots
         return false;
     }
 
@@ -1106,74 +1102,11 @@ public class UIManager : MonoBehaviour, IDamageable
                 Debug.Log("Consumed cooked steak from hotbar selected slot.");
                 return;
             }
-            
-            // Check all other hotbar slots
-            for (int i = 0; i < hotbarManager.hotbarSlots.Length; i++)
-            {
-                if (i == selectedSlot) continue; // Already checked
-                
-                GameObject item = hotbarManager.GetItem(i);
-                if (IsCookedSteak(item))
-                {
-                    InventorySlot slot = hotbarManager.hotbarSlots[i];
-                    int stackCount = slot.GetStackCount();
-                    
-                    if (stackCount > 1)
-                    {
-                        slot.SetStackCount(stackCount - 1);
-                    }
-                    else
-                    {
-                        hotbarManager.SetItem(i, null);
-                        if (item != null)
-                        {
-                            Destroy(item);
-                        }
-                    }
-                    hotbarManager.UpdateHotbarUI();
-                    Debug.Log($"Consumed cooked steak from hotbar slot {i}.");
-                    return;
-                }
-            }
         }
 
-        // Use cached reference
-        if (cachedInventoryManager == null)
-        {
-            cachedInventoryManager = FindFirstObjectByType<InventoryManager>();
-        }
-
-        InventoryManager inventoryManager = cachedInventoryManager;
-        if (inventoryManager != null)
-        {
-            for (int i = 0; i < inventoryManager.inventorySlots.Length; i++)
-            {
-                GameObject item = inventoryManager.GetItem(i);
-                if (IsCookedSteak(item))
-                {
-                    InventorySlot slot = inventoryManager.inventorySlots[i];
-                    int stackCount = slot.GetStackCount();
-                    
-                    if (stackCount > 1)
-                    {
-                        slot.SetStackCount(stackCount - 1);
-                    }
-                    else
-                    {
-                        inventoryManager.SetItem(i, null);
-                        if (item != null)
-                        {
-                            Destroy(item);
-                        }
-                    }
-                    inventoryManager.UpdateInventoryUI();
-                    Debug.Log($"Consumed cooked steak from inventory slot {i}.");
-                    return;
-                }
-            }
-        }
-        
-        Debug.LogWarning("Could not find cooked steak to consume!");
+        // If we reach here, the steak wasn't in the selected slot
+        // Since steak must be held to consume, we don't check other slots
+        Debug.LogWarning("Cooked steak not found in selected slot. Cannot consume.");
     }
 
     /// <summary>
@@ -1324,7 +1257,7 @@ public class UIManager : MonoBehaviour, IDamageable
             float remainingCooldown = waterDrinkCooldown - timeSinceLastDrink;
             float remainingMinutes = remainingCooldown / 60f;
             Debug.Log($"Cannot drink water yet! Cooldown remaining: {remainingMinutes:F1} minutes ({remainingCooldown:F0} seconds)");
-            return;
+            return; // Return early if on cooldown - audio won't play
         }
 
         // Restore thirst
@@ -1335,6 +1268,12 @@ public class UIManager : MonoBehaviour, IDamageable
         
         // Update thirst UI immediately
         UpdateThirstUI();
+
+        // Play thirst audio sound only when water is actually consumed (after cooldown check)
+        if (thirstAudioClip != null && audioSource != null)
+        {
+            audioSource.PlayOneShot(thirstAudioClip);
+        }
 
         Debug.Log($"Drank water! Thirst restored by {waterDrinkRestore}. Current thirst: {currentThirst}. Cooldown: {waterDrinkCooldown} seconds.");
     }

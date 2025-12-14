@@ -34,15 +34,23 @@ public class ApplySavedPlayerState : MonoBehaviour
 			PauseMenuManager.LoadInventoryData();
 
 			// Load temperature data with a small delay to ensure all components are initialized
-			StartCoroutine(LoadTemperatureDataDelayed());
+			StartCoroutine(LoadSavedDataDelayed());
 		}
 	}
 
-	private IEnumerator LoadTemperatureDataDelayed()
+	private IEnumerator LoadSavedDataDelayed()
 	{
 		// Wait a frame to ensure all components are initialized
 		yield return null;
 		PauseMenuManager.LoadTemperatureData();
+		
+		// DayNightCycle now loads its state in Start(), so we don't need to call LoadDayNightCycleData here
+		// But we'll keep it as a backup in case Start() hasn't run yet
+		PauseMenuManager.LoadDayNightCycleData();
+		
+		// Wait another frame for spawners to initialize
+		yield return null;
+		PauseMenuManager.LoadSpawnerStates();
 	}
 }
 
