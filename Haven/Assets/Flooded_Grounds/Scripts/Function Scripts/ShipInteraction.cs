@@ -275,12 +275,10 @@ public class ShipInteraction : MonoBehaviour
         
         if (success)
         {
+            Debug.Log($"ShipInteraction: Minigame completed successfully for {part.partName}. Consuming item '{part.requiredItemName}'...");
+            
             // Consume the item only on success
-            if (craftingService != null)
-            {
-                // Consume from inventory/hotbar
-                ConsumeRepairItem(part.requiredItemName, part.requiredQuantity);
-            }
+            ConsumeRepairItem(part.requiredItemName, part.requiredQuantity);
             
             // Mark part as repaired
             repairedParts[part.partName] = true;
@@ -306,43 +304,89 @@ public class ShipInteraction : MonoBehaviour
     
     private void ConsumeRepairItem(string itemName, int quantity)
     {
-        if (craftingService == null) return;
+        if (craftingService == null)
+        {
+            Debug.LogError("ShipInteraction: CraftingService is null! Cannot consume item.");
+            return;
+        }
         
-        // Use CraftingService's consume methods (similar to crafting)
-        // We'll need to access private methods or create a public method
-        // For now, manually consume from inventory/hotbar
+        Debug.Log($"ShipInteraction: Consuming {quantity} of '{itemName}'");
         
         InventoryManager inventoryManager = FindObjectOfType<InventoryManager>();
         HotbarManager hotbarManager = FindObjectOfType<HotbarManager>();
         
         int remaining = quantity;
         
-        // Consume from hotbar first
+        // Consume from hotbar first (check selected slot first)
         if (hotbarManager != null && remaining > 0)
         {
-            for (int i = 0; i < hotbarManager.hotbarSlots.Length && remaining > 0; i++)
+            // Check selected slot first
+            int selectedSlot = hotbarManager.selectedSlot;
+            GameObject selectedItem = hotbarManager.GetItem(selectedSlot);
+            if (selectedItem != null && MatchesItemName(selectedItem, itemName))
             {
-                GameObject item = hotbarManager.GetItem(i);
-                if (item != null && MatchesItemName(item, itemName))
+                InventorySlot slot = hotbarManager.hotbarSlots[selectedSlot];
+                int stackCount = slot.GetStackCount();
+                int toConsume = Mathf.Min(stackCount, remaining);
+                
+                Debug.Log($"ShipInteraction: Found item in selected slot {selectedSlot}. Stack: {stackCount}, Consuming: {toConsume}");
+                
+                if (toConsume >= stackCount)
                 {
-                    InventorySlot slot = hotbarManager.hotbarSlots[i];
-                    int stackCount = slot.GetStackCount();
-                    int toConsume = Mathf.Min(stackCount, remaining);
-                    
-                    if (toConsume >= stackCount)
+                    // Consuming entire stack - clear the slot properly
+                    Debug.Log($"ShipInteraction: Clearing selected slot {selectedSlot}");
+                    GameObject itemToDestroy = hotbarManager.GetItem(selectedSlot);
+                    hotbarManager.ClearCurrentHotbarSlot();
+                    // Destroy the item after clearing
+                    if (itemToDestroy != null)
                     {
-                        hotbarManager.SetItem(i, null);
-                        Destroy(item);
-                        remaining -= stackCount;
+                        Destroy(itemToDestroy);
+                        Debug.Log($"ShipInteraction: Destroyed item '{itemToDestroy.name}' from selected slot");
                     }
-                    else
+                    remaining -= stackCount;
+                }
+                else
+                {
+                    // Consuming part of stack - just reduce count
+                    slot.SetStackCount(stackCount - toConsume);
+                    remaining -= toConsume;
+                    Debug.Log($"ShipInteraction: Reduced stack in slot {selectedSlot} from {stackCount} to {slot.GetStackCount()}");
+                }
+                hotbarManager.UpdateHotbarUI();
+            }
+            
+            // Consume from other hotbar slots if still needed
+            if (remaining > 0)
+            {
+                for (int i = 0; i < hotbarManager.hotbarSlots.Length && remaining > 0; i++)
+                {
+                    if (i == selectedSlot) continue; // Already handled selected slot
+                    
+                    GameObject item = hotbarManager.GetItem(i);
+                    if (item != null && MatchesItemName(item, itemName))
                     {
-                        slot.SetStackCount(stackCount - toConsume);
-                        remaining -= toConsume;
+                        InventorySlot slot = hotbarManager.hotbarSlots[i];
+                        int stackCount = slot.GetStackCount();
+                        int toConsume = Mathf.Min(stackCount, remaining);
+                        
+                        if (toConsume >= stackCount)
+                        {
+                            // Deactivate and unparent before destroying
+                            item.SetActive(false);
+                            item.transform.SetParent(null);
+                            hotbarManager.SetItem(i, null);
+                            Destroy(item);
+                            remaining -= stackCount;
+                        }
+                        else
+                        {
+                            slot.SetStackCount(stackCount - toConsume);
+                            remaining -= toConsume;
+                        }
                     }
                 }
+                hotbarManager.UpdateHotbarUI();
             }
-            hotbarManager.UpdateHotbarUI();
         }
         
         // Consume from inventory
