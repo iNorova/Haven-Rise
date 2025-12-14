@@ -25,10 +25,23 @@ public class ShipRepairPart
     [Tooltip("Number of color pairs to match (each pair = 2 boxes, only for Engine minigame)")]
     public int numberOfKnotPairs = 3;
     
-    [Tooltip("Time limit in seconds (only for Engine minigame)")]
-    public float timeLimit = 30f;
+    [Header("Propeller Minigame Settings")]
+    [Tooltip("Time limit in seconds (for Propeller minigame)")]
+    public float timeLimit = 15f;
     
-    [Tooltip("Difficulty of knot untying (affects speed/difficulty)")]
+    [Tooltip("Target points to reach (out of 100, for Propeller minigame)")]
+    public float targetPoints = 80f;
+    
+    [Tooltip("Points added per click (for Propeller minigame)")]
+    public float pointsPerClick = 10f;
+    
+    [Tooltip("Points lost per second (decay rate, for Propeller minigame)")]
+    public float decayRate = 15f;
+    
+    [Tooltip("Failure threshold - instant fail if bar drops below this (for Propeller minigame)")]
+    public float failureThreshold = 20f;
+    
+    [Tooltip("Difficulty level (affects various settings)")]
     public int difficultyLevel = 1;
     
     public enum MinigameType

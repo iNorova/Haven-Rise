@@ -161,7 +161,18 @@ public class EngineRepairMiniGame : MonoBehaviour
             totalPairs = Mathf.Max(1, part.numberOfKnots / 2);
         }
         
-        timeRemaining = part.timeLimit;
+        // Set time limit - use part's timeLimit if > 0, otherwise use component default (60 seconds)
+        if (part.timeLimit > 0)
+        {
+            timeRemaining = part.timeLimit;
+        }
+        else
+        {
+            // Default to 60 seconds if not set
+            timeRemaining = 60f;
+            Debug.LogWarning($"EngineRepairMiniGame: Part '{part.partName}' has timeLimit = 0. Using default 60 seconds.");
+        }
+        
         pairsMatched = 0;
         firstSelectedKnot = null;
         isActive = true;

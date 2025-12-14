@@ -74,17 +74,44 @@ public class ShipInteraction : MonoBehaviour
         }
         
         Debug.Log($"ShipInteraction: Initialized with {requiredParts?.Length ?? 0} required parts.");
+        if (requiredParts != null && requiredParts.Length > 0)
+        {
+            foreach (var part in requiredParts)
+            {
+                if (part != null)
+                {
+                    Debug.Log($"  - Part: {part.partName}, Item: {part.requiredItemName}, Type: {part.minigameType}");
+                }
+            }
+        }
+        
+        // Debug: List all items in inventory/hotbar to help with setup
+        if (craftingService != null)
+        {
+            Debug.Log("ShipInteraction: Debug - Listing items in player inventory...");
+            ListAllPlayerItems();
+        }
     }
     
     void Update()
     {
-        if (!isInteractable) return;
+        if (!isInteractable)
+        {
+            // Debug log why interaction is disabled
+            // Debug.Log("ShipInteraction: Not interactable (minigame active or disabled).");
+            return;
+        }
         
         bool canInteract = IsPlayerInRange();
         if (canInteract && Input.GetKeyDown(interactKey))
         {
             Debug.Log("ShipInteraction: Interact key pressed.");
             TryInteract();
+        }
+        else if (Input.GetKeyDown(interactKey))
+        {
+            float dist = player != null ? Vector3.Distance(player.position, transform.position) : -1f;
+            Debug.LogWarning($"ShipInteraction: E pressed but cannot interact. Player in range: {canInteract}, Distance: {dist:F2}, Range: {interactRange}, Player: {(player != null ? player.name : "NULL")}");
         }
     }
     
@@ -97,12 +124,72 @@ public class ShipInteraction : MonoBehaviour
     
     private void TryInteract()
     {
-        // Find the first part that isn't repaired yet
+        Debug.Log("ShipInteraction: TryInteract called.");
+        
+        // Check if requiredParts array is set up
+        if (requiredParts == null || requiredParts.Length == 0)
+        {
+            Debug.LogError("ShipInteraction: Required Parts array is null or empty! Please configure it in the Inspector.");
+            return;
+        }
+        
+        // Get the currently held item from hotbar
+        HotbarManager hotbarManager = FindObjectOfType<HotbarManager>();
+        GameObject heldItem = null;
+        string heldItemName = null;
+        
+        if (hotbarManager != null)
+        {
+            heldItem = hotbarManager.GetItem(hotbarManager.selectedSlot);
+            if (heldItem != null)
+            {
+                // Try to get item name from ItemIconProvider
+                ItemIconProvider iconProvider = heldItem.GetComponent<ItemIconProvider>();
+                if (iconProvider != null && !string.IsNullOrEmpty(iconProvider.itemName))
+                {
+                    heldItemName = iconProvider.itemName;
+                }
+                else
+                {
+                    // Fallback to GameObject name
+                    heldItemName = heldItem.name.Replace("(Clone)", "").Trim();
+                }
+                Debug.Log($"ShipInteraction: Player is holding '{heldItemName}' (from slot {hotbarManager.selectedSlot})");
+            }
+            else
+            {
+                Debug.LogWarning("ShipInteraction: No item in selected hotbar slot. Please select the repair part you want to use.");
+                return;
+            }
+        }
+        else
+        {
+            Debug.LogError("ShipInteraction: HotbarManager not found! Cannot check held item.");
+            return;
+        }
+        
+        // Find the part that matches the held item
         ShipRepairPart partToRepair = null;
         foreach (var part in requiredParts)
         {
-            if (part != null && !IsPartRepaired(part.partName))
+            if (part == null)
             {
+                Debug.LogWarning("ShipInteraction: Found null part in requiredParts array!");
+                continue;
+            }
+            
+            // Check if this part's required item matches what player is holding
+            if (MatchesItemName(heldItem, part.requiredItemName))
+            {
+                bool isRepaired = IsPartRepaired(part.partName);
+                Debug.Log($"ShipInteraction: Found matching part '{part.partName}' for held item '{heldItemName}' - Repaired: {isRepaired}, Minigame Type: {part.minigameType}");
+                
+                if (isRepaired)
+                {
+                    Debug.LogWarning($"ShipInteraction: Part '{part.partName}' is already repaired!");
+                    return;
+                }
+                
                 partToRepair = part;
                 break;
             }
@@ -110,30 +197,30 @@ public class ShipInteraction : MonoBehaviour
         
         if (partToRepair == null)
         {
-            Debug.Log("ShipInteraction: All parts are already repaired!");
-            PlaySfx(allPartsRepairedSfx);
+            Debug.LogWarning($"ShipInteraction: No repair part found that matches held item '{heldItemName}'. Make sure the item name matches the part's 'Required Item Name' in the Inspector.");
             return;
         }
         
-        // Check if player has the required item
-        if (craftingService != null)
+        // Check if player has enough of the required item
+        if (craftingService == null)
         {
-            int itemCount = craftingService.CountByItemName(partToRepair.requiredItemName);
-            if (itemCount < partToRepair.requiredQuantity)
-            {
-                Debug.Log($"ShipInteraction: Need {partToRepair.requiredQuantity} {partToRepair.requiredItemName}, but only have {itemCount}.");
-                // TODO: Show UI message to player
-                return;
-            }
+            Debug.LogError("ShipInteraction: CraftingService not found! Cannot check for items.");
+            return;
         }
-        else
+        
+        Debug.Log($"ShipInteraction: Checking for item '{partToRepair.requiredItemName}' in inventory...");
+        int itemCount = craftingService.CountByItemName(partToRepair.requiredItemName);
+        Debug.Log($"ShipInteraction: Found {itemCount} of '{partToRepair.requiredItemName}' (need {partToRepair.requiredQuantity})");
+        
+        if (itemCount < partToRepair.requiredQuantity)
         {
-            Debug.LogWarning("ShipInteraction: CraftingService not found. Cannot check for items.");
+            Debug.LogWarning($"ShipInteraction: Need {partToRepair.requiredQuantity} {partToRepair.requiredItemName}, but only have {itemCount}. Make sure the item name matches exactly!");
+            // TODO: Show UI message to player
             return;
         }
         
         // Start the minigame for this part
-        Debug.Log($"ShipInteraction: Starting repair minigame for {partToRepair.partName}.");
+        Debug.Log($"ShipInteraction: Starting repair minigame for {partToRepair.partName} (Type: {partToRepair.minigameType}).");
         StartRepairMinigame(partToRepair);
     }
     
@@ -153,9 +240,19 @@ public class ShipInteraction : MonoBehaviour
             
             engineMiniGame.Begin(part, OnRepairMinigameComplete);
         }
+        else if (part.minigameType == ShipRepairPart.MinigameType.Propeller)
+        {
+            PropellerRepairMiniGame propellerMiniGame = GetComponent<PropellerRepairMiniGame>();
+            if (propellerMiniGame == null)
+            {
+                propellerMiniGame = gameObject.AddComponent<PropellerRepairMiniGame>();
+            }
+            
+            propellerMiniGame.Begin(part, OnRepairMinigameComplete);
+        }
         else
         {
-            // Add more minigame types here later (propeller, metal scraps, wood, etc.)
+            // Add more minigame types here later (metal scraps, wood, etc.)
             Debug.LogWarning($"ShipInteraction: Minigame type {part.minigameType} not yet implemented!");
             OnRepairMinigameComplete(part, false);
         }
@@ -163,12 +260,12 @@ public class ShipInteraction : MonoBehaviour
     
     private void OnRepairMinigameComplete(ShipRepairPart part, bool success)
     {
-        // Re-enable interaction
+        // Re-enable interaction (player can try again if failed)
         isInteractable = true;
         
         if (success)
         {
-            // Consume the item
+            // Consume the item only on success
             if (craftingService != null)
             {
                 // Consume from inventory/hotbar
@@ -191,7 +288,9 @@ public class ShipInteraction : MonoBehaviour
         }
         else
         {
-            Debug.Log($"ShipInteraction: Failed to repair {part.partName}. Try again!");
+            // Failure - don't consume item, player can try again
+            string partName = part != null && !string.IsNullOrEmpty(part.partName) ? part.partName : "Unknown Part";
+            Debug.Log($"ShipInteraction: Failed to repair {partName}. Press E again to retry!");
         }
     }
     
@@ -301,6 +400,53 @@ public class ShipInteraction : MonoBehaviour
         {
             sfxSource.PlayOneShot(clip, sfxVolume);
         }
+    }
+    
+    // Debug helper to list all items player has
+    private void ListAllPlayerItems()
+    {
+        InventoryManager inventoryManager = FindObjectOfType<InventoryManager>();
+        HotbarManager hotbarManager = FindObjectOfType<HotbarManager>();
+        
+        System.Collections.Generic.HashSet<string> itemNames = new System.Collections.Generic.HashSet<string>();
+        
+        // Check hotbar
+        if (hotbarManager != null)
+        {
+            for (int i = 0; i < hotbarManager.hotbarSlots.Length; i++)
+            {
+                GameObject item = hotbarManager.GetItem(i);
+                if (item != null)
+                {
+                    ItemIconProvider provider = item.GetComponent<ItemIconProvider>();
+                    string name = provider != null && !string.IsNullOrEmpty(provider.itemName) 
+                        ? provider.itemName 
+                        : item.name.Replace("(Clone)", "").Trim();
+                    itemNames.Add(name);
+                    Debug.Log($"  Hotbar Slot {i}: {name}");
+                }
+            }
+        }
+        
+        // Check inventory
+        if (inventoryManager != null)
+        {
+            for (int i = 0; i < inventoryManager.inventorySlots.Length; i++)
+            {
+                GameObject item = inventoryManager.GetItem(i);
+                if (item != null)
+                {
+                    ItemIconProvider provider = item.GetComponent<ItemIconProvider>();
+                    string name = provider != null && !string.IsNullOrEmpty(provider.itemName) 
+                        ? provider.itemName 
+                        : item.name.Replace("(Clone)", "").Trim();
+                    itemNames.Add(name);
+                    Debug.Log($"  Inventory Slot {i}: {name}");
+                }
+            }
+        }
+        
+        Debug.Log($"ShipInteraction: Player has {itemNames.Count} unique item type(s) total.");
     }
     
     void OnDrawGizmosSelected()

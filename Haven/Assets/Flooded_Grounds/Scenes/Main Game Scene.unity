@@ -123895,6 +123895,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 127258, guid: 8a98dd32bb1a39c4eb50296503009ea2, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1957656195}
+    - targetCorrespondingSourceObject: {fileID: 127258, guid: 8a98dd32bb1a39c4eb50296503009ea2, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1957656197}
   m_SourcePrefab: {fileID: 100100000, guid: 8a98dd32bb1a39c4eb50296503009ea2, type: 3}
 --- !u!1001 &824868752
 PrefabInstance:
@@ -305255,7 +305258,23 @@ MonoBehaviour:
     numberOfKnots: 6
     numberOfKnotPairs: 3
     timeLimit: 60
+    targetPoints: 80
+    pointsPerClick: 10
+    decayRate: 15
+    failureThreshold: 20
     difficultyLevel: 3
+  - partName: Propeller
+    requiredItemName: Propeller
+    requiredQuantity: 1
+    minigameType: 1
+    numberOfKnots: 0
+    numberOfKnotPairs: 3
+    timeLimit: 15
+    targetPoints: 80
+    pointsPerClick: 10
+    decayRate: 15
+    failureThreshold: 20
+    difficultyLevel: 2
   - partName: 
     requiredItemName: 
     requiredQuantity: 0
@@ -305263,27 +305282,49 @@ MonoBehaviour:
     numberOfKnots: 0
     numberOfKnotPairs: 3
     timeLimit: 0
-    difficultyLevel: 0
-  - partName: 
-    requiredItemName: 
-    requiredQuantity: 0
-    minigameType: 0
-    numberOfKnots: 0
-    numberOfKnotPairs: 3
-    timeLimit: 0
-    difficultyLevel: 0
-  - partName: 
-    requiredItemName: 
-    requiredQuantity: 0
-    minigameType: 0
-    numberOfKnots: 0
-    numberOfKnotPairs: 3
-    timeLimit: 0
+    targetPoints: 80
+    pointsPerClick: 10
+    decayRate: 15
+    failureThreshold: 20
     difficultyLevel: 0
   sfxSource: {fileID: 0}
   interactSfx: {fileID: 0}
   partRepairedSfx: {fileID: 0}
   allPartsRepairedSfx: {fileID: 0}
+  sfxVolume: 0.8
+--- !u!114 &1957656197
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1957656191}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5fde2d6633db923409c5e10303402aac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  minigameCanvas: {fileID: 0}
+  progressBar: {fileID: 0}
+  progressBarFill: {fileID: 0}
+  timerText: {fileID: 0}
+  instructionsText: {fileID: 0}
+  clickCountText: {fileID: 0}
+  timeLimit: 15
+  pointsPerClick: 10
+  decayRate: 15
+  targetPoints: 80
+  failureThreshold: 20
+  greenZoneColor: {r: 0, g: 1, b: 0, a: 1}
+  yellowZoneColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  redZoneColor: {r: 1, g: 0, b: 0, a: 1}
+  greenZoneStart: 0.7
+  yellowZoneStart: 0.4
+  sfxSource: {fileID: 0}
+  clickSfx: {fileID: 0}
+  successSfx: {fileID: 0}
+  failSfx: {fileID: 0}
+  warningSfx: {fileID: 0}
   sfxVolume: 0.8
 --- !u!1001 &1957723294
 PrefabInstance:
