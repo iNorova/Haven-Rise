@@ -355,6 +355,12 @@ public class WorkbenchPlacement : MonoBehaviour
             previewWorkbench = Instantiate(gameObject, Vector3.zero, Quaternion.identity);
             previewWorkbench.name = "WorkbenchPreview";
             
+            // CRITICAL: Reset scale immediately after instantiation
+            // Unparent first to avoid parent scale affecting it
+            previewWorkbench.transform.SetParent(null);
+            // Set specific scale for workbench preview (matches placed scale)
+            previewWorkbench.transform.localScale = new Vector3(0.01f, 0.009999999f, 0.009999999f);
+            
             // Remove WorkbenchPlacement from preview FIRST (before any other operations)
             WorkbenchPlacement previewPlacement = previewWorkbench.GetComponent<WorkbenchPlacement>();
             if (previewPlacement != null)
@@ -702,10 +708,20 @@ public class WorkbenchPlacement : MonoBehaviour
         GameObject placedWorkbench = Instantiate(gameObject, previewPosition, previewRotation);
         placedWorkbench.name = gameObject.name + "_Placed";
         
-        // Ensure placed workbench has correct rotation (no janky rotation)
+        // CRITICAL: Reset scale BEFORE setting position/rotation to ensure no parent scaling affects it
+        // Unparent first to avoid parent scale affecting it
+        Transform originalParent = placedWorkbench.transform.parent;
+        placedWorkbench.transform.SetParent(null);
+        
+        // Set specific scale for workbench
+        placedWorkbench.transform.localScale = new Vector3(0.01f, 0.009999999f, 0.009999999f);
+        
+        // Ensure placed workbench has correct rotation and position
         placedWorkbench.transform.rotation = previewRotation;
         placedWorkbench.transform.position = previewPosition;
-        placedWorkbench.transform.localScale = Vector3.one; // Ensure scale is normal
+        
+        // Verify scale is correct (debug)
+        Debug.Log($"[WorkbenchPlacement] Placed workbench scale: {placedWorkbench.transform.localScale}, lossyScale: {placedWorkbench.transform.lossyScale}");
         
         // Enable physics and collider for the placed workbench
         Rigidbody rb = placedWorkbench.GetComponent<Rigidbody>();
