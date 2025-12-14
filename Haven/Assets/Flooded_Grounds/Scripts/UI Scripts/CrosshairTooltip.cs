@@ -59,6 +59,11 @@ public class CrosshairTooltip : MonoBehaviour
     private GameObject lastHitObject;
     private HotbarManager hotbarManager;
     
+    // Ship requirements UI
+    private GameObject shipRequirementsPanel;
+    private TextMeshProUGUI shipRequirementsText;
+    private ShipInteraction lastDetectedShip;
+    
     void Start()
     {
         playerCamera = Camera.main;
@@ -289,12 +294,14 @@ public class CrosshairTooltip : MonoBehaviour
         if (inventoryUI != null && inventoryUI.IsInventoryOpen())
         {
             HideTooltip();
+            HideShipRequirements();
             return;
         }
         
         if (PauseMenuManager.IsPauseMenuOpen())
         {
             HideTooltip();
+            HideShipRequirements();
             return;
         }
         
@@ -373,6 +380,11 @@ public class CrosshairTooltip : MonoBehaviour
             return;
         }
         
+        // Check for nearby ships using proximity (before raycast)
+        // This makes detection work even when looking at different parts of the ship
+        ShipInteraction nearbyShip = FindNearestShip();
+        bool isNearShip = nearbyShip != null && Vector3.Distance(playerCamera.transform.position, nearbyShip.transform.position) <= nearbyShip.interactRange * 1.5f;
+        
         // Normal tooltip logic when bed is not selected
         // Use a longer range or no layer mask restriction to detect beds properly
         if (Physics.Raycast(ray, out hit, detectionRange))
@@ -387,6 +399,31 @@ public class CrosshairTooltip : MonoBehaviour
             
             lastHitObject = hitObject;
             lastHit = hit;
+            
+            // Check for ship interaction (also check in children and parents in case raycast hits a child part)
+            ShipInteraction shipInteraction = hitObject.GetComponent<ShipInteraction>();
+            if (shipInteraction == null)
+            {
+                shipInteraction = hitObject.GetComponentInParent<ShipInteraction>();
+            }
+            if (shipInteraction == null)
+            {
+                shipInteraction = hitObject.GetComponentInChildren<ShipInteraction>();
+            }
+            if (shipInteraction != null)
+            {
+                lastDetectedShip = shipInteraction;
+                ShowShipRequirements(shipInteraction);
+                return;
+            }
+            
+            // Also check if we're near a ship (even if raycast didn't hit it directly)
+            if (isNearShip && nearbyShip != null)
+            {
+                lastDetectedShip = nearbyShip;
+                ShowShipRequirements(nearbyShip);
+                return;
+            }
             
             // Check for bed interaction first (needs special handling for two texts)
             BedInteraction bedInteraction = hitObject.GetComponent<BedInteraction>();
@@ -411,16 +448,50 @@ public class CrosshairTooltip : MonoBehaviour
             
             if (!string.IsNullOrEmpty(tooltip))
             {
+                // Only hide ship requirements if we're not near a ship
+                if (lastDetectedShip == null || Vector3.Distance(playerCamera.transform.position, lastDetectedShip.transform.position) > lastDetectedShip.interactRange * 1.5f)
+                {
+                    HideShipRequirements();
+                }
                 ShowTooltip(tooltip);
             }
             else
             {
                 HideTooltip();
+                // Check if we're still near a ship
+                if (lastDetectedShip == null || Vector3.Distance(playerCamera.transform.position, lastDetectedShip.transform.position) > lastDetectedShip.interactRange * 1.5f)
+                {
+                    HideShipRequirements();
+                }
+                else
+                {
+                    // Still near ship, keep showing requirements
+                    ShowShipRequirements(lastDetectedShip);
+                }
             }
         }
         else
         {
             HideTooltip();
+            // Check if we're still near a ship even though raycast didn't hit
+            if (lastDetectedShip != null)
+            {
+                float distance = Vector3.Distance(playerCamera.transform.position, lastDetectedShip.transform.position);
+                if (distance <= lastDetectedShip.interactRange * 1.5f)
+                {
+                    // Still near ship, keep showing requirements
+                    ShowShipRequirements(lastDetectedShip);
+                }
+                else
+                {
+                    HideShipRequirements();
+                    lastDetectedShip = null;
+                }
+            }
+            else
+            {
+                HideShipRequirements();
+            }
             lastHitObject = null;
         }
     }
@@ -739,6 +810,151 @@ public class CrosshairTooltip : MonoBehaviour
             mainRect.anchoredPosition.x,
             mainRect.anchoredPosition.y + mainRect.sizeDelta.y / 2 + spacing + topRect.sizeDelta.y / 2
         );
+    }
+    
+    void ShowShipRequirements(ShipInteraction shipInteraction)
+    {
+        // Hide regular tooltip
+        HideTooltip();
+        
+        // Create requirements panel if it doesn't exist
+        if (shipRequirementsPanel == null)
+        {
+            CreateShipRequirementsUI();
+        }
+        
+        if (shipRequirementsPanel == null) return;
+        
+        // Build requirements text
+        string requirementsText = "SHIP REPAIR REQUIREMENTS:\n\n";
+        bool allRepaired = true;
+        
+        if (shipInteraction.requiredParts != null && shipInteraction.requiredParts.Length > 0)
+        {
+            foreach (var part in shipInteraction.requiredParts)
+            {
+                if (part == null) continue;
+                
+                bool isRepaired = shipInteraction.IsPartRepaired(part.partName);
+                string status = isRepaired ? "✓ REPAIRED" : "✗ MISSING";
+                Color statusColor = isRepaired ? Color.green : Color.red;
+                
+                requirementsText += $"{part.partName}: {part.requiredQuantity}x {part.requiredItemName} - {status}\n";
+                
+                if (!isRepaired)
+                {
+                    allRepaired = false;
+                }
+            }
+        }
+        else
+        {
+            requirementsText += "No requirements set.";
+        }
+        
+        if (allRepaired)
+        {
+            requirementsText += "\n\n✓ SHIP FULLY REPAIRED!";
+        }
+        else
+        {
+            requirementsText += "\n\nPress [E] to repair parts.";
+        }
+        
+        // Update text
+        if (shipRequirementsText != null)
+        {
+            shipRequirementsText.text = requirementsText;
+            shipRequirementsPanel.SetActive(true);
+        }
+    }
+    
+    ShipInteraction FindNearestShip()
+    {
+        ShipInteraction[] allShips = FindObjectsOfType<ShipInteraction>();
+        if (allShips == null || allShips.Length == 0) return null;
+        
+        if (playerCamera == null) return null;
+        
+        ShipInteraction nearest = null;
+        float nearestDist = float.MaxValue;
+        
+        foreach (var ship in allShips)
+        {
+            if (ship == null) continue;
+            float dist = Vector3.Distance(playerCamera.transform.position, ship.transform.position);
+            if (dist < nearestDist && dist <= ship.interactRange * 1.5f)
+            {
+                nearestDist = dist;
+                nearest = ship;
+            }
+        }
+        
+        return nearest;
+    }
+    
+    void HideShipRequirements()
+    {
+        if (shipRequirementsPanel != null)
+        {
+            shipRequirementsPanel.SetActive(false);
+        }
+        lastDetectedShip = null;
+    }
+    
+    void CreateShipRequirementsUI()
+    {
+        // Find or create canvas
+        Canvas canvas = GetComponentInParent<Canvas>();
+        if (canvas == null)
+        {
+            canvas = FindObjectOfType<Canvas>();
+        }
+        if (canvas == null)
+        {
+            GameObject canvasObj = new GameObject("ShipRequirementsCanvas");
+            canvas = canvasObj.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 100;
+            canvasObj.AddComponent<UnityEngine.UI.CanvasScaler>();
+            canvasObj.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+        }
+        
+        // Create panel
+        GameObject panelObj = new GameObject("ShipRequirementsPanel");
+        panelObj.transform.SetParent(canvas.transform, false);
+        RectTransform panelRect = panelObj.AddComponent<RectTransform>();
+        panelRect.anchorMin = new Vector2(0.5f, 0.5f);
+        panelRect.anchorMax = new Vector2(0.5f, 0.5f);
+        panelRect.sizeDelta = new Vector2(400, 300);
+        panelRect.anchoredPosition = new Vector2(0, 150); // Position above center
+        
+        // Add background image
+        UnityEngine.UI.Image panelImage = panelObj.AddComponent<UnityEngine.UI.Image>();
+        panelImage.color = new Color(0.1f, 0.1f, 0.1f, 0.9f);
+        
+        // Create text
+        GameObject textObj = new GameObject("RequirementsText");
+        textObj.transform.SetParent(panelObj.transform, false);
+        shipRequirementsText = textObj.AddComponent<TextMeshProUGUI>();
+        RectTransform textRect = shipRequirementsText.rectTransform;
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.sizeDelta = Vector2.zero;
+        textRect.anchoredPosition = Vector2.zero;
+        
+        shipRequirementsText.text = "";
+        shipRequirementsText.fontSize = 16;
+        shipRequirementsText.alignment = TextAlignmentOptions.Left;
+        shipRequirementsText.color = Color.white;
+        shipRequirementsText.enableWordWrapping = true;
+        
+        // Add padding
+        textRect.offsetMin = new Vector2(15, 15);
+        textRect.offsetMax = new Vector2(-15, -15);
+        
+        shipRequirementsPanel = panelObj;
+        shipRequirementsPanel.SetActive(false);
     }
     
     void HideTooltip()
