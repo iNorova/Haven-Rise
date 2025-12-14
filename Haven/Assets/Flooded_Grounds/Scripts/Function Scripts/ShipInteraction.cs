@@ -455,3 +455,4 @@ public class ShipInteraction : MonoBehaviour
         Gizmos.DrawWireSphere(transform.position, interactRange);
     }
 }
+

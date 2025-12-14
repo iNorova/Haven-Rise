@@ -306178,12 +306178,12 @@ MonoBehaviour:
   knotMatchedColor: {r: 0, g: 1, b: 0, a: 1}
   knotErrorColor: {r: 1, g: 0, b: 0, a: 1}
   sfxSource: {fileID: 0}
-  knotUntieSfx: {fileID: 0}
-  knotCompleteSfx: {fileID: 0}
-  successSfx: {fileID: 0}
-  failSfx: {fileID: 0}
+  knotUntieSfx: {fileID: 8300000, guid: a12e3a41bed59884bb42264926a0bb78, type: 3}
+  knotCompleteSfx: {fileID: 8300000, guid: a12e3a41bed59884bb42264926a0bb78, type: 3}
+  successSfx: {fileID: 8300000, guid: cd7db3e8abc2e7f4d89088ced3dbc16c, type: 3}
+  failSfx: {fileID: 8300000, guid: 391a7b54de796ff429895f1693f7a838, type: 3}
   timerTickSfx: {fileID: 0}
-  sfxVolume: 0.8
+  sfxVolume: 1
 --- !u!114 &1957656196
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -306237,9 +306237,9 @@ MonoBehaviour:
     difficultyLevel: 0
   sfxSource: {fileID: 0}
   interactSfx: {fileID: 0}
-  partRepairedSfx: {fileID: 0}
-  allPartsRepairedSfx: {fileID: 0}
-  sfxVolume: 0.8
+  partRepairedSfx: {fileID: 8300000, guid: c0f887cc782f33d48b59a79f67da0f5b, type: 3}
+  allPartsRepairedSfx: {fileID: 8300000, guid: 086c4b37d5bbd044b851da0e856765d5, type: 3}
+  sfxVolume: 1
 --- !u!114 &1957656197
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -306269,11 +306269,11 @@ MonoBehaviour:
   greenZoneStart: 0.7
   yellowZoneStart: 0.4
   sfxSource: {fileID: 0}
-  clickSfx: {fileID: 0}
-  successSfx: {fileID: 0}
-  failSfx: {fileID: 0}
-  warningSfx: {fileID: 0}
-  sfxVolume: 0.8
+  clickSfx: {fileID: 8300000, guid: f10ed915d6fc0894ca54ec47b010f63e, type: 3}
+  successSfx: {fileID: 8300000, guid: cd7db3e8abc2e7f4d89088ced3dbc16c, type: 3}
+  failSfx: {fileID: 8300000, guid: 391a7b54de796ff429895f1693f7a838, type: 3}
+  warningSfx: {fileID: 8300000, guid: 3bd27d0c35ba52e40aaf37b7a81534dd, type: 3}
+  sfxVolume: 1
 --- !u!1001 &1957723294
 PrefabInstance:
   m_ObjectHideFlags: 0
