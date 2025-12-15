@@ -300620,21 +300620,21 @@ MonoBehaviour:
   plywoodItemName: Plywood
   plywoodRequirements:
   - itemName: Wood
-    quantity: 4
+    quantity: 1
   engineItemName: Engine
   engineRequirements:
   - itemName: metal scrap
     quantity: 1
   - itemName: Gear
-    quantity: 1
+    quantity: 0
   - itemName: screws
-    quantity: 1
+    quantity: 0
   propellerItemName: Propeller
   propellerRequirements:
   - itemName: metal scrap
-    quantity: 1
+    quantity: 0
   - itemName: screws
-    quantity: 1
+    quantity: 0
   - itemName: Gear
     quantity: 1
 --- !u!4 &1918980432
