@@ -766,6 +766,28 @@ public class WorkbenchPlacement : MonoBehaviour
             Debug.Log("WorkbenchPlacement: Added WorkbenchPickup component to placed workbench.");
         }
         
+        // Add WorkbenchInteraction component for crafting menu
+        WorkbenchInteraction interaction = placedWorkbench.GetComponent<WorkbenchInteraction>();
+        if (interaction == null)
+        {
+            interaction = placedWorkbench.AddComponent<WorkbenchInteraction>();
+            Debug.Log("WorkbenchPlacement: Added WorkbenchInteraction component to placed workbench.");
+        }
+        else
+        {
+            Debug.Log("WorkbenchPlacement: WorkbenchInteraction component already exists on placed workbench.");
+        }
+        
+        // Verify the component was added
+        if (interaction != null)
+        {
+            Debug.Log($"WorkbenchPlacement: WorkbenchInteraction verified! Interaction key: {interaction.interactKey}, Range: {interaction.interactionRange}");
+        }
+        else
+        {
+            Debug.LogError("WorkbenchPlacement: Failed to add WorkbenchInteraction component!");
+        }
+        
         // Remove WorkbenchPlacement component from placed workbench (only the held one should have it)
         WorkbenchPlacement placementScript = placedWorkbench.GetComponent<WorkbenchPlacement>();
         if (placementScript != null)

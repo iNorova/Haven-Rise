@@ -236,7 +236,7 @@ public class ObjectDragger : MonoBehaviour
     
     bool IsPlacedItem(GameObject obj)
     {
-        // Check if object has a pickup component (CampfirePickup, BedPickup, etc.)
+        // Check if object has a pickup component (CampfirePickup, BedPickup, WorkbenchPickup, etc.)
         // Placed items have pickup components, dropped items don't
         if (obj.GetComponent<CampfirePickup>() != null)
         {
@@ -244,6 +244,12 @@ public class ObjectDragger : MonoBehaviour
         }
         
         if (obj.GetComponent<BedPickup>() != null)
+        {
+            return true;
+        }
+        
+        // Exclude workbenches from dragging (treat as placed/non-draggable)
+        if (obj.GetComponent<WorkbenchPickup>() != null)
         {
             return true;
         }
@@ -260,6 +266,7 @@ public class ObjectDragger : MonoBehaviour
         {
             if (parent.GetComponent<CampfirePickup>() != null || 
                 parent.GetComponent<BedPickup>() != null ||
+                parent.GetComponent<WorkbenchPickup>() != null ||
                 parent.GetComponent<ChestInteraction>() != null)
             {
                 return true;

@@ -77,8 +77,15 @@ public class HotbarManager : MonoBehaviour
         }
 
         // Manual pickup with F (works alongside auto pickup)
+        // But don't pick up if player is near a workbench (E key should open crafting menu instead)
         if (Input.GetKeyDown(KeyCode.F))
-            TryPickupItem();
+        {
+            // Check if player is near a workbench - if so, don't pick up (let workbench handle E key)
+            if (!IsPlayerNearWorkbench())
+            {
+                TryPickupItem();
+            }
+        }
 
         // Drop with Q
         if (Input.GetKeyDown(KeyCode.Q))
@@ -1002,6 +1009,31 @@ public class HotbarManager : MonoBehaviour
     {
         _canProcessItemInput = active;
         Debug.Log($"[HotbarManager] SetInputActive: Input processing set to {active}");
+    }
+    
+    private bool IsPlayerNearWorkbench()
+    {
+        // Check if player is near any workbench with WorkbenchInteraction component
+        WorkbenchInteraction[] workbenches = FindObjectsOfType<WorkbenchInteraction>();
+        if (workbenches == null || workbenches.Length == 0)
+            return false;
+        
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player == null)
+            return false;
+        
+        foreach (WorkbenchInteraction workbench in workbenches)
+        {
+            if (workbench == null) continue;
+            
+            float distance = Vector3.Distance(player.transform.position, workbench.transform.position);
+            if (distance <= workbench.interactionRange)
+            {
+                return true;
+            }
+        }
+        
+        return false;
     }
     
     // Public method to reset animation state (useful when item breaks)

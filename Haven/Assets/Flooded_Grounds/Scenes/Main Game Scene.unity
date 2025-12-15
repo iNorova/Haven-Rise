@@ -300584,6 +300584,74 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 4743926f06b7fdc4c93033724c776cdc, type: 3}
+--- !u!1 &1918980430
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1918980432}
+  - component: {fileID: 1918980431}
+  m_Layer: 10
+  m_Name: WorkbenchCraftingUI
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1918980431
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1918980430}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b5684b6251098d43a673372bc96f64e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  workbenchPrefab: {fileID: 276895353}
+  plywoodPrefab: {fileID: 1591318004}
+  enginePrefab: {fileID: 1956930722}
+  propellerPrefab: {fileID: 807833824}
+  plywoodItemName: Plywood
+  plywoodRequirements:
+  - itemName: Wood
+    quantity: 4
+  engineItemName: Engine
+  engineRequirements:
+  - itemName: metal scrap
+    quantity: 1
+  - itemName: Gear
+    quantity: 1
+  - itemName: screws
+    quantity: 1
+  propellerItemName: Propeller
+  propellerRequirements:
+  - itemName: metal scrap
+    quantity: 1
+  - itemName: screws
+    quantity: 1
+  - itemName: Gear
+    quantity: 1
+--- !u!4 &1918980432
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1918980430}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 615.86017, y: 516.4602, z: 210.47903}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1919182401
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -338641,6 +338709,7 @@ SceneRoots:
   m_Roots:
   - {fileID: 1808299448}
   - {fileID: 1613347017}
+  - {fileID: 1918980432}
   - {fileID: 1780305047}
   - {fileID: 1759552048}
   - {fileID: 353138526}
