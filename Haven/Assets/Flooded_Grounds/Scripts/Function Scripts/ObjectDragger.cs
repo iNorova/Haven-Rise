@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 public class ObjectDragger : MonoBehaviour
 {
@@ -54,6 +55,19 @@ public class ObjectDragger : MonoBehaviour
     void Update()
     {
         if (playerCamera == null) return;
+        
+        // Don't process input if pause menu is open
+        if (PauseMenuManager.IsPauseMenuOpen())
+            return;
+        
+        // Don't process input if workbench crafting UI is open
+        WorkbenchCraftingUI craftingUI = FindObjectOfType<WorkbenchCraftingUI>();
+        if (craftingUI != null && craftingUI.IsOpen())
+            return;
+        
+        // Check if clicking on UI - if so, don't drag
+        if (Input.GetMouseButtonDown(0) && EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            return;
         
         // Start dragging
         if (Input.GetMouseButtonDown(0) && !isDragging)

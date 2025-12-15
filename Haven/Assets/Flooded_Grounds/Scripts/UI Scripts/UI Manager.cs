@@ -118,6 +118,7 @@ public class UIManager : MonoBehaviour, IDamageable
     private float permanentTemperatureIncrease = 0f;  // Tracks permanent temperature increase from deforestation
     private bool isTemperatureIncreasing = false; // Flag to control temperature increase
     private float temperatureIncreaseTimer = 0f;  // Timer for temperature increase duration
+    private bool isDead = false;  // Flag to prevent multiple death triggers and further damage
 
     // Static instance for global access
     public static UIManager Instance { get; private set; }
@@ -725,9 +726,10 @@ public class UIManager : MonoBehaviour, IDamageable
     /// </summary>
     public void ApplyDamage(float amount)
     {
-        if (isPaused)
+        // Don't take damage if already dead or paused
+        if (isDead || isPaused)
         {
-            return; // Don't take damage while paused
+            return;
         }
 
         currentHealth -= Mathf.Abs(amount);
@@ -759,7 +761,7 @@ public class UIManager : MonoBehaviour, IDamageable
         Debug.Log($"Player took {amount} damage. Current health: {currentHealth}");
 
         // Check if player died
-        if (currentHealth <= 0f)
+        if (currentHealth <= 0f && !isDead)
         {
             HandlePlayerDeath();
         }
@@ -767,9 +769,32 @@ public class UIManager : MonoBehaviour, IDamageable
 
     private void HandlePlayerDeath()
     {
-        Debug.Log("Player died from heat damage!");
-        // Broadcast death to listeners (e.g., RespawnManager)
+        // Prevent multiple death triggers
+        if (isDead)
+        {
+            Debug.LogWarning("UIManager: HandlePlayerDeath called but player is already dead!");
+            return;
+        }
+        
+        isDead = true;
+        Debug.Log("UIManager: Player died! Triggering death event.");
+        Debug.Log($"UIManager: Current health: {currentHealth}");
+        
+        // Check if event has subscribers
+        if (OnPlayerDeath == null)
+        {
+            Debug.LogError("UIManager: OnPlayerDeath event has NO subscribers! Death screen will not show!");
+        }
+        else
+        {
+            int subscriberCount = OnPlayerDeath.GetInvocationList().Length;
+            Debug.Log($"UIManager: OnPlayerDeath event has {subscriberCount} subscriber(s). Invoking event...");
+        }
+        
+        // Broadcast death to listeners (e.g., RespawnManager, DeathScreenUI)
         OnPlayerDeath?.Invoke();
+        
+        Debug.Log("UIManager: Death event invocation completed.");
     }
 
     public bool CanSprint()
@@ -1323,6 +1348,7 @@ public class UIManager : MonoBehaviour, IDamageable
     // Convenience method to reset all gameplay stats on respawn
     public void ResetAllStats()
     {
+        isDead = false;  // Reset death flag so player can die again after respawn
         RestoreFullHealth();
         RestoreFullStamina();
         RestoreFullHunger();

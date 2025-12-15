@@ -18,6 +18,9 @@ public class DeathScreenUI : MonoBehaviour
     private bool prevCursorVisible;
     private CursorLockMode prevCursorLock;
     private TemperatureVisualEffects[] temperatureOverlays;
+    private Coroutine cursorUnlockCoroutine;
+    private MonoBehaviour inventoryUIManager;
+    private bool wasInventoryUIManagerEnabled;
 
     private void Awake()
     {
@@ -37,6 +40,21 @@ public class DeathScreenUI : MonoBehaviour
     {
         respawnManager = FindObjectOfType<RespawnManager>();
         temperatureOverlays = FindObjectsOfType<TemperatureVisualEffects>(true);
+        
+        // Find InventoryUIManager to disable it when death screen is shown
+        // Use reflection to find it since we can't directly reference the type
+        MonoBehaviour[] allBehaviours = FindObjectsOfType<MonoBehaviour>();
+        foreach (var behaviour in allBehaviours)
+        {
+            if (behaviour != null && behaviour.GetType().Name == "InventoryUIManager")
+            {
+                inventoryUIManager = behaviour;
+                wasInventoryUIManagerEnabled = behaviour.enabled;
+                Debug.Log("DeathScreenUI: Found InventoryUIManager");
+                break;
+            }
+        }
+        
         if (respawnNearButton != null)
         {
             respawnNearButton.onClick.AddListener(OnRespawnNearClicked);
@@ -45,27 +63,92 @@ public class DeathScreenUI : MonoBehaviour
         {
             respawnStartButton.onClick.AddListener(OnRespawnStartClicked);
         }
+        
+        // Ensure we're subscribed (backup in case OnEnable wasn't called or GameObject was disabled)
+        SubscribeToDeathEvent();
+        
+        // Ensure this GameObject stays active so it can receive events
+        gameObject.SetActive(true);
+        Debug.Log($"DeathScreenUI: Start() - GameObject active: {gameObject.activeInHierarchy}, Enabled: {enabled}");
     }
 
     private void OnEnable()
     {
-        UIManager.OnPlayerDeath += Show;
+        SubscribeToDeathEvent();
+        Debug.Log($"DeathScreenUI: OnEnable() - GameObject active: {gameObject.activeInHierarchy}, Enabled: {enabled}");
     }
 
     private void OnDisable()
     {
+        // Only unsubscribe if we're actually being destroyed, not just disabled
+        // This prevents unsubscribing when the GameObject is temporarily disabled
         UIManager.OnPlayerDeath -= Show;
+        Debug.LogWarning($"DeathScreenUI: OnDisable() - Unsubscribed from OnPlayerDeath event. GameObject active: {gameObject.activeInHierarchy}");
+    }
+    
+    private void SubscribeToDeathEvent()
+    {
+        // Remove any existing subscription first to avoid duplicates
+        UIManager.OnPlayerDeath -= Show;
+        // Then subscribe
+        UIManager.OnPlayerDeath += Show;
+        Debug.Log("DeathScreenUI: Subscribed to OnPlayerDeath event");
+    }
+    
+    private void OnDestroy()
+    {
+        // Clean up subscription when destroyed
+        UIManager.OnPlayerDeath -= Show;
+        Debug.Log("DeathScreenUI: OnDestroy() - Unsubscribed from OnPlayerDeath event");
     }
 
     private void Show()
     {
-        if (isShowing) return;
+        Debug.Log("DeathScreenUI: Show() called!");
+        if (isShowing)
+        {
+            Debug.LogWarning("DeathScreenUI: Show() called but already showing!");
+            return;
+        }
         isShowing = true;
         // Save and then unlock/show cursor for UI interaction
         prevCursorVisible = Cursor.visible;
         prevCursorLock = Cursor.lockState;
-        Cursor.visible = true;
-        Cursor.lockState = CursorLockMode.None;
+        
+        // Temporarily disable InventoryUIManager to prevent it from locking cursor
+        if (inventoryUIManager != null)
+        {
+            wasInventoryUIManagerEnabled = inventoryUIManager.enabled;
+            inventoryUIManager.enabled = false;
+            Debug.Log("DeathScreenUI: Temporarily disabled InventoryUIManager to prevent cursor locking.");
+        }
+        else
+        {
+            // Try to find it again if we didn't find it in Start()
+            MonoBehaviour[] allBehaviours = FindObjectsOfType<MonoBehaviour>();
+            foreach (var behaviour in allBehaviours)
+            {
+                if (behaviour != null && behaviour.GetType().Name == "InventoryUIManager")
+                {
+                    inventoryUIManager = behaviour;
+                    wasInventoryUIManagerEnabled = behaviour.enabled;
+                    inventoryUIManager.enabled = false;
+                    Debug.Log("DeathScreenUI: Found and disabled InventoryUIManager to prevent cursor locking.");
+                    break;
+                }
+            }
+        }
+        
+        // Unlock cursor immediately
+        UnlockCursorForDeathScreen();
+        
+        // Start continuous cursor unlock coroutine (other systems might try to lock it)
+        if (cursorUnlockCoroutine != null)
+        {
+            StopCoroutine(cursorUnlockCoroutine);
+        }
+        cursorUnlockCoroutine = StartCoroutine(ContinuousCursorUnlock());
+        
         // Pause temperature overlays (stop blinking)
         if (temperatureOverlays != null)
         {
@@ -74,12 +157,21 @@ public class DeathScreenUI : MonoBehaviour
                 if (temperatureOverlays[i] != null) temperatureOverlays[i].SetPaused(true);
             }
         }
+        Debug.Log("DeathScreenUI: Starting fade in routine...");
         StartCoroutine(FadeInRoutine());
     }
 
     private void Hide()
     {
         if (!isShowing) return;
+        
+        // Stop cursor unlock coroutine
+        if (cursorUnlockCoroutine != null)
+        {
+            StopCoroutine(cursorUnlockCoroutine);
+            cursorUnlockCoroutine = null;
+        }
+        
         StartCoroutine(FadeOutRoutine());
     }
 
@@ -120,6 +212,14 @@ public class DeathScreenUI : MonoBehaviour
         isShowing = false;
         // Resume gameplay after fade out
         Time.timeScale = 1f;
+        
+        // Restore InventoryUIManager
+        if (inventoryUIManager != null)
+        {
+            inventoryUIManager.enabled = wasInventoryUIManagerEnabled;
+            Debug.Log("DeathScreenUI: Re-enabled InventoryUIManager.");
+        }
+        
         // Restore cursor state
         Cursor.visible = prevCursorVisible;
         Cursor.lockState = prevCursorLock;
@@ -149,6 +249,35 @@ public class DeathScreenUI : MonoBehaviour
             respawnManager.RespawnAtStart();
         }
         Hide();
+    }
+    
+    private void UnlockCursorForDeathScreen()
+    {
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        
+        // If it's still locked, try Confined mode
+        if (Cursor.lockState == CursorLockMode.Locked)
+        {
+            Cursor.lockState = CursorLockMode.Confined;
+            Cursor.visible = true;
+        }
+        
+        // Force unlock again
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+    }
+    
+    private IEnumerator ContinuousCursorUnlock()
+    {
+        while (isShowing)
+        {
+            UnlockCursorForDeathScreen();
+            yield return null; // Wait one frame
+            UnlockCursorForDeathScreen();
+            yield return new WaitForEndOfFrame(); // Wait until end of frame
+            UnlockCursorForDeathScreen();
+        }
     }
 }
 

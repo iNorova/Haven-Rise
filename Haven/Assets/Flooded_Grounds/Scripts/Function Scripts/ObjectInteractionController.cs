@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 public class ObjectInteractionController : MonoBehaviour
 {
@@ -61,10 +62,29 @@ public class ObjectInteractionController : MonoBehaviour
         if (PauseMenuManager.IsPauseMenuOpen())
             return;
         
-        if (Input.GetMouseButtonDown(0) && Time.time >= nextHitTime)  // Left click
+        // Don't process input if workbench crafting UI is open
+        // Use singleton instance for reliable access
+        if (WorkbenchCraftingUI.Instance != null && WorkbenchCraftingUI.Instance.IsOpen())
         {
-            TryInteractWithObject();
-            nextHitTime = Time.time + hitCooldown;
+            return;
+        }
+        
+        // Don't process mouse clicks if clicking on UI
+        if (Input.GetMouseButtonDown(0))
+        {
+            // Check if clicking on UI (EventSystem)
+            if (UnityEngine.EventSystems.EventSystem.current != null && 
+                UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
+            {
+                return; // Don't process gameplay input when clicking on UI
+            }
+            
+            // Only process if cooldown allows
+            if (Time.time >= nextHitTime)
+            {
+                TryInteractWithObject();
+                nextHitTime = Time.time + hitCooldown;
+            }
         }
     }
 

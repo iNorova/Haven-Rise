@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using TMPro;
 using System.Collections;
 using System.Collections.Generic;
@@ -52,6 +53,11 @@ public class WorkbenchCraftingUI : MonoBehaviour
     private static WorkbenchCraftingUI instance;
     private Coroutine cursorUnlockCoroutine;
     
+    public static WorkbenchCraftingUI Instance
+    {
+        get { return instance; }
+    }
+    
     void Awake()
     {
         // Singleton pattern
@@ -84,6 +90,40 @@ public class WorkbenchCraftingUI : MonoBehaviour
         if (isOpen && Input.GetKeyDown(KeyCode.Escape))
         {
             Close();
+        }
+        
+        // Debug: Check if UI is receiving clicks
+        if (isOpen && Input.GetMouseButtonDown(0))
+        {
+            EventSystem eventSystem = EventSystem.current;
+            if (eventSystem != null)
+            {
+                bool isOverUI = eventSystem.IsPointerOverGameObject();
+                Debug.Log($"WorkbenchCraftingUI: Mouse click detected. IsPointerOverGameObject: {isOverUI}, EventSystem: {eventSystem.name}");
+                
+                if (isOverUI)
+                {
+                    // Check what UI element was clicked
+                    PointerEventData pointerData = new PointerEventData(eventSystem);
+                    pointerData.position = Input.mousePosition;
+                    var results = new System.Collections.Generic.List<RaycastResult>();
+                    eventSystem.RaycastAll(pointerData, results);
+                    
+                    foreach (var result in results)
+                    {
+                        Debug.Log($"WorkbenchCraftingUI: Clicked on: {result.gameObject.name}, Layer: {result.gameObject.layer}");
+                        Button btn = result.gameObject.GetComponent<Button>();
+                        if (btn != null)
+                        {
+                            Debug.Log($"WorkbenchCraftingUI: Found button: {btn.name}, Interactable: {btn.interactable}");
+                        }
+                    }
+                }
+            }
+            else
+            {
+                Debug.LogWarning("WorkbenchCraftingUI: No EventSystem found!");
+            }
         }
     }
     
@@ -176,6 +216,21 @@ public class WorkbenchCraftingUI : MonoBehaviour
     {
         Debug.Log("WorkbenchCraftingUI: CreateUI() called");
         
+        // Ensure EventSystem exists (required for UI button clicks)
+        if (EventSystem.current == null)
+        {
+            Debug.Log("WorkbenchCraftingUI: No EventSystem found, creating one...");
+            GameObject eventSystemObj = new GameObject("EventSystem");
+            eventSystemObj.AddComponent<EventSystem>();
+            eventSystemObj.AddComponent<StandaloneInputModule>();
+            DontDestroyOnLoad(eventSystemObj);
+            Debug.Log("WorkbenchCraftingUI: Created EventSystem for UI interactions");
+        }
+        else
+        {
+            Debug.Log($"WorkbenchCraftingUI: Using existing EventSystem: {EventSystem.current.name}");
+        }
+        
         // Always create a dedicated canvas for the workbench crafting UI (like minigames do)
         if (craftingCanvas == null)
         {
@@ -191,11 +246,12 @@ public class WorkbenchCraftingUI : MonoBehaviour
             scaler.referenceResolution = new Vector2(1920, 1080);
             scaler.matchWidthOrHeight = 0.5f;
             
-            canvasObj.AddComponent<GraphicRaycaster>();
+            GraphicRaycaster raycaster = canvasObj.AddComponent<GraphicRaycaster>();
+            raycaster.enabled = true; // Ensure GraphicRaycaster is enabled
             
             // Ensure canvas GameObject is active
             canvasObj.SetActive(true);
-            Debug.Log($"WorkbenchCraftingUI: Created new canvas '{canvasObj.name}', Active: {canvasObj.activeInHierarchy}, Enabled: {craftingCanvas.enabled}, SortingOrder: {craftingCanvas.sortingOrder}");
+            Debug.Log($"WorkbenchCraftingUI: Created new canvas '{canvasObj.name}', Active: {canvasObj.activeInHierarchy}, Enabled: {craftingCanvas.enabled}, SortingOrder: {craftingCanvas.sortingOrder}, GraphicRaycaster: {raycaster.enabled}");
         }
         else
         {
@@ -226,6 +282,7 @@ public class WorkbenchCraftingUI : MonoBehaviour
         // Add background
         Image panelImage = panelObj.AddComponent<Image>();
         panelImage.color = new Color(0.1f, 0.1f, 0.1f, 0.95f);
+        panelImage.raycastTarget = true; // Allow clicks through to buttons (buttons are children, so they'll receive clicks first)
         
         // Create title
         GameObject titleObj = new GameObject("Title");
@@ -246,8 +303,10 @@ public class WorkbenchCraftingUI : MonoBehaviour
         GameObject closeBtnObj = new GameObject("CloseButton");
         closeBtnObj.transform.SetParent(panelObj.transform, false);
         Button closeBtn = closeBtnObj.AddComponent<Button>();
+        closeBtn.interactable = true; // Ensure button is interactable
         Image closeBtnImage = closeBtnObj.AddComponent<Image>();
         closeBtnImage.color = new Color(0.3f, 0.1f, 0.1f, 1f);
+        closeBtnImage.raycastTarget = true; // Enable raycast target for clicks
         RectTransform closeBtnRect = closeBtnObj.GetComponent<RectTransform>();
         closeBtnRect.anchorMin = new Vector2(1f, 1f);
         closeBtnRect.anchorMax = new Vector2(1f, 1f);
@@ -257,6 +316,7 @@ public class WorkbenchCraftingUI : MonoBehaviour
         GameObject closeBtnTextObj = new GameObject("Text");
         closeBtnTextObj.transform.SetParent(closeBtnObj.transform, false);
         TextMeshProUGUI closeBtnText = closeBtnTextObj.AddComponent<TextMeshProUGUI>();
+        closeBtnText.raycastTarget = false; // Text shouldn't block button clicks
         RectTransform closeBtnTextRect = closeBtnText.rectTransform;
         closeBtnTextRect.anchorMin = Vector2.zero;
         closeBtnTextRect.anchorMax = Vector2.one;
@@ -267,6 +327,7 @@ public class WorkbenchCraftingUI : MonoBehaviour
         closeBtnText.color = Color.white;
         
         closeBtn.onClick.AddListener(Close);
+        Debug.Log("WorkbenchCraftingUI: Close button created and configured");
         
         // Create scroll view for recipes
         GameObject scrollViewObj = new GameObject("ScrollView");
@@ -332,8 +393,10 @@ public class WorkbenchCraftingUI : MonoBehaviour
         GameObject buttonObj = new GameObject($"{displayName}Button");
         buttonObj.transform.SetParent(recipeContainer, false);
         Button button = buttonObj.AddComponent<Button>();
+        button.interactable = true; // Ensure button is interactable
         Image buttonImage = buttonObj.AddComponent<Image>();
         buttonImage.color = new Color(0.2f, 0.2f, 0.2f, 1f);
+        buttonImage.raycastTarget = true; // Enable raycast target for clicks
         
         RectTransform buttonRect = buttonObj.GetComponent<RectTransform>();
         buttonRect.sizeDelta = new Vector2(0, 100);
@@ -350,6 +413,7 @@ public class WorkbenchCraftingUI : MonoBehaviour
         GameObject nameObj = new GameObject("ItemName");
         nameObj.transform.SetParent(buttonObj.transform, false);
         TextMeshProUGUI nameText = nameObj.AddComponent<TextMeshProUGUI>();
+        nameText.raycastTarget = false; // Text shouldn't block button clicks
         RectTransform nameRect = nameText.rectTransform;
         nameRect.sizeDelta = new Vector2(150, 0);
         nameText.text = displayName;
@@ -362,6 +426,7 @@ public class WorkbenchCraftingUI : MonoBehaviour
         GameObject reqObj = new GameObject("Requirements");
         reqObj.transform.SetParent(buttonObj.transform, false);
         TextMeshProUGUI reqText = reqObj.AddComponent<TextMeshProUGUI>();
+        reqText.raycastTarget = false; // Text shouldn't block button clicks
         RectTransform reqRect = reqText.rectTransform;
         reqRect.sizeDelta = new Vector2(300, 0);
         reqText.fontSize = 18;
@@ -388,14 +453,17 @@ public class WorkbenchCraftingUI : MonoBehaviour
         GameObject craftBtnObj = new GameObject("CraftButton");
         craftBtnObj.transform.SetParent(buttonObj.transform, false);
         Button craftBtn = craftBtnObj.AddComponent<Button>();
+        craftBtn.interactable = canCraft; // Set interactable state
         Image craftBtnImage = craftBtnObj.AddComponent<Image>();
         craftBtnImage.color = canCraft ? new Color(0.1f, 0.3f, 0.1f, 1f) : new Color(0.3f, 0.1f, 0.1f, 1f);
+        craftBtnImage.raycastTarget = true; // Enable raycast target for clicks
         RectTransform craftBtnRect = craftBtnObj.GetComponent<RectTransform>();
         craftBtnRect.sizeDelta = new Vector2(100, 0);
         
         GameObject craftBtnTextObj = new GameObject("Text");
         craftBtnTextObj.transform.SetParent(craftBtnObj.transform, false);
         TextMeshProUGUI craftBtnText = craftBtnTextObj.AddComponent<TextMeshProUGUI>();
+        craftBtnText.raycastTarget = false; // Text shouldn't block button clicks
         RectTransform craftBtnTextRect = craftBtnText.rectTransform;
         craftBtnTextRect.anchorMin = Vector2.zero;
         craftBtnTextRect.anchorMax = Vector2.one;
@@ -406,7 +474,6 @@ public class WorkbenchCraftingUI : MonoBehaviour
         craftBtnText.color = Color.white;
         craftBtnText.fontStyle = FontStyles.Bold;
         
-        craftBtn.interactable = canCraft;
         craftBtn.onClick.AddListener(() => CraftItem(itemName, requirements, outputPrefab));
         
         // Update button color based on craftability
