@@ -825,7 +825,7 @@ public class CrosshairTooltip : MonoBehaviour
         
         if (shipRequirementsPanel == null) return;
         
-        // Build requirements text
+        // Build requirements text with rich text formatting for colors
         string requirementsText = "SHIP REPAIR REQUIREMENTS:\n\n";
         bool allRepaired = true;
         
@@ -836,13 +836,16 @@ public class CrosshairTooltip : MonoBehaviour
                 if (part == null) continue;
                 
                 bool isRepaired = shipInteraction.IsPartRepaired(part.partName);
-                string status = isRepaired ? "✓ REPAIRED" : "✗ MISSING";
-                Color statusColor = isRepaired ? Color.green : Color.red;
                 
-                requirementsText += $"{part.partName}: {part.requiredQuantity}x {part.requiredItemName} - {status}\n";
-                
-                if (!isRepaired)
+                if (isRepaired)
                 {
+                    // Green color for completed parts
+                    requirementsText += $"<color=#00FF00>{part.partName}: {part.requiredQuantity}x {part.requiredItemName} - ✓ REPAIRED</color>\n";
+                }
+                else
+                {
+                    // Red color for missing parts
+                    requirementsText += $"<color=#FF0000>{part.partName}: {part.requiredQuantity}x {part.requiredItemName} - ✗ MISSING</color>\n";
                     allRepaired = false;
                 }
             }
@@ -854,7 +857,8 @@ public class CrosshairTooltip : MonoBehaviour
         
         if (allRepaired)
         {
-            requirementsText += "\n\n✓ SHIP FULLY REPAIRED!";
+            requirementsText += "\n\n<color=#00FF00>✓ SHIP FULLY REPAIRED!</color>";
+            requirementsText += "\n<color=#FFFF00>Press [F] to begin your journey...</color>";
         }
         else
         {

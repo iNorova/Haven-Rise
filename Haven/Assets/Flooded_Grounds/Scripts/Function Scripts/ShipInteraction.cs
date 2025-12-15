@@ -95,6 +95,20 @@ public class ShipInteraction : MonoBehaviour
     
     void Update()
     {
+        bool canInteract = IsPlayerInRange();
+        
+        // Check for F key to trigger cutscene when all parts are repaired
+        if (canInteract && AreAllPartsRepaired() && Input.GetKeyDown(KeyCode.F))
+        {
+            // Don't start cutscene if pause menu is open
+            if (PauseMenuManager.IsPauseMenuOpen())
+                return;
+            
+            Debug.Log("ShipInteraction: F key pressed - all parts repaired! Starting cutscene...");
+            StartCutscene();
+            return;
+        }
+        
         if (!isInteractable)
         {
             // Debug log why interaction is disabled
@@ -102,7 +116,6 @@ public class ShipInteraction : MonoBehaviour
             return;
         }
         
-        bool canInteract = IsPlayerInRange();
         if (canInteract && Input.GetKeyDown(interactKey))
         {
             Debug.Log("ShipInteraction: Interact key pressed.");
@@ -446,6 +459,16 @@ public class ShipInteraction : MonoBehaviour
     {
         // Override this in a derived class or use UnityEvent for custom behavior
         Debug.Log("ShipInteraction: Ship is fully repaired and ready to use!");
+    }
+    
+    private void StartCutscene()
+    {
+        // Don't start if pause menu is open
+        if (PauseMenuManager.IsPauseMenuOpen())
+            return;
+        
+        // Create and show the "To Be Continued" screen
+        ToBeContinuedScreen.Show();
     }
     
     private void PlaySfx(AudioClip clip)
