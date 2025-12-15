@@ -226,6 +226,10 @@ public class CampfireFuel : MonoBehaviour
     
     void Update()
     {
+        // Don't process input if pause menu is open
+        if (PauseMenuManager.IsPauseMenuOpen())
+            return;
+        
         // Check for wood contact continuously (throttled for performance)
         contactCheckTimer += Time.deltaTime;
         if (contactCheckTimer >= contactCheckInterval)
@@ -602,6 +606,10 @@ public class CampfireFuel : MonoBehaviour
     
     void CheckForWoodFromInventory()
     {
+        // Don't process input if pause menu is open
+        if (PauseMenuManager.IsPauseMenuOpen())
+            return;
+        
         // Check if player is near campfire and has wood selected in hotbar/inventory
         if (playerCamera == null) return;
         
@@ -713,6 +721,10 @@ public class CampfireFuel : MonoBehaviour
     
     void CheckForCookableItemsFromInventory()
     {
+        // Don't process input if pause menu is open
+        if (PauseMenuManager.IsPauseMenuOpen())
+            return;
+        
         // Check if player is near campfire and has a cookable item selected in hotbar/inventory
         if (playerCamera == null) return;
         

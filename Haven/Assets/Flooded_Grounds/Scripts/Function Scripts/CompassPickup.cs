@@ -150,12 +150,6 @@ public class CompassPickup : MonoBehaviour
         {
             TryPickupCompass();
         }
-        
-        // If compass is acquired, check for interaction to show objectives
-        if (isCompassAcquired && Input.GetKeyDown(interactKey))
-        {
-            TryShowObjectivePanel();
-        }
     }
     
     void TryPickupCompass()
@@ -236,19 +230,9 @@ public class CompassPickup : MonoBehaviour
             }
         }
         
-        Debug.Log("Compass acquired! Press F while holding compass to view objectives.");
-    }
-    
-    void TryShowObjectivePanel()
-    {
-        if (player == null || playerCamera == null)
-        {
-            return;
-        }
+        Debug.Log("Compass acquired!");
         
-        // Check if player is close enough (optional - can remove this check if you want to show objectives from anywhere)
-        // For now, we'll allow showing objectives from anywhere once compass is acquired
-        
+        // Show objective panel once when compass is acquired
         ShowObjectivePanel();
     }
     

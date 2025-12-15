@@ -68,6 +68,10 @@ public class ItemPickup : MonoBehaviour
 
     void Update()
     {
+        // Don't process input if pause menu is open
+        if (PauseMenuManager.IsPauseMenuOpen())
+            return;
+        
         if (Input.GetKeyDown(pickupKey))
         {
             if (!isHoldingItem)

@@ -306697,7 +306697,7 @@ MonoBehaviour:
     clicksPerScrew: 10
   - partName: Plywood
     requiredItemName: Plywood
-    requiredQuantity: 6
+    requiredQuantity: 1
     minigameType: 2
     numberOfKnots: 0
     numberOfKnotPairs: 3

@@ -57,6 +57,10 @@ public class ObjectInteractionController : MonoBehaviour
 
     void Update()
     {
+        // Don't process input if pause menu is open
+        if (PauseMenuManager.IsPauseMenuOpen())
+            return;
+        
         if (Input.GetMouseButtonDown(0) && Time.time >= nextHitTime)  // Left click
         {
             TryInteractWithObject();

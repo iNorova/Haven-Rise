@@ -65,6 +65,10 @@ public class HotbarManager : MonoBehaviour
 
     void Update()
     {
+        // Don't process input if pause menu is open
+        if (PauseMenuManager.IsPauseMenuOpen())
+            return;
+        
         // Select slot with 1-X (where X is hotbarSlots.Length)
         for (int i = 0; i < hotbarSlots.Length; i++)
         {

@@ -70,10 +70,100 @@ public class PauseMenuManager : MonoBehaviour
 
         if (saveButton != null) saveButton.onClick.AddListener(SaveGameOnly);
         if (loadButton != null) loadButton.onClick.AddListener(LoadGameOnly);
+        
+        // Disable buttons initially (they should only work when pause menu is open)
+        DisablePauseButtons();
+        
+        // Disable any Button components on the pause panel background to prevent accidental clicks
+        DisableBackgroundButtons();
+    }
+    
+    void DisableBackgroundButtons()
+    {
+        if (pauseMenuPanel != null)
+        {
+            // Find all Button components on the pause panel
+            Button[] buttons = pauseMenuPanel.GetComponentsInChildren<Button>(true);
+            foreach (Button btn in buttons)
+            {
+                // Skip the buttons we want to keep (saveAndMenuButton, saveButton, loadButton)
+                if (btn == saveAndMenuButton || btn == saveButton || btn == loadButton)
+                    continue;
+                
+                // Check if this button is on the background (not a child of another button)
+                // If it's directly on the pause panel or a background image, disable it
+                if (btn.transform.parent == pauseMenuPanel.transform || 
+                    btn.GetComponent<Image>() != null && btn.GetComponent<Image>().raycastTarget)
+                {
+                    // This might be a background button - remove any onClick listeners that might close the menu
+                    btn.onClick.RemoveAllListeners();
+                    Debug.Log($"[PauseMenuManager] Removed onClick listeners from background button: {btn.name}");
+                }
+            }
+        }
     }
 
     void Update()
     {
+        // Safety check: If pause panel is deactivated but we think we're paused, restore controls
+        if (isPaused && pauseMenuPanel != null && !pauseMenuPanel.activeSelf)
+        {
+            Debug.LogWarning("[PauseMenuManager] Pause panel was deactivated without ResumeGame()! Restoring controls...");
+            ResumeGame();
+            return;
+        }
+        
+        // Prevent left clicks from closing pause menu - only ESC should close it
+        if (isPaused && Input.GetMouseButtonDown(0))
+        {
+            // Check if clicking on a UI element (button, etc.)
+            UnityEngine.EventSystems.EventSystem eventSystem = UnityEngine.EventSystems.EventSystem.current;
+            if (eventSystem != null && eventSystem.IsPointerOverGameObject())
+            {
+                // Get all UI elements under the mouse
+                UnityEngine.EventSystems.PointerEventData pointerData = new UnityEngine.EventSystems.PointerEventData(eventSystem);
+                pointerData.position = Input.mousePosition;
+                var results = new System.Collections.Generic.List<UnityEngine.EventSystems.RaycastResult>();
+                eventSystem.RaycastAll(pointerData, results);
+                
+                // Check if we clicked on a valid button
+                bool clickedValidButton = false;
+                foreach (var result in results)
+                {
+                    Button btn = result.gameObject.GetComponent<Button>();
+                    if (btn != null)
+                    {
+                        // Only allow clicks on our explicitly defined buttons
+                        if (btn == saveAndMenuButton || btn == saveButton || btn == loadButton)
+                        {
+                            clickedValidButton = true;
+                            break;
+                        }
+                        // Block any other buttons (including background buttons)
+                        else
+                        {
+                            Debug.Log($"[PauseMenuManager] Blocked click on button: {btn.name} (not a valid pause menu button)");
+                            return; // Block the click - don't allow it to close the menu
+                        }
+                    }
+                }
+                
+                // If we clicked a valid button, allow it
+                if (clickedValidButton)
+                {
+                    return; // Allow button click
+                }
+                
+                // If we clicked on other UI elements (like sliders, text, etc.), allow them
+                // But make sure they don't close the menu
+                return; // Allow other UI interactions
+            }
+            
+            // Clicking on non-UI (background), completely ignore it - don't close pause menu
+            Debug.Log("[PauseMenuManager] Blocked background click - pause menu stays open");
+            return;
+        }
+        
         if (Input.GetKeyDown(KeyCode.Escape))
         {
             // Check if inventory is open first - if so, don't handle pause menu (inventory will close itself)
@@ -121,8 +211,24 @@ public class PauseMenuManager : MonoBehaviour
         pauseMenuPanel.SetActive(true);
         Time.timeScale = 0f;
 
+        // Enable pause menu buttons (they should only work when paused)
+        EnablePauseButtons();
+
+        // Disable player movement
         var motor = FindObjectOfType<CharController_Motor>();
-        if (motor != null) motor.SetInputActive(false);
+        if (motor != null)
+        {
+            motor.SetInputActive(false);
+            Debug.Log("[PauseMenuManager] Disabled player movement.");
+        }
+
+        // Disable hotbar input
+        HotbarManager hotbarManager = FindObjectOfType<HotbarManager>();
+        if (hotbarManager != null)
+        {
+            hotbarManager.SetInputActive(false);
+            Debug.Log("[PauseMenuManager] Disabled hotbar input.");
+        }
 
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
@@ -130,15 +236,115 @@ public class PauseMenuManager : MonoBehaviour
 
     public void ResumeGame()
     {
+        // Prevent multiple calls
+        if (!isPaused)
+        {
+            Debug.LogWarning("[PauseMenuManager] ResumeGame() called but game is not paused. Ignoring.");
+            return;
+        }
+        
+        Debug.Log("[PauseMenuManager] Resuming game...");
         isPaused = false;
-        pauseMenuPanel.SetActive(false);
+        
+        // Disable pause menu buttons (they should only work when paused)
+        DisablePauseButtons();
+        
+        // Set time scale first
         Time.timeScale = 1f;
+        
+        // Deactivate panel
+        if (pauseMenuPanel != null)
+        {
+            pauseMenuPanel.SetActive(false);
+        }
 
+        // Re-enable player movement
         var motor = FindObjectOfType<CharController_Motor>();
-        if (motor != null) motor.SetInputActive(true);
+        if (motor != null)
+        {
+            motor.SetInputActive(true);
+            Debug.Log("[PauseMenuManager] Re-enabled player movement.");
+        }
+        else
+        {
+            Debug.LogWarning("[PauseMenuManager] CharController_Motor not found! Cannot re-enable player movement.");
+        }
 
+        // Re-enable hotbar input
+        HotbarManager hotbarManager = FindObjectOfType<HotbarManager>();
+        if (hotbarManager != null)
+        {
+            hotbarManager.SetInputActive(true);
+            Debug.Log("[PauseMenuManager] Re-enabled hotbar input.");
+        }
+
+        // Lock cursor and hide it
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+        
+        // Force cursor lock in case it didn't work (sometimes needed)
+        StartCoroutine(ForceCursorLock());
+        
+        Debug.Log("[PauseMenuManager] Game resumed successfully.");
+    }
+    
+    void EnablePauseButtons()
+    {
+        // Enable buttons so they can be clicked when pause menu is open
+        if (saveAndMenuButton != null)
+        {
+            saveAndMenuButton.interactable = true;
+        }
+        if (saveButton != null)
+        {
+            saveButton.interactable = true;
+        }
+        if (loadButton != null)
+        {
+            loadButton.interactable = true;
+        }
+    }
+    
+    void DisablePauseButtons()
+    {
+        // Disable buttons so they can't be clicked when pause menu is closed
+        if (saveAndMenuButton != null)
+        {
+            saveAndMenuButton.interactable = false;
+        }
+        if (saveButton != null)
+        {
+            saveButton.interactable = false;
+        }
+        if (loadButton != null)
+        {
+            loadButton.interactable = false;
+        }
+    }
+    
+    void LateUpdate()
+    {
+        // Safety check: If pause panel is deactivated but we think we're paused, restore controls
+        // This catches cases where the panel is deactivated without going through ResumeGame()
+        if (isPaused && pauseMenuPanel != null && !pauseMenuPanel.activeSelf)
+        {
+            Debug.LogWarning("[PauseMenuManager] Pause panel was deactivated in LateUpdate! Restoring controls...");
+            ResumeGame();
+        }
+    }
+    
+    private System.Collections.IEnumerator ForceCursorLock()
+    {
+        // Wait a frame to ensure everything is updated
+        yield return null;
+        
+        // Force cursor lock multiple times to ensure it works
+        for (int i = 0; i < 3; i++)
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+            yield return null;
+        }
     }
 
     void OnVolumeChanged(float value)
@@ -149,6 +355,13 @@ public class PauseMenuManager : MonoBehaviour
 
 	public void SaveAndGoToMenu()
 	{
+		// Only allow this action when pause menu is actually open
+		if (!isPaused)
+		{
+			Debug.LogWarning("[PauseMenuManager] SaveAndGoToMenu() called but game is not paused. Ignoring.");
+			return;
+		}
+		
 		// Save scene name and player's current transform so Continue resumes where you left off
 		var currentScene = SceneManager.GetActiveScene().name;
 		PlayerPrefs.SetString(LastSaveSceneKey, currentScene);
@@ -217,6 +430,13 @@ public class PauseMenuManager : MonoBehaviour
     // Optional minimal save/load hooks if you wire buttons in gameplay directly
     public void SaveGameOnly()
     {
+        // Only allow this action when pause menu is actually open
+        if (!isPaused)
+        {
+            Debug.LogWarning("[PauseMenuManager] SaveGameOnly() called but game is not paused. Ignoring.");
+            return;
+        }
+        
         var currentScene = SceneManager.GetActiveScene().name;
         PlayerPrefs.SetString(LastSaveSceneKey, currentScene);
         PlayerPrefs.Save();
@@ -224,6 +444,13 @@ public class PauseMenuManager : MonoBehaviour
 
     public void LoadGameOnly()
     {
+        // Only allow this action when pause menu is actually open
+        if (!isPaused)
+        {
+            Debug.LogWarning("[PauseMenuManager] LoadGameOnly() called but game is not paused. Ignoring.");
+            return;
+        }
+        
         var sceneToLoad = PlayerPrefs.GetString(LastSaveSceneKey, string.Empty);
         if (!string.IsNullOrEmpty(sceneToLoad))
         {

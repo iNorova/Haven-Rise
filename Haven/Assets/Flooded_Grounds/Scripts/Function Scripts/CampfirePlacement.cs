@@ -130,6 +130,10 @@ public class CampfirePlacement : MonoBehaviour
 
     void Update()
     {
+        // Don't process input if pause menu is open
+        if (PauseMenuManager.IsPauseMenuOpen())
+            return;
+        
         // Cache expensive lookups - only check once per frame max
         if (hotbarManager == null)
         {
